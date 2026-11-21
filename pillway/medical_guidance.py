@@ -21,10 +21,116 @@ EMERGENCY_SIGNS = (
     "confusion",
 )
 
+ACUTE_CRISIS_KEYWORDS = [
+    {"topic": "vomiting", "keywords": ["vomiting", "throwing up"]},
+    {"topic": "nausea", "keywords": ["nausea", "nauseous"]},
+    {"topic": "abdominal pain", "keywords": ["stomach pain", "abdominal pain", "belly pain"]},
+    {"topic": "fruity breath", "keywords": [
+        "fruity breath", "sweet-smelling breath", "sweet smelling breath", "acetone breath",
+    ]},
+    {"topic": "abnormal breathing", "keywords": [
+        "heavy breathing", "deep breathing", "gasping", "short of breath",
+    ]},
+    {"topic": "mental status change", "keywords": [
+        "confused", "confusion", "disoriented", "foggy", "slurred",
+    ]},
+    {"topic": "reduced alertness", "keywords": [
+        "drowsy", "hard to wake", "lethargic", "passing out", "fainting",
+    ]},
+    {"topic": "dehydration", "keywords": [
+        "severely dehydrated", "can't keep fluids down", "cannot keep fluids down",
+    ]},
+]
+
+HYPERGLYCEMIA_SYMPTOMS = [
+    {"topic": "frequent urination", "keywords": [
+        "peeing a lot", "frequent urination", "urinating constantly",
+        "going to the bathroom every hour",
+    ]},
+    {"topic": "nighttime urination", "keywords": [
+        "waking up to pee", "peeing at night", "nocturia",
+    ]},
+    {"topic": "bedwetting", "keywords": ["bedwetting", "wetting the bed"]},
+    {"topic": "excessive thirst", "keywords": [
+        "always thirsty", "constantly thirsty", "extreme thirst",
+        "can't quench my thirst", "cannot quench my thirst", "drinking gallons",
+    ]},
+    {"topic": "dry mouth", "keywords": ["dry mouth", "cotton mouth", "parched"]},
+    {"topic": "increased hunger", "keywords": [
+        "always hungry", "starving all the time", "extreme hunger", "eating constantly",
+    ]},
+    {"topic": "unexplained weight loss", "keywords": [
+        "losing weight", "weight loss", "clothes are loose", "dropping pounds",
+    ], "requires_any": ["without trying", "unexplained", "unintentional"]},
+    {"topic": "fatigue or weakness", "keywords": [
+        "exhausted", "fatigued", "no energy", "drained", "always tired", "weak",
+    ]},
+    {"topic": "vision changes", "keywords": [
+        "blurry vision", "blurred vision", "fuzzy vision", "trouble focusing",
+        "eyesight changing",
+    ]},
+    {"topic": "yeast infection or thrush", "keywords": ["yeast infection", "thrush"]},
+    {"topic": "urinary infection", "keywords": [
+        "uti", "urinary tract infection", "bladder infection",
+    ]},
+    {"topic": "slow healing", "keywords": [
+        "slow healing", "cuts won't heal", "cuts will not heal", "sores won't heal",
+        "sores will not heal", "scabs taking forever",
+    ]},
+    {"topic": "skin infection", "keywords": ["skin infection", "boils"]},
+    {"topic": "tingling or numbness", "keywords": [
+        "tingling", "pins and needles", "numbness", "numb", "burning feet", "burning hands",
+    ]},
+    {"topic": "dark or velvety skin patches", "keywords": [
+        "dark patches", "velvety skin", "dark neck", "dark armpits",
+    ]},
+]
+
+DIABETES_RISK_FACTORS = [
+    {"topic": "prediabetes or elevated glucose history", "keywords": [
+        "prediabetes", "pre-diabetes", "borderline diabetes", "high sugar", "impaired glucose",
+    ]},
+    {"topic": "pregnancy-related history", "keywords": [
+        "gestational diabetes", "diabetes during pregnancy", "pregnancy diabetes",
+        "big baby", "heavy baby", "9 pound baby", "9-pound baby",
+        "10 pound baby", "10-pound baby", "macrosomia",
+    ]},
+    {"topic": "PCOS", "keywords": ["pcos", "polycystic ovary"]},
+    {"topic": "other health history", "keywords": [
+        "high blood pressure", "hypertension", "high cholesterol", "high triglycerides",
+        "low hdl", "heart disease", "stroke", "heart attack", "vascular disease",
+        "pancreatitis", "pancreas", "fatty liver",
+    ]},
+    {"topic": "medication history", "keywords": [
+        "prednisone", "steroids", "corticosteroids", "dexamethasone", "antipsychotic",
+        "olanzapine", "quetiapine", "risperidone", "aripiprazole", "clozapine",
+        "statin", "atorvastatin", "rosuvastatin", "lipitor", "crestor", "hiv meds",
+        "hiv medication", "antiretroviral", "antiretroviral meds", "immunosuppressant",
+        "anti-rejection", "tacrolimus", "cyclosporine",
+    ]},
+    {"topic": "family history", "keywords": [
+        "family history", "runs in the family", "mom has diabetes", "mum has diabetes",
+        "mother has diabetes", "dad has diabetes", "father has diabetes",
+        "parent has diabetes", "sibling has diabetes", "brother has diabetes",
+        "sister has diabetes",
+    ]},
+    {"topic": "weight or activity history", "keywords": [
+        "overweight", "obese", "belly fat", "gained weight", "high bmi",
+    ]},
+    {"topic": "smoking history", "keywords": ["smoker", "smoking", "cigarettes"]},
+    {"topic": "background associated with higher population risk", "keywords": [
+        "indigenous", "first nations", "métis", "metis", "inuit", "south asian",
+        "asian", "african", "black", "arab", "hispanic", "latino",
+    ]},
+]
+
 MEDICAL_KEYWORDS = [
     {
         "topic": "blood sugar",
-        "keywords": ["blood sugar", "glucose", "a1c", "diabetes", "insulin", "hypoglyc", "hyperglyc"],
+        "keywords": [
+            "blood sugar", "high sugar", "glucose", "a1c", "diabetes", "insulin",
+            "hypoglyc", "hyperglyc",
+        ],
         "response": (
             "The care-plan notes you shared recommend recording glucose regularly and checking A1C "
             "about every 3 months; they list an A1C target of 6.5%. Your own clinician may set a "
@@ -48,8 +154,12 @@ MEDICAL_KEYWORDS = [
             "emergency help."
         ),
         "follow_ups": (
-            "Do you have a recent reading, and is it usual for you?",
-            "Are you having any symptoms along with the reading?",
+            "How are you feeling right now, any symptoms, or do you feel concerned it may be high? "
+            "If you have a blood-pressure cuff, please check it and share the numbers. Blood pressure "
+            "can be high without noticeable symptoms, so don't rely on feeling alone.",
+            "Do you feel unwell or have any symptoms, or are you worried it may be high? If a cuff "
+            "is available, take a reading according to its instructions and tell me the result. "
+            "Feeling normal can't rule out high blood pressure.",
         ),
     },
     {
@@ -120,6 +230,26 @@ GREETINGS = (
     "hello", "hi", "hey", "howdy", "yo", "what's up", "whats up",
     "good morning", "good afternoon", "good evening",
 )
+
+HYPERGLYCEMIA_FOLLOW_UPS = (
+    "Have you checked your blood glucose recently, and when did these symptoms start?",
+    "Have you had an A1C or glucose check lately? Are the symptoms getting worse?",
+    "How long has this been happening, and have you discussed it with your care team?",
+)
+
+RISK_FOLLOW_UPS = (
+    "A clinician can assess your overall risk and decide whether glucose or A1C screening is appropriate. Have you discussed this with your care team?",
+    "This doesn't mean you have diabetes. Would you like help preparing questions about screening for your clinician?",
+    "Risk factors are only one part of an assessment. A healthcare professional can help decide whether testing makes sense for you.",
+)
+
+CARE_PLAN_REFERENCE = [
+    ("Blood glucose", "Monitor and record as directed; the supplied plan lists A1C every 3 months and a 6.5% target."),
+    ("Blood pressure", "The supplied plan lists a resting target below 130/80 mmHg and regular checks."),
+    ("Cholesterol", "The supplied plan lists LDL below 2.0 mmol/L or a 50% reduction from baseline."),
+    ("Medication", "Take medicines as prescribed; discuss side effects or any change with the care team."),
+    ("Activity", "The supplied plan suggests 150 minutes of weekly activity and two resistance sessions."),
+]
 
 WELLNESS_REPLIES = {
     "good": "Glad to hear that. Is there a health concern or care-plan topic you'd like help with?",

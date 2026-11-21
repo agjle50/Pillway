@@ -3,8 +3,9 @@
 import ctypes
 import sys
 import tkinter as tk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox, simpledialog
 
+from .chat_history import ChatHistoryStore
 from .constants import (
     BASE_H,
     BASE_W,
@@ -26,6 +27,7 @@ from .constants import (
 )
 from .icons import IconMixin
 from .medical_robot import MedicalRobot
+from .profile_store import ProfileStore
 from .views import DashboardViewMixin, SettingsViewMixin
 
 
@@ -63,19 +65,41 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
         self.status = ""              # small message under Check up bars
         self.prescriptions = []
         self.notifications = list(NOTIFICATIONS)
+        self.profile_status = ""
+        self.doctor_status = ""
+        self.doctor_section = "User account information"
+        self.profile_store = ProfileStore()
+        stored_profiles = self.profile_store.load()
+        self.profiles = {profile["id"]: profile for profile in stored_profiles}
+        patient_ids = [profile_id for profile_id, profile in self.profiles.items()
+                       if profile["role"] == "Patient"]
+        self.active_profile_id = "patient" if "patient" in patient_ids else patient_ids[0]
+        self.selected_patient_id = patient_ids[0]
+        self.chat_history = ChatHistoryStore(self.profiles)
+        self.chat_logs = self.chat_history.load()
+        self.chat_messages = self.chat_logs[self.active_profile_id]
+        self.medical_robots = {
+            profile_id: MedicalRobot()
+            for profile_id, profile in self.profiles.items()
+            if profile["role"] == "Patient"
+        }
         self.prescription_flow = False
         self.prescription_stage = None
         self.prescription_photo = ""
         self.prescription_draft = ""
         self.prescription_entry = None
         self.chat_open = False
-        self.chat_messages = []
-        self.medical_robot = MedicalRobot()
+        self.call_open = False
+        self.medical_robot = self.medical_robots[self.active_profile_id]
         self.chat_draft = ""
+        self.chat_focus_requested = False
         self.chat_entry = None
         self.chat_view_frame = None
         self.chat_message_canvas = None
         self.chat_scrollbar = None
+        self.doctor_tabs_frame = None
+        self.doctor_log_frame = None
+        self.profiles_view_frame = None
         self.chat_placeholder = "TYPE YOUR MESSAGE..."
         self.tasks = [                # alarm-style reminders
             ["8:00", "AM", "Check blood sugar", True],
@@ -117,11 +141,14 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
     def render(self):
         self._job = None
         c = self.c
+        restore_chat_focus = self.chat_focus_requested
+        self.chat_focus_requested = False
         if self.prescription_entry and self.prescription_entry.winfo_exists():
             self.prescription_draft = self.prescription_entry.get()
             self.prescription_entry.destroy()
             self.prescription_entry = None
         if self.chat_entry and self.chat_entry.winfo_exists():
+            restore_chat_focus = restore_chat_focus or self.focus_get() == self.chat_entry
             current_text = self.chat_entry.get()
             self.chat_draft = "" if current_text == self.chat_placeholder else current_text
             self.chat_entry.destroy()
@@ -129,6 +156,11 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
         if self.chat_view_frame and self.chat_view_frame.winfo_exists():
             self.chat_view_frame.destroy()
         self.chat_view_frame = None
+        for attribute in ("doctor_tabs_frame", "doctor_log_frame", "profiles_view_frame"):
+            frame = getattr(self, attribute)
+            if frame and frame.winfo_exists():
+                frame.destroy()
+            setattr(self, attribute, None)
         self.chat_message_canvas = None
         self.chat_scrollbar = None
         c.delete("all")
@@ -140,15 +172,30 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
         self.draw_sidebar()
         self.draw_header()
         if self.section == "Dashboard":
-            self.draw_dashboard()
+            if self.profiles[self.active_profile_id]["role"] == "Doctor":
+                self.draw_doctor_dashboard()
+            else:
+                self.draw_dashboard()
         elif self.section == "Settings":
             self.draw_settings()
+        elif self.section == "Manage profiles":
+            self.draw_manage_profiles()
         else:
             self.draw_placeholder_page(self.section)
         if self.dropdown:
             self.draw_dropdown()
+        if restore_chat_focus and self.chat_open and self.chat_entry:
+            self.chat_entry.focus_set()
+            self.chat_focus_in()
+            self.chat_entry.icursor(tk.END)
 
     def draw_sidebar(self):
+        if (
+            self.section == "Dashboard"
+            and self.profiles[self.active_profile_id]["role"] == "Doctor"
+        ):
+            self.draw_doctor_sidebar()
+            return
         c, s, sw, h = self.c, self.s, self.sw, self.h
         c.create_rectangle(0, 0, sw, h, fill=NAVY, outline=NAVY)
         c.create_rectangle(0, 0, sw, self.S(100), fill=NAVY_DARK, outline=NAVY_DARK)
@@ -177,6 +224,12 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
             y += row_h
 
     def draw_header(self):
+        if (
+            self.section == "Dashboard"
+            and self.profiles[self.active_profile_id]["role"] == "Doctor"
+        ):
+            self.draw_doctor_header()
+            return
         c, w = self.c, self.w
         top = self.S(18)
         size = self.S(54)
@@ -223,9 +276,42 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
         self.section = section
         self.dropdown = None
         self.chat_open = False
+        self.call_open = False
         if section == "Dashboard":
             self.select_tab(self.tab)
             return
+        self.render()
+
+    def switch_profile(self, profile_id):
+        if profile_id not in self.profiles:
+            raise ValueError(f"Unknown profile: {profile_id}")
+        self.chat_history.save(self.chat_logs)
+        self.active_profile_id = profile_id
+        self.chat_messages = self.chat_logs[profile_id]
+        if self.profiles[profile_id]["role"] == "Doctor":
+            patients = [key for key, profile in self.profiles.items()
+                        if profile["role"] == "Patient"]
+            if self.selected_patient_id not in patients:
+                self.selected_patient_id = patients[0]
+        else:
+            self.medical_robot = self.medical_robots[profile_id]
+        self.chat_open = False
+        self.call_open = False
+        self.chat_draft = ""
+        self.section = "Dashboard"
+        self.dropdown = None
+        self.status = ""
+        self.render()
+
+    def open_profile_chat(self):
+        if self.profiles[self.active_profile_id]["role"] != "Patient":
+            raise RuntimeError("The Doctor profile has no chatbot.")
+        self.call_open = False
+        if not self.chat_messages:
+            self.chat_messages.append(("Juliez", self.medical_robot.greeting()))
+            self.chat_history.save(self.chat_logs)
+        self.chat_open = True
+        self.dropdown = None
         self.render()
 
     def toggle_dropdown(self, which):
@@ -239,6 +325,7 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
     def select_tab(self, name):
         self.tab = name
         self.chat_open = False
+        self.call_open = False
         self.dropdown = None
         self.status = ""
         if name == "Check up":
@@ -263,18 +350,24 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
 
     def checkup_choice(self, kind):
         if kind == "Chat":
-            if not self.chat_messages:
-                self.chat_messages.append(("Sarah", self.medical_robot.greeting()))
-            self.chat_open = True
-            self.dropdown = None
+            self.open_profile_chat()
+            return
+        if kind == "Call":
+            self.call_open = True
+            self.chat_open = False
+            self.status = ""
             self.render()
             return
-        self.status = ("Connecting you to a pharmacist..." if kind == "Call"
-                       else "Opening a chat with your care assistant...")
+        self.status = "Opening a chat with your care assistant..."
+        self.render()
+
+    def close_call_preview(self):
+        self.call_open = False
         self.render()
 
     def close_chat(self):
         self.chat_open = False
+        self.call_open = False
         self.chat_draft = ""
         self.render()
 
@@ -289,14 +382,204 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
             self.chat_entry.configure(fg=TEXT_MUTED)
 
     def send_chat_message(self, _event=None):
+        if self.profiles[self.active_profile_id]["role"] != "Patient":
+            raise RuntimeError("The Doctor profile cannot send chatbot messages.")
         message = self.chat_entry.get().strip() if self.chat_entry else ""
         if not message or message == self.chat_placeholder:
             return
         self.chat_messages.append(("You", message))
-        self.chat_messages.append(("Sarah", self.medical_robot.reply(message)))
+        self.chat_messages.append(("Juliez", self.medical_robot.reply(message)))
+        self.chat_history.save(self.chat_logs)
         if self.chat_entry:
             self.chat_entry.delete(0, tk.END)
         self.chat_draft = ""
+        self.chat_focus_requested = True
+        self.render()
+
+    def select_doctor_patient(self, profile_id):
+        profile = self.profiles.get(profile_id)
+        if not profile or profile["role"] != "Patient":
+            raise ValueError(f"Unknown patient profile: {profile_id}")
+        self.selected_patient_id = profile_id
+        self.render()
+
+    def select_doctor_section(self, section):
+        if section not in self.doctor_sections:
+            raise ValueError(f"Unknown care-plan section: {section}")
+        self.doctor_section = section
+        self.render()
+
+    def save_doctor_workspace(self):
+        try:
+            self.profile_store.save(list(self.profiles.values()))
+            self.chat_history.save(self.chat_logs)
+        except OSError as error:
+            self.doctor_status = f"Could not save local care-plan data: {error}"
+            self.render()
+            return
+        self.doctor_status = "Local demo profiles and chat logs saved."
+        self.render()
+
+    def add_patient_profile(self):
+        name = simpledialog.askstring(
+            "Add patient",
+            "Enter a name for this local demo patient profile:",
+            parent=self,
+        )
+        if name is None:
+            return
+        try:
+            profile = ProfileStore.new_patient(name)
+        except ValueError:
+            self.profile_status = "Enter a patient name to add the profile."
+            self.render()
+            return
+        self.profiles[profile["id"]] = profile
+        self.profile_store.save(list(self.profiles.values()))
+        self.chat_logs[profile["id"]] = []
+        self.chat_history = ChatHistoryStore(self.profiles, self.chat_history.path)
+        self.chat_history.save(self.chat_logs)
+        self.medical_robots[profile["id"]] = MedicalRobot()
+        self.selected_patient_id = profile["id"]
+        self.profile_status = f"{name.strip()} added as a local demo patient."
+        self.render()
+
+    def delete_profile(self, profile_id):
+        profile = self.profiles.get(profile_id)
+        if not profile:
+            raise ValueError(f"Unknown profile: {profile_id}")
+        role_ids = [
+            key for key, item in self.profiles.items() if item["role"] == profile["role"]
+        ]
+        if len(role_ids) <= 1:
+            self.profile_status = f"The last {profile['role'].lower()} profile cannot be deleted."
+            self.render()
+            return
+        confirmed = messagebox.askyesno(
+            "Delete profile",
+            f"Delete {profile['name']} and permanently remove their saved chat log?",
+            parent=self,
+            default=messagebox.NO,
+        )
+        if not confirmed:
+            return
+
+        remaining_profiles = {
+            key: value for key, value in self.profiles.items() if key != profile_id
+        }
+        remaining_logs = {
+            key: value for key, value in self.chat_logs.items() if key != profile_id
+        }
+        scrubbed_logs = dict(self.chat_logs)
+        scrubbed_logs[profile_id] = []
+        scrubbed_store = ChatHistoryStore(self.profiles, self.chat_history.path)
+        try:
+            scrubbed_store.save(scrubbed_logs)
+        except OSError as error:
+            messagebox.showerror(
+                "Could not delete chat history",
+                f"The profile was not deleted because its chat history could not be cleared:\n{error}",
+                parent=self,
+            )
+            return
+        self.chat_logs = scrubbed_logs
+        self.chat_history = scrubbed_store
+        if self.active_profile_id == profile_id:
+            self.chat_messages = scrubbed_logs[profile_id]
+        try:
+            self.profile_store.save(list(remaining_profiles.values()))
+        except OSError as error:
+            self.profile_status = "The chat log was cleared, but the profile could not be deleted."
+            messagebox.showerror(
+                "Profile deletion incomplete",
+                f"The chat log was cleared, but the profile file could not be updated:\n{error}",
+                parent=self,
+            )
+            self.render()
+            return
+
+        self.profiles = remaining_profiles
+        self.chat_logs = remaining_logs
+        history_store = ChatHistoryStore(remaining_profiles, self.chat_history.path)
+        self.chat_history = history_store
+        self.medical_robots.pop(profile_id, None)
+        self.selected_patient_id = (
+            self.selected_patient_id if self.selected_patient_id in remaining_profiles
+            else next(key for key, item in remaining_profiles.items() if item["role"] == "Patient")
+        )
+        role_ids = [key for key, item in self.profiles.items() if item["role"] == profile["role"]]
+        if self.active_profile_id == profile_id:
+            self.active_profile_id = role_ids[0]
+            self.chat_messages = self.chat_logs[self.active_profile_id]
+            if profile["role"] == "Patient":
+                self.medical_robot = self.medical_robots[self.active_profile_id]
+            self.section = "Dashboard"
+        try:
+            self.chat_history.save(self.chat_logs)
+        except OSError as error:
+            self.profile_status = "Profile and chat were deleted; local chat index cleanup failed."
+            messagebox.showerror(
+                "Chat index cleanup failed",
+                f"The chat messages were cleared, but the local chat file could not be fully updated:\n{error}",
+                parent=self,
+            )
+            self.render()
+            return
+        self.profile_status = f"{profile['name']} and their chat log were deleted."
+        self.render()
+
+    def delete_patient_profile(self, profile_id):
+        self.delete_profile(profile_id)
+
+    def delete_all_local_data(self):
+        confirmed = messagebox.askyesno(
+            "Delete all local Pillway data",
+            "Permanently delete all saved profiles and chat logs from this PC? "
+            "This removes the local profiles.json and chat_history.json files. "
+            "Built-in demo accounts will be restored afterward.",
+            parent=self,
+            default=messagebox.NO,
+        )
+        if not confirmed:
+            return
+
+        paths = (
+            self.profile_store.path,
+            self.profile_store.path.with_name(self.profile_store.path.name + ".tmp"),
+            self.chat_history.path,
+            self.chat_history.path.with_name(self.chat_history.path.name + ".tmp"),
+        )
+        try:
+            for path in paths:
+                if path.exists():
+                    path.unlink()
+        except OSError as error:
+            messagebox.showerror(
+                "Could not delete all local data",
+                f"Some files may already have been deleted. Fix the file access issue and retry:\n{error}",
+                parent=self,
+            )
+            return
+
+        self.profiles = {profile["id"]: profile for profile in self.profile_store.load()}
+        self.chat_history = ChatHistoryStore(self.profiles, self.chat_history.path)
+        self.chat_logs = self.chat_history.load()
+        patient_ids = [key for key, item in self.profiles.items() if item["role"] == "Patient"]
+        self.active_profile_id = patient_ids[0]
+        self.selected_patient_id = patient_ids[0]
+        self.chat_messages = self.chat_logs[self.active_profile_id]
+        self.medical_robots = {
+            key: MedicalRobot()
+            for key, item in self.profiles.items()
+            if item["role"] == "Patient"
+        }
+        self.medical_robot = self.medical_robots[self.active_profile_id]
+        self.profile_status = "Saved profiles and chat logs deleted; built-in demo accounts restored."
+        self.doctor_status = ""
+        self.chat_open = False
+        self.call_open = False
+        self.chat_draft = ""
+        self.dropdown = None
         self.render()
 
     def copy_chat_message(self, message):
