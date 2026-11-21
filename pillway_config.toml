@@ -1,0 +1,206 @@
+# =============================================================================
+#  PILLWAY SETTINGS  (the ONE settings file for everyone on the team)
+# =============================================================================
+#  How to use this file:
+#    * Change a value, save, and restart the app (python Pillway.py).
+#    * Text goes in "quotes". true/false have no quotes. Numbers have no quotes.
+#    * Lines starting with # are notes for humans; the app ignores them.
+#    * Check your changes with:   python Pillway.py --check-config
+#
+#  NEVER put your API key in this file. This file is shared on GitHub.
+#  Your key goes in pillway_config.local.toml (see pillway_config.local.example.toml).
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+#  [ai]  The settings people change most: which AI model does which job.
+# -----------------------------------------------------------------------------
+[ai]
+# Which company's AI to use. Only "anthropic" is supported right now.
+provider = "anthropic"
+
+# One model per job. Change any one line to switch that job's model.
+# Allowed model names (what each is good for):
+#   "claude-opus-5-5"    smartest, slower, most expensive  (best for chat and care plans)
+#   "claude-sonnet-5-5"  balanced speed and quality        (good for summaries)
+#   "claude-haiku-5-5"   fastest and cheapest               (good for safety checks, dev work)
+# Tip for cheap development: set all four to "claude-haiku-5-5".
+chat_model = "claude-opus-5-5"        # Sarah's replies to the patient
+flag_model = "claude-haiku-5-5"       # layer 2 safety check on every patient message (must be fast)
+care_plan_model = "claude-opus-5-5"   # writes the lifestyle parts of the care plan
+summary_model = "claude-sonnet-5-5"   # recaps for the pharmacist and weekly summaries
+
+# How creative the AI is: 0.0 = very consistent, 1.0 = very varied. Example: 0.3
+temperature = 0.3
+# Longest reply the AI may write (in "tokens", about 3/4 of a word each). Example: 900
+max_tokens = 900
+# Give up on an AI call after this many seconds, then use the offline reply. Example: 20
+timeout_seconds = 20
+# How many times to retry a failed AI call (0 to 3). Example: 1
+retries = 1
+
+# true = no AI at all: Sarah uses scripted, offline replies (perfect for the stage demo).
+# The app also switches to this automatically if there is no API key or the internet drops.
+demo_mode = false
+# true = an AI double-checks every patient message for danger signs (layer 2). Keep true.
+ai_safety_layer_enabled = true
+# true = names, phone numbers, emails, health card numbers are removed before anything goes to the AI. Keep true.
+deidentify_before_ai = true
+# true = reuse Sarah's long instructions between calls (faster and cheaper). Keep true.
+prompt_caching = true
+# The name of the environment variable that holds the API key.
+api_key_env_var = "ANTHROPIC_API_KEY"
+
+
+# -----------------------------------------------------------------------------
+#  [safety]  Danger thresholds.  ALL VALUES ARE PLACEHOLDERS: confirm with Pillway.
+# -----------------------------------------------------------------------------
+[safety]
+# Blood sugar in mmol/L. Diabetes Canada calls below 3.9 "low". (confirm with Pillway)
+blood_sugar_low = 3.9          # below this = URGENT (Tier 1)
+blood_sugar_high = 14.0        # at or above this = WATCH (Tier 2)   (confirm with Pillway)
+blood_sugar_very_high = 20.0   # at or above this = URGENT (Tier 1)  (confirm with Pillway)
+# Blood pressure in mmHg (top number / bottom number). (confirm with Pillway)
+bp_systolic_urgent = 180       # top number at or above this = URGENT
+bp_diastolic_urgent = 110      # bottom number at or above this = URGENT
+bp_systolic_watch = 160        # top number at or above this = WATCH
+bp_diastolic_watch = 100       # bottom number at or above this = WATCH
+bp_systolic_low = 90           # top number below this = WATCH (can cause dizziness)
+# A patient who misses this many days of check-ins jumps to the top of the pharmacist's list.
+missed_check_in_days = 2
+# Editable lists (open these in any text editor):
+buzzwords_file = "data/buzzwords.json"   # danger words, by tier
+questions_file = "data/questions.json"   # the questions Sarah asks, in order
+
+
+# -----------------------------------------------------------------------------
+#  [pharmacist]  How the pharmacist side works.
+# -----------------------------------------------------------------------------
+[pharmacist]
+# true = every AI care plan waits for a pharmacist to approve it (Pillway wants to compare both).
+pharmacist_review_required = true
+# Which filter the dashboard opens with: "All", "ACTIVE" or "WATCHING".
+default_filter = "All"
+# How patient tiles are sorted: "Needs attention" (flags first) or "Name".
+default_sort = "Needs attention"
+# "comfortable" (big tiles) or "compact" (small tiles). The pharmacist's choice is remembered.
+default_view = "comfortable"
+# How urgent flags reach the pharmacist. Only "dashboard" works for now (email/SMS: Phase 2).
+alert_method = "dashboard"
+# A patient counts as ACTIVE (green "live" dot) if they sent a message in the last N seconds.
+active_window_seconds = 180
+# Made-up login shown on the sign-in screen (no real accounts in this demo).
+demo_username = "pharmacist"
+demo_password = "demo"
+
+
+# -----------------------------------------------------------------------------
+#  [patient]  What the patient sees.
+# -----------------------------------------------------------------------------
+[patient]
+# Starting language: "en" (English) or "fr" (French). There is always a toggle on screen.
+default_language = "en"
+# Show the "Read aloud" button on Sarah's messages.
+read_aloud = true
+# Show the microphone button in the chat.
+voice_input = true
+# Text size: 1.0 = normal, 1.3 = 30% bigger. Between 0.8 and 1.6.
+text_size = 1.0
+# Show tap-to-answer buttons under Sarah's questions.
+quick_replies = true
+# Most questions Sarah asks in one check-in (the demo is quicker with 4).
+max_questions_per_check_in = 8
+demo_username = "maria"
+demo_password = "demo"
+
+
+# -----------------------------------------------------------------------------
+#  [french]  Canadian French text.
+# -----------------------------------------------------------------------------
+[french]
+# Show a small "Translation: needs review" / "Translation reviewed" label in the app.
+show_translation_review_status = true
+# Every French string lives here, so a French speaker can review it.
+french_strings_file = "data/french_strings.json"
+
+
+# -----------------------------------------------------------------------------
+#  [call]  Check up -> Call (talk to Sarah by voice).
+# -----------------------------------------------------------------------------
+[call]
+call_enabled = true
+# "vosk" = offline speech-to-text on this computer (downloads a ~40 MB model once).
+# "none" = no microphone; the call uses the scripted demo lines.
+speech_to_text_engine = "vosk"
+# Leave blank to use the computer's default microphone. Or type part of its name, like "USB".
+microphone_device = ""
+# "hold_to_talk" (press and hold the big button; most reliable) or "continuous".
+listening_mode = "hold_to_talk"
+# How jumpy the green voice meter is. 1.0 = normal, 2.0 = more sensitive.
+voice_meter_sensitivity = 1.0
+# Sarah's speaking voice (leave blank for the computer's default) and speed (words per minute).
+sarah_voice = ""
+sarah_speech_rate = 165
+
+
+# -----------------------------------------------------------------------------
+#  [check_ins]  Daily and weekly check-ins. Reminders are NEVER about medication.
+# -----------------------------------------------------------------------------
+[check_ins]
+daily_check_in_time = "19:00"
+weekly_summary_day = "Sunday"
+weekly_summary_time = "18:00"
+# No reminders between these times.
+quiet_hours_start = "21:30"
+quiet_hours_end = "08:00"
+# false = reminders stay off until the patient says yes (required by CASL).
+reminders_opt_in_default = false
+check_in_messages_file = "data/check_in_messages.json"
+
+
+# -----------------------------------------------------------------------------
+#  [branding]  Re-skin the app when Pillway sends brand colours.
+# -----------------------------------------------------------------------------
+[branding]
+app_name = "Pillway"
+assistant_name = "Sarah"
+pharmacy_name = "Pillway"
+navy = "#0a0f42"
+navy_dark = "#080c38"
+red = "#ef3f3f"
+text_dark = "#4a566f"
+text_muted = "#768197"
+border = "#dde2ea"
+logo_path = ""
+
+
+# -----------------------------------------------------------------------------
+#  [demo]  Made-up patients and the pitch numbers.
+# -----------------------------------------------------------------------------
+[demo]
+seed_patients_file = "data/seed_patients.json"
+# Which made-up patients appear. Add "james", "priya", "luc" to show more tiles.
+visible_patients = ["maria"]
+# Fake step and watch data on the pharmacist side (labelled "Phase 2").
+fake_watch_data = true
+# Pitch estimate: 100 plans x 6 follow-ups x 10-15 minutes = 100-150 pharmacist hours a month.
+plans_per_month = 100
+follow_ups_per_plan = 6
+minutes_per_follow_up_low = 10
+minutes_per_follow_up_high = 15
+
+
+# -----------------------------------------------------------------------------
+#  [storage]  Where the app saves data on this computer.
+# -----------------------------------------------------------------------------
+[storage]
+# Leave blank for the normal place (Windows: AppData\Local\Pillway, Mac: ~/Library/Application Support/Pillway).
+data_folder = ""
+
+
+# -----------------------------------------------------------------------------
+#  [dev]  For developers.
+# -----------------------------------------------------------------------------
+[dev]
+# true = print AI reply timings and extra details in the terminal.
+dev_mode = false

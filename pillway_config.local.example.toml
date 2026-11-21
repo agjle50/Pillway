@@ -1,0 +1,24 @@
+# =============================================================================
+#  YOUR PERSONAL SETTINGS (example)
+# =============================================================================
+#  1. Copy this file and name the copy:   pillway_config.local.toml
+#     (just remove ".example" from the name)
+#  2. Paste your Anthropic API key between the quotes below.
+#     Get one at https://console.anthropic.com (API usage is billed separately
+#     from a claude.ai chat subscription).
+#  3. Save and run:  python Pillway.py --check-config
+#
+#  pillway_config.local.toml is listed in .gitignore, so it is never committed.
+#  Anything you set here overrides pillway_config.toml, just for you.
+# =============================================================================
+
+[ai]
+api_key = ""
+
+# Optional: cheaper models while you develop (uncomment by removing the #).
+# chat_model = "claude-haiku-5-5"
+# care_plan_model = "claude-haiku-5-5"
+# summary_model = "claude-haiku-5-5"
+
+# Optional: always use the offline demo on your laptop.
+# demo_mode = true
