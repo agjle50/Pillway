@@ -14,7 +14,7 @@ PATTERNS = [
     ("[email]", re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")),
     ("[health card]", re.compile(r"\b\d{4}[- ]?\d{3}[- ]?\d{3}(?:[- ]?[A-Za-z]{2})?\b")),
     ("[health card]", re.compile(r"\b[A-Z]{4}[- ]?\d{4}[- ]?\d{4}\b")),
-    ("[phone]", re.compile(r"(?:\+?1[ .-]?)?\(?\b\d{3}\)?[ .-]?\d{3}[ .-]?\d{4}\b")),
+    ("[phone]", re.compile(r"(?:\+?1[ .-]?)?\(?\b\d{3}\)?[ .-]?\d{3}[ .-]?\d{4}\b\)?")),
     ("[postal code]", re.compile(r"\b[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d\b")),
     ("[date]", re.compile(r"\b(?:19|20)\d{2}[-/](?:0?[1-9]|1[0-2])[-/](?:0?[1-9]|[12]\d|3[01])\b")),
     ("[address]", re.compile(r"\b\d{1,5}\s+(?:[A-Z][a-z]+\s){1,3}(?:St|Street|Ave|Avenue|Rd|Road|Blvd|Dr|Drive|Cres|Crescent|Way|Lane|Ln|Court|Ct|rue)\b\.?", re.IGNORECASE)),
