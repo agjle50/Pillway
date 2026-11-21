@@ -1,0 +1,19 @@
+{
+  "_about": "Daily and weekly check-in messages. One topic per week, like Pillway's follow-up calls. The pharmacist can override any message per patient in the app. Reminders are NEVER about medication.",
+  "weekly_topics": [
+    {"id": "fibre", "en": "Fibre week", "fr": "Semaine des fibres",
+     "daily_en": "Hi {first_name}, quick fibre check-in: did you have a high-fibre food today, like oats, beans or berries?",
+     "daily_fr": "Bonjour {first_name}, petit suivi sur les fibres : avez-vous mangé un aliment riche en fibres aujourd'hui, comme de l'avoine, des légumineuses ou des petits fruits?"},
+    {"id": "foot_care", "en": "Foot care week", "fr": "Semaine des soins des pieds",
+     "daily_en": "Hi {first_name}, did you check your feet today? Tell me if you notice any sore, cut, blister or numbness.",
+     "daily_fr": "Bonjour {first_name}, avez-vous vérifié vos pieds aujourd'hui? Dites-moi si vous remarquez une plaie, une coupure, une ampoule ou de l'engourdissement."},
+    {"id": "activity", "en": "Activity week", "fr": "Semaine de l'activité",
+     "daily_en": "Hi {first_name}, how many minutes did you walk or move today?",
+     "daily_fr": "Bonjour {first_name}, combien de minutes avez-vous marché ou bougé aujourd'hui?"},
+    {"id": "blood_pressure", "en": "Blood pressure week", "fr": "Semaine de la tension artérielle",
+     "daily_en": "Hi {first_name}, if you checked your blood pressure today, what were the two numbers?",
+     "daily_fr": "Bonjour {first_name}, si vous avez mesuré votre tension artérielle aujourd'hui, quels étaient les deux chiffres?"}
+  ],
+  "weekly_summary_en": "Your week: {check_ins} check-ins, {tasks_done} tasks done. Topic this week: {topic}.",
+  "weekly_summary_fr": "Votre semaine : {check_ins} suivis, {tasks_done} tâches faites. Sujet de la semaine : {topic}."
+}

@@ -108,8 +108,8 @@ voice_input = true
 text_size = 1.0
 # Show tap-to-answer buttons under Sarah's questions.
 quick_replies = true
-# Most questions Sarah asks in one check-in (the demo is quicker with 4).
-max_questions_per_check_in = 8
+# Most questions Sarah asks in one check-in (there are 10 in data/questions.json; the demo is quicker with 4).
+max_questions_per_check_in = 10
 demo_username = "maria"
 demo_password = "demo"
 

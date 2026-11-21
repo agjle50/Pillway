@@ -1,0 +1,206 @@
+{
+  "_about": "The questions Sarah asks, ONE at a time, in this order. Edit wording freely. 'fr' text is machine-written Canadian French: needs review by a French speaker. 'skip_if' hides a question for some patients (e.g. smoking question only for smokers). The protein question is always asked BEFORE any protein advice (that rule is in code: core/conversation_flow.py).",
+  "intro": {
+    "summary_en": "From your questionnaire, it looks like you're managing {conditions}. Your last blood pressure reading was {last_bp}, {smoking_text}, and you're taking {medications}.",
+    "summary_fr": "D'après votre questionnaire, vous gérez {conditions}. Votre dernière mesure de tension artérielle était de {last_bp}, {smoking_text}, et vous prenez {medications}.",
+    "changes_en": "Are there any changes since you filled this in?",
+    "changes_fr": "Y a-t-il eu des changements depuis que vous l'avez rempli?",
+    "changes_quick_en": [
+      "No changes",
+      "Yes, something changed"
+    ],
+    "changes_quick_fr": [
+      "Aucun changement",
+      "Oui, quelque chose a changé"
+    ],
+    "wrap_up_en": "Is there anything else you'd like to tell me?",
+    "wrap_up_fr": "Y a-t-il autre chose que vous aimeriez me dire?",
+    "wrap_up_quick_en": [
+      "No, that's all",
+      "Yes"
+    ],
+    "wrap_up_quick_fr": [
+      "Non, c'est tout",
+      "Oui"
+    ]
+  },
+  "questions": [
+    {
+      "id": "diet",
+      "topic": "diet",
+      "care_plan_section": "pharmacist_identified_goals",
+      "en": "Let's talk about food. How do you feel about what you eat day to day?",
+      "fr": "Parlons d'alimentation. Comment vous sentez-vous par rapport à ce que vous mangez au quotidien?",
+      "quick_en": [
+        "I'm not sure what to eat",
+        "I eat pretty well",
+        "I want to eat better"
+      ],
+      "quick_fr": [
+        "Je ne sais pas quoi manger",
+        "Je mange plutôt bien",
+        "Je veux mieux manger"
+      ]
+    },
+    {
+      "id": "protein_limit",
+      "topic": "protein",
+      "care_plan_section": "pharmacist_identified_goals",
+      "en": "Before I give you any advice about protein: has a doctor ever told you to limit protein, for example because of your kidneys?",
+      "fr": "Avant de vous conseiller sur les protéines : un médecin vous a-t-il déjà dit de limiter les protéines, par exemple à cause de vos reins?",
+      "quick_en": [
+        "No",
+        "Yes",
+        "I'm not sure"
+      ],
+      "quick_fr": [
+        "Non",
+        "Oui",
+        "Je ne suis pas sûr(e)"
+      ]
+    },
+    {
+      "id": "feet",
+      "topic": "feet",
+      "care_plan_section": "exercise",
+      "en": "Have you looked at your feet lately and noticed any sores, cuts, blisters, numbness or tingling?",
+      "fr": "Avez-vous regardé vos pieds récemment et remarqué des plaies, des coupures, des ampoules, de l'engourdissement ou des picotements?",
+      "quick_en": [
+        "My feet look fine",
+        "I noticed something",
+        "I don't check them"
+      ],
+      "quick_fr": [
+        "Mes pieds vont bien",
+        "J'ai remarqué quelque chose",
+        "Je ne les vérifie pas"
+      ]
+    },
+    {
+      "id": "blood_sugar",
+      "topic": "blood sugar",
+      "care_plan_section": "a1c",
+      "en": "What was your last blood sugar reading? Please tell me the number, the time, and whether it was before or after a meal.",
+      "fr": "Quelle était votre dernière mesure de glycémie? Dites-moi le chiffre, l'heure, et si c'était avant ou après un repas.",
+      "quick_en": [
+        "I don't have a recent reading",
+        "I don't check at home"
+      ],
+      "quick_fr": [
+        "Je n'ai pas de mesure récente",
+        "Je ne la vérifie pas à la maison"
+      ]
+    },
+    {
+      "id": "blood_pressure",
+      "topic": "blood pressure",
+      "care_plan_section": "blood_pressure",
+      "en": "If you checked your blood pressure this week, what were the two numbers and the time?",
+      "fr": "Si vous avez mesuré votre tension artérielle cette semaine, quels étaient les deux chiffres et l'heure?",
+      "quick_en": [
+        "I haven't checked",
+        "I don't have a cuff"
+      ],
+      "quick_fr": [
+        "Je ne l'ai pas vérifiée",
+        "Je n'ai pas de tensiomètre"
+      ]
+    },
+    {
+      "id": "activity",
+      "topic": "exercise",
+      "care_plan_section": "exercise",
+      "en": "In the last week, about how many minutes did you walk or exercise in total?",
+      "fr": "Au cours de la dernière semaine, combien de minutes au total avez-vous marché ou fait de l'exercice, environ?",
+      "quick_en": [
+        "Less than 30",
+        "30 to 90",
+        "90 to 150",
+        "More than 150"
+      ],
+      "quick_fr": [
+        "Moins de 30",
+        "30 à 90",
+        "90 à 150",
+        "Plus de 150"
+      ]
+    },
+    {
+      "id": "alcohol",
+      "topic": "alcohol",
+      "care_plan_section": "pharmacist_identified_goals",
+      "en": "How many alcoholic drinks do you have in a usual week?",
+      "fr": "Combien de verres d'alcool prenez-vous dans une semaine habituelle?",
+      "quick_en": [
+        "None",
+        "1 to 2",
+        "3 to 7",
+        "More than 7"
+      ],
+      "quick_fr": [
+        "Aucun",
+        "1 à 2",
+        "3 à 7",
+        "Plus de 7"
+      ]
+    },
+    {
+      "id": "smoking",
+      "topic": "smoking",
+      "care_plan_section": "pharmacist_identified_goals",
+      "skip_if": {
+        "smoker": false
+      },
+      "en": "You mentioned you smoke. Which is closest for you right now: not thinking about quitting, thinking about it, or ready to quit?",
+      "fr": "Vous avez mentionné que vous fumez. Qu'est-ce qui vous ressemble le plus en ce moment : je n'y pense pas, j'y pense, ou je suis prêt(e) à arrêter?",
+      "quick_en": [
+        "Not thinking about it",
+        "Thinking about it",
+        "Ready to quit"
+      ],
+      "quick_fr": [
+        "Je n'y pense pas",
+        "J'y pense",
+        "Je suis prêt(e) à arrêter"
+      ]
+    },
+    {
+      "id": "barriers",
+      "topic": "barriers",
+      "care_plan_section": "barriers",
+      "en": "What makes it hardest for you to look after your health right now?",
+      "fr": "Qu'est-ce qui vous rend la tâche la plus difficile pour prendre soin de votre santé en ce moment?",
+      "quick_en": [
+        "Not enough time",
+        "Cost of healthy food",
+        "Low motivation",
+        "Pain or tiredness"
+      ],
+      "quick_fr": [
+        "Pas assez de temps",
+        "Le coût des aliments sains",
+        "Peu de motivation",
+        "Douleur ou fatigue"
+      ]
+    },
+    {
+      "id": "goal",
+      "topic": "goals",
+      "care_plan_section": "goals",
+      "en": "Last one: what is one health goal you'd like to work on in the next month?",
+      "fr": "Dernière question : quel est un objectif de santé sur lequel vous aimeriez travailler le mois prochain?",
+      "quick_en": [
+        "Walk more",
+        "Eat better",
+        "Lower my blood sugar",
+        "Lose some weight"
+      ],
+      "quick_fr": [
+        "Marcher davantage",
+        "Mieux manger",
+        "Baisser ma glycémie",
+        "Perdre un peu de poids"
+      ]
+    }
+  ]
+}

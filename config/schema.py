@@ -62,7 +62,7 @@ SCHEMA = {
         "voice_input": (True, bool, None),
         "text_size": (1.0, float, (0.8, 1.6)),
         "quick_replies": (True, bool, None),
-        "max_questions_per_check_in": (8, int, (1, 20)),
+        "max_questions_per_check_in": (10, int, (1, 20)),
         "demo_username": ("maria", str, None),
         "demo_password": ("demo", str, None),
     },
