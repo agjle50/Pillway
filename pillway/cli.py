@@ -1,0 +1,109 @@
+"""Command-line options for `python Pillway.py ...`.
+
+Called by: Pillway.py.
+  --check-config      print the active settings and warn about anything unsafe
+  --show-ai-payload   print exactly what would be sent to the AI for a sample message
+  --reset-demo        restore Maria (and the other demo patients) to a fresh state
+  --role patient|pharmacist   open straight into one side (run two windows side by side)
+  --demo              force demo mode for this run (no AI, no internet needed)
+"""
+
+import argparse
+import json
+
+from config import ConfigError, get_settings
+from config.schema import UNSAFE_WHEN
+
+
+def parse_args(argv=None):
+    parser = argparse.ArgumentParser(prog="python Pillway.py", description="Pillway care assistant (hackathon demo)")
+    parser.add_argument("--check-config", action="store_true", help="show settings and warnings, then exit")
+    parser.add_argument("--show-ai-payload", action="store_true", help="show what the AI would receive, then exit")
+    parser.add_argument("--reset-demo", action="store_true", help="restore the demo patients to a fresh state")
+    parser.add_argument("--role", choices=["patient", "pharmacist"], help="open straight into one side")
+    parser.add_argument("--demo", action="store_true", help="force demo mode (no AI) for this run")
+    return parser.parse_args(argv)
+
+
+def check_config():
+    settings = get_settings()
+    ai = settings.ai
+    print("Pillway settings check\n" + "=" * 40)
+    print(f"Settings folder : {settings.root}")
+    print(f"API key         : {'found (ends ' + settings.masked_key() + ') via ' + settings.api_key_source if settings.api_key else 'none -> demo mode'}")
+    print(f"Demo mode       : {ai.demo_mode}")
+    print("Models per job  :")
+    for job in ("chat", "flag", "care_plan", "summary"):
+        print(f"   {job:<10} {getattr(ai, job + '_model')}")
+    print(f"Thresholds      : sugar low {settings.safety.blood_sugar_low}, high {settings.safety.blood_sugar_high}, "
+          f"very high {settings.safety.blood_sugar_very_high} mmol/L; BP urgent {settings.safety.bp_systolic_urgent}/"
+          f"{settings.safety.bp_diastolic_urgent} (PLACEHOLDERS: confirm with Pillway)")
+    print(f"Pharmacist review required: {settings.pharmacist.pharmacist_review_required}")
+    print(f"Estimated cost per demo run: {estimate_cost()}")
+    warnings = list(settings.warnings)
+    for (section, key), (bad_value, message) in UNSAFE_WHEN.items():
+        if getattr(getattr(settings, section), key) == bad_value:
+            warnings.append(message)
+    print("\nWarnings:" if warnings else "\nNo warnings. Ready.")
+    for warning in warnings:
+        print(f"  ! {warning}")
+
+
+def estimate_cost():
+    """Very rough: about 15 chat turns, 15 flag checks, 1 care plan, 2 recaps per stage run."""
+    ai = get_settings().ai
+    price = {"opus": (5.0, 25.0), "sonnet": (3.0, 15.0), "haiku": (1.0, 5.0)}  # USD per million tokens (estimate)
+
+    def cost(model, calls, tokens_in, tokens_out):
+        tier = next((name for name in price if name in model), "opus")
+        return calls * (tokens_in * price[tier][0] + tokens_out * price[tier][1]) / 1_000_000
+    total = (cost(ai.chat_model, 15, 4000, 250) + cost(ai.flag_model, 15, 1500, 80)
+             + cost(ai.care_plan_model, 1, 3000, 1200) + cost(ai.summary_model, 2, 2500, 120))
+    return f"about US${total:.2f} (estimate; check current prices on anthropic.com)"
+
+
+def show_ai_payload():
+    from pillway.ai.brain import patient_context, system_prompt
+    from pillway.ai.client import AIClient
+    from pillway.storage.patient_store import PatientStore, blank_record
+    store = PatientStore()
+    record = blank_record("maria", store.seeds()["maria"])
+    sample = "Hi, it's Maria Rossi (416-555-0198). I have a sore on my foot that won't heal."
+    record["messages"].append({"role": "patient", "text": sample, "time": "2026-11-22T10:00:00-05:00"})
+    user = (f"<patient_data>\n{json.dumps(patient_context(record), ensure_ascii=False, indent=1)}\n</patient_data>\n\n"
+            f"TASK: (the turn's task)\n\n<patient_message>\n{sample}\n</patient_message>")
+    request = AIClient().build_request("chat", system_prompt(), user, record["profile"])
+    print("What the AI company would receive for a sample message\n" + "=" * 56)
+    print(f"Sample message typed by the patient: {sample}\n")
+    print(f"model: {request['model']}")
+    print(f"system prompt: {len(request['system'][0]['text'])} characters of Sarah's rules (no patient data)")
+    print("user message:\n" + request["messages"][0]["content"])
+    print("\nNever sent: name, phone, email, address, health card number, date of birth.")
+
+
+def reset_demo():
+    from pillway.storage.patient_store import PatientStore
+    PatientStore().reset_demo()
+    print("Demo reset: Maria is back to a fresh, newly-enrolled state.")
+
+
+def run(argv=None):
+    """Handle command-line flags. Returns the chosen role, or None if the program should exit."""
+    try:
+        args = parse_args(argv)
+        settings = get_settings()
+    except ConfigError as error:
+        print(error)
+        return None
+    if args.demo:
+        settings.ai.demo_mode = True
+    if args.check_config:
+        check_config()
+        return None
+    if args.show_ai_payload:
+        show_ai_payload()
+        return None
+    if args.reset_demo:
+        reset_demo()
+        return None
+    return args.role or ""

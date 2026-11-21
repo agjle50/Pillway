@@ -24,6 +24,7 @@ class DemoBrain:
         self._robots = {}
 
     # ---- layer 2 flag check ---------------------------------------------------
+
     def flag_check(self, record, text, layer1):
         if MISSED_BY_WORDS.search(text):
             return {"is_concern": True, "tier": 1, "reason": "Colour or temperature change in the foot: possible poor blood flow.",
@@ -45,6 +46,7 @@ class DemoBrain:
         return {"is_concern": True, "tier": tier, "reason": reason, "ask_next": layer1.ask_next}
 
     # ---- Sarah's paragraph for one turn ---------------------------------------
+
     def reply(self, record, plan, text, layer1=None):
         lang = record["language"]
         result = {"advice": "", "possible_issues": [], "summary_updates": [],
@@ -76,6 +78,7 @@ class DemoBrain:
         return advice("after_flow", "en") if answer == "Prompt Claude" else answer
 
     # ---- care plan lifestyle lines --------------------------------------------
+
     def care_plan_lifestyle(self, record):
         answers = record["conversation"]["answers"]
         lines = {"pharmacist_identified_goals": [], "a1c": [], "blood_pressure": [], "exercise": []}
@@ -109,14 +112,14 @@ class DemoBrain:
         return {"sections": lines, "barrier_plans": barrier_plans}
 
     # ---- pharmacist recap --------------------------------------------------------
+
     def recap(self, record):
         open_flags = [f for f in record["flags"] if f["status"] == "open"]
         urgent = [f for f in open_flags if f["tier"] == 1]
         first = urgent[0] if urgent else (open_flags[0] if open_flags else None)
         if not first:
             return ["No open flags.", "Check-in up to date.", "No action needed today."]
-        details = [m["text"] for m in record["messages"] if m["role"] == "patient"
-                   and m["time"] >= first["time"]][1:2]
+        details = [d["text"] for d in first.get("details", [])][:1]
         return [f"{'URGENT' if first['tier'] == 1 else 'Watch'}: {first['topic']} reported in {first['source']}.",
                 f"Patient said: \"{first['text'][:90]}\"" + (f" Then: \"{details[0][:60]}\"" if details else ""),
                 "Patient told a pharmacist will contact them. Suggested next step: call today."

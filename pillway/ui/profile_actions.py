@@ -18,22 +18,14 @@ class ProfileActionsMixin:
         self._stop_call_input()
         self.chat_history.save(self.chat_logs)
         self.active_profile_id = profile_id
-        self.chat_messages = self.chat_logs[profile_id]
-        if self.profiles[profile_id]["role"] == "Doctor":
-            self.doctor_workspace_open = False
-            patients = [key for key, profile in self.profiles.items()
-                        if profile["role"] == "Patient"]
-            if self.selected_patient_id not in patients:
-                self.selected_patient_id = patients[0]
-        else:
-            self.medical_robot = self.medical_robots[profile_id]
-        self.chat_open = False
-        self.call_open = False
+        self.chat_messages = self.chat_logs.get(profile_id, [])
+        if self.profiles[profile_id]["role"] == "Patient":
+            self.medical_robot = self.medical_robots.setdefault(profile_id, MedicalRobot())
         self.chat_draft = ""
-        self.section = "Dashboard"
-        self.dropdown = None
         self.status = ""
-        self.render()
+        # switching account = signing in as that role (pharmacist or that patient)
+        self.sign_in("pharmacist" if self.profiles[profile_id]["role"] == "Pharmacist" else "patient")
+
     def add_patient_profile(self):
         name = simpledialog.askstring(
             "Add patient",
@@ -54,9 +46,12 @@ class ProfileActionsMixin:
         self.chat_history = ChatHistoryStore(self.profiles, self.chat_history.path)
         self.chat_history.save(self.chat_logs)
         self.medical_robots[profile["id"]] = MedicalRobot()
+        first, _, last = name.strip().partition(" ")
+        self.store.update(profile["id"], lambda r: r["profile"].update(first_name=first, last_name=last))
         self.selected_patient_id = profile["id"]
         self.profile_status = f"{name.strip()} added as a local demo patient."
         self.render()
+
     def delete_profile(self, profile_id):
         profile = self.profiles.get(profile_id)
         if not profile:
@@ -140,8 +135,10 @@ class ProfileActionsMixin:
             return
         self.profile_status = f"{profile['name']} and their chat log were deleted."
         self.render()
+
     def delete_patient_profile(self, profile_id):
         self.delete_profile(profile_id)
+
     def delete_all_local_data(self):
         confirmed = messagebox.askyesno(
             "Delete all local Pillway data",
@@ -186,6 +183,8 @@ class ProfileActionsMixin:
             if item["role"] == "Patient"
         }
         self.medical_robot = self.medical_robots[self.active_profile_id]
+        if hasattr(self, "store"):
+            self.store.reset_demo()
         self.profile_status = "Saved profiles and chat logs deleted; built-in demo accounts restored."
         self.doctor_status = ""
         self.chat_open = False

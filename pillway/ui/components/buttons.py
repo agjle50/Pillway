@@ -23,6 +23,7 @@ class ButtonsMixin:
                            fill="#f7f8fb", width=self.S(2), tags=tag)
         self.draw_icon(icon, (x1 + x2) / 2, (y1 + y2) / 2, self.S(26), INK, tag)
         self.clickable(tag, func)
+
     def toggle(self, x, cy, on, tag, func):
         w, h = self.S(84), self.S(48)
         track_tag = f"{tag}::track"

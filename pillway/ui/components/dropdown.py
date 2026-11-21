@@ -1,52 +1,77 @@
 """The notifications and profile dropdown menus under the header.
 
 Called by: PillwayApp.render() when self.dropdown is set.
+BUG FIX (Manage profiles dropdown): Tk always draws embedded widgets (the profile list,
+the chat, scroll areas) ON TOP of canvas drawings, so the old dropdown was hidden behind
+them on the Manage profiles page. The dropdown is now its own small canvas placed above
+everything with place() + lift(). It closes on Escape, on a second click, or on any
+click elsewhere on the page.
 """
 
+import tkinter as tk
 
-from ..theme import (
-    BORDER,
-    INK,
-    RED,
-    SHADOW,
-    TEXT_MUTED,
-    WHITE,
-)
+from ...storage.patient_store import display_name
+from ..theme import BORDER, INK, RED, TEXT_MUTED, WHITE
 
 
 class DropdownMixin:
-    def draw_dropdown(self):
+    def dropdown_items(self):
         if self.dropdown == "notifications":
-            items = self.notifications
-            x2 = self.bell_box[0] + self.S(330)
-            title = "Notifications"
-        else:
-            items = [("Manage profiles", "Switch between family members"),
-                     ("Settings", "Account, payments, notifications"),
-                     ("Sign out", "")]
-            x2 = self.w - self.S(18)
-            title = "Team AGILE"
-        top = self.S(86)
-        dw = self.S(340)
-        x1 = x2 - dw
-        rh = self.S(66)
-        y2 = top + self.S(56) + rh * len(items)
-        self.rrect(x1, top + self.S(5), x2, y2 + self.S(5), self.S(16), fill=SHADOW, outline="")
-        self.rrect(x1, top, x2, y2, self.S(16), fill=WHITE, outline=BORDER, width=self.S(1.2))
-        self.text(x1 + self.S(20), top + self.S(28), title, 16, INK, "bold")
-        y = top + self.S(56)
-        for i, (head, sub) in enumerate(items):
-            tag = f"dd::{i}"
-            self.c.create_line(x1 + self.S(16), y, x2 - self.S(16), y, fill=BORDER)
-            self.c.create_rectangle(x1 + self.S(2), y + 1, x2 - self.S(2), y + rh - 1,
-                                    fill=WHITE, outline=WHITE, tags=tag)
+            if self.role == "pharmacist":
+                items = [(f"Urgent: {display_name(r)}", f"{f['topic']} · {f['time'][11:16]}",
+                          lambda pid=r["id"]: self.select_doctor_patient(pid))
+                         for r in self.store.all() for f in r["flags"] if f["status"] == "open" and f["tier"] == 1]
+                return "Notifications", items or [("All clear", "No urgent flags right now.", None)]
+            return "Notifications", [(head, sub, None) for head, sub in self.notifications] or [
+                ("No notifications", "You're all caught up.", None)]
+        items = [("Manage profiles", "Switch between demo accounts", lambda: self.go("Manage profiles")),
+                 ("Settings", "Account, payments, notifications", lambda: self.go("Settings"))]
+        if self.role == "pharmacist":
+            items.append(("Reset demo", "Restore Maria to a fresh state", self.reset_demo))
+        items.append(("Sign out", "", self.sign_out))
+        return ("Pharmacist" if self.role == "pharmacist" else display_name(self.record or {"id": "Patient"})), items
+
+    def draw_dropdown(self):
+        title, items = self.dropdown_items()
+        width, row = self.S(340), self.S(66)
+        height = self.S(56) + row * len(items) + self.S(8)
+        x2 = (self.bell_box[0] + self.S(330)) if self.dropdown == "notifications" else self.w - self.S(18)
+        x1, top = min(x2, self.w - self.S(10)) - width, self.S(86)
+        menu = tk.Canvas(self, width=int(width), height=int(height), bg=WHITE, highlightthickness=1,
+                         highlightbackground=BORDER, bd=0)
+        menu.place(x=int(x1), y=int(top))
+        menu.lift()
+        self.dropdown_frame = menu
+        self.tx(menu, self.S(20), self.S(18), title, 16, INK, "bold")
+        y = self.S(56)
+        for index, (head, sub, action) in enumerate(items):
+            tag = f"dd::{index}"
+            menu.create_line(self.S(16), y, width - self.S(16), y, fill=BORDER)
+            menu.create_rectangle(2, y + 1, width - 2, y + row - 1, fill=WHITE, outline=WHITE, tags=tag)
             if sub:
-                self.text(x1 + self.S(20), y + self.S(22), head, 14, INK, "bold", tag=tag)
-                self.text(x1 + self.S(20), y + self.S(46), sub, 13, TEXT_MUTED, tag=tag)
+                self.tx(menu, self.S(20), y + self.S(10), head, 14, INK, "bold", tag=tag)
+                self.tx(menu, self.S(20), y + self.S(36), sub, 12, TEXT_MUTED, tag=tag, width=width - self.S(40))
             else:
-                self.text(x1 + self.S(20), y + rh / 2, head, 14, RED, "bold", tag=tag)
-            if self.dropdown == "profile" and head in ("Manage profiles", "Settings"):
-                self.clickable(tag, lambda h=head: self.go(h))
-            else:
-                self.clickable(tag, lambda: self.toggle_dropdown(None))
-            y += rh
+                self.tx(menu, self.S(20), y + row / 2, head, 14, RED, "bold", anchor="w", tag=tag)
+            self.bind_click(menu, tag, lambda a=action: self._dropdown_choose(a))
+            y += row
+        self._dropdown_opened_by_click = True
+        self.after_idle(self._arm_dropdown_close)
+
+    def _arm_dropdown_close(self):
+        self._dropdown_opened_by_click = False
+
+    def _dropdown_choose(self, action):
+        self.dropdown = None
+        if action:
+            action()
+        else:
+            self.render()
+
+    def close_dropdown_on_outside_click(self, _event=None):
+        if self.dropdown and not getattr(self, "_dropdown_opened_by_click", False):
+            self.after_idle(lambda: self.dropdown and self.toggle_dropdown(None))
+
+    def reset_demo(self):
+        self.store.reset_demo()
+        self.flash("Demo reset: Maria is back to a fresh state.")

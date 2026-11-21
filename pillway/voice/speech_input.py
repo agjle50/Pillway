@@ -1,6 +1,7 @@
 """On-device speech transcription for the call preview."""
 
 import json
+from array import array
 import shutil
 import tempfile
 import threading
@@ -83,8 +84,18 @@ def ensure_model(model_root, stop_event, events):
             temporary_archive.unlink()
 
 
+def audio_level(raw_bytes):
+    """0.0 (silent) to 1.0 (loud) from 16-bit audio, for the green voice meter."""
+    samples = array("h", bytes(raw_bytes)[: len(raw_bytes) - len(raw_bytes) % 2])
+    if not samples:
+        return 0.0
+    rms = (sum(value * value for value in samples) / len(samples)) ** 0.5
+    return min(1.0, rms / 6000)
+
+
 class LocalSpeechInput:
-    def __init__(self, model_root, events):
+    def __init__(self, model_root, events, device=None):
+        self.device = device or None
         self.model_root = Path(model_root)
         self.events = events
         self.stop_event = threading.Event()
@@ -122,6 +133,7 @@ class LocalSpeechInput:
             recognizer = KaldiRecognizer(model, 16000)
 
             def on_audio(indata, _frames, _time_info, status):
+                self.events.put(("level", audio_level(indata)))
                 if status:
                     self.events.put(("status", f"Microphone status: {status}"))
                 if recognizer.AcceptWaveform(bytes(indata)):
@@ -135,7 +147,8 @@ class LocalSpeechInput:
 
             with sounddevice.RawInputStream(
                 samplerate=16000,
-                blocksize=8000,
+                blocksize=1600,
+                device=self.device,
                 dtype="int16",
                 channels=1,
                 callback=on_audio,

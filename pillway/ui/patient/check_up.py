@@ -17,13 +17,13 @@ from ..theme import (
 
 class CheckUpMixin:
     def draw_checkup(self, x1, x2, y):
-        self.text((x1 + x2) / 2, y + self.S(14), "How would you like to check in?", 20, INK,
+        self.text((x1 + x2) / 2, y + self.S(14), self.t("checkup.title"), 20, INK,
                   "bold", anchor="center")
         y += self.S(48)
-        bars = [("Call", "phone", "Open a phone preview (not connected)"),
-                ("Chat", "chat", "Message your care assistant, any time")]
+        bars = [("Call", "phone", self.t("checkup.call_sub"), self.t("checkup.call")),
+                ("Chat", "chat", self.t("checkup.chat_sub"), self.t("checkup.chat"))]
         bh = self.S(104)
-        for i, (title, icon, sub) in enumerate(bars):
+        for i, (title, icon, sub, label) in enumerate(bars):
             off = (1 - self.anim) * self.S(70) * (i + 1)
             by = y + i * (bh + self.S(22)) + off
             tag = f"bar::{title}"
@@ -34,36 +34,37 @@ class CheckUpMixin:
             cx, cy, r = x1 + self.S(56), by + bh / 2, self.S(30)
             self.c.create_oval(cx - r, cy - r, cx + r, cy + r, fill=RED, outline="", tags=tag)
             self.draw_icon(icon, cx, cy, self.S(28), WHITE, tag, bg=RED)
-            self.text(x1 + self.S(106), cy - self.S(14), title, 26, INK, "bold", tag=tag)
+            self.text(x1 + self.S(106), cy - self.S(14), label, 26, INK, "bold", tag=tag)
             self.text(x1 + self.S(106), cy + self.S(20), sub, 14, TEXT_MUTED, tag=tag)
             self.draw_icon("chev_right", x2 - self.S(34), cy, self.S(24), TEXT_MUTED, tag)
             self.clickable(tag, lambda t=title: self.checkup_choice(t))
         if self.status and self.anim >= 1:
             self.text((x1 + x2) / 2, y + 2 * bh + self.S(60),
                       self.status, 14, TEXT_MUTED, anchor="center")
+
     def checkup_choice(self, kind):
         if kind == "Chat":
             self.open_profile_chat()
             return
         if kind == "Call":
             self._cancel_checkup_animation()
+            self._stop_call_input()
+            self.call_state = {}          # the call screen sets itself up on first draw
             self.call_open = True
-            self.call_mic_state = "off"
-            self.call_status = "Mic off. First use downloads a ~40 MB offline model."
-            self.call_transcript = ""
-            self.call_partial = ""
             self.chat_open = False
             self.status = ""
             self.render()
             return
         self.status = "Opening a chat with your care assistant..."
         self.render()
+
     def _cancel_checkup_animation(self):
         if self._checkup_animation_job:
             self.after_cancel(self._checkup_animation_job)
             self._checkup_animation_job = None
         self._checkup_animation_started = None
         self.anim = 1.0
+
     def _animate(self):
         self._checkup_animation_job = None
         if (

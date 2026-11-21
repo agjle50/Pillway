@@ -80,7 +80,8 @@ class ManageProfilesMixin:
                 fill=TEXT_MUTED, anchor="w", font=self.font(13), tags=tag,
             )
             if active:
-                count = len(self.chat_logs.get(profile_id, []))
+                record_id = profile.get("record_id") or profile_id
+                count = len(self.store.load(record_id)["messages"]) if profile["role"] == "Patient" else 0
                 profile_canvas.create_text(
                     self.S(24), row_y + self.S(86),
                     text=f"{count} chat messages saved on this device",

@@ -22,6 +22,7 @@ class ConsultPagesMoreMixin:
         self._doctor_card(x, y, width, self.S(185), self.doctor_section)
         cx = x + width / 2
         self.text(cx, y + self.S(98), message, 12, TEXT_MUTED, anchor="center")
+
     def _draw_doctor_resources_page(self, x, y, width):
         resources = (
             ("Diabetes education", "General learning resources"),
@@ -40,6 +41,7 @@ class ConsultPagesMoreMixin:
             self.c.create_text(bx + self.S(18), by + self.S(52), text=description,
                                fill=TEXT_MUTED, anchor="nw", width=card_w - self.S(36),
                                font=self.font(10))
+
     def _draw_doctor_summary_page(self, x, y, width, patient):
         messages = self.chat_logs.get(self.selected_patient_id, [])
         latest = next(
@@ -68,6 +70,7 @@ class ConsultPagesMoreMixin:
             text=concern, fill=TEXT_DARK, anchor="nw",
             width=card_w - self.S(36), font=self.font(10),
         )
+
     def _draw_doctor_take_home_page(self, x, y, width):
         card_height = self.S(390)
         self.rrect(x, y, x + width, y + card_height, self.S(12),
@@ -93,6 +96,7 @@ class ConsultPagesMoreMixin:
             if index < len(CARE_PLAN_REFERENCE) - 1:
                 self.c.create_line(x + self.S(20), line_y + self.S(34),
                                    x + width - self.S(20), line_y + self.S(34), fill=BORDER)
+
     def _draw_doctor_chat_log(self, x, y, width, bottom):
         log_y = y + self.S(6)
         self.doctor_log_frame = tk.Frame(self, bg=WHITE, bd=0, highlightthickness=0)

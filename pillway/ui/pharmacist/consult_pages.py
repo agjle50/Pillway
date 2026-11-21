@@ -61,6 +61,7 @@ class ConsultPagesMixin:
                                font=self.font(9), anchor="n")
         self.text(x + self.S(18), journey_y + journey_h - self.S(16),
                   "Status not recorded in this local demo.", 9, TEXT_MUTED)
+
     def _draw_doctor_patient_page(self, x, y, width):
         gap = self.S(16)
         card_w = (width - gap) / 2
@@ -89,6 +90,7 @@ class ConsultPagesMixin:
                  "Actual measurements and personal targets have not been entered.",
             fill=TEXT_DARK, anchor="nw", width=width - self.S(36), font=self.font(12),
         )
+
     def _draw_doctor_medication_page(self, x, y, width):
         height = self.S(300)
         self._doctor_card(x, y, width, height, "Medication review")
@@ -106,6 +108,7 @@ class ConsultPagesMixin:
         self.c.create_text(x + self.S(18), notes_y + self.S(52),
                            text="No pharmacist comments saved.", fill=TEXT_MUTED,
                            anchor="nw", font=self.font(11))
+
     def _draw_doctor_checklist_page(self, x, y, width):
         items = (
             "Patient information reviewed", "Medication review completed",
@@ -131,6 +134,7 @@ class ConsultPagesMixin:
             self.text(bx + self.S(44), by + row_h / 2, label, 10, TEXT_DARK)
             self.text(bx + card_w - self.S(12), by + row_h / 2, "Not recorded",
                       9, TEXT_MUTED, anchor="e")
+
     def _draw_doctor_diabetes_page(self, x, y, width):
         gap = self.S(16)
         card_w = (width - gap) / 2

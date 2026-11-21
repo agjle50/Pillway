@@ -151,5 +151,27 @@ class IconMixin:
             line(9, 5, 16, 12, 9, 19)
         elif kind == "chev_down":
             line(5, 9, 12, 16, 19, 9)
+        elif kind == "clipboard":
+            rect(5, 4, 19, 21, 2)
+            rect(9, 2.5, 15, 6, 1, fill=bg)
+            line(8.5, 10, 15.5, 10)
+            line(8.5, 13.5, 15.5, 13.5)
+            line(8.5, 17, 13, 17)
+        elif kind == "flag":
+            line(6, 21, 6, 3)
+            c.create_polygon(*P(6, 3.5, 18, 3.5, 15, 7.5, 18, 11.5, 6, 11.5), fill=color, outline=color, tags=tags)
+        elif kind == "speaker":
+            c.create_polygon(*P(4, 9, 8, 9, 13, 5, 13, 19, 8, 15, 4, 15), fill="", outline=color, width=lw, tags=tags)
+            c.create_arc(*P(11, 8, 17, 16), start=-60, extent=120, style="arc", outline=color, width=lw, tags=tags)
+            c.create_arc(*P(11, 5, 21, 19), start=-60, extent=120, style="arc", outline=color, width=lw, tags=tags)
+        elif kind == "check":
+            line(5, 12.5, 10, 17.5, 19, 7)
+        elif kind == "alert":
+            c.create_polygon(*P(12, 3, 22, 20, 2, 20), fill="", outline=color, width=lw, tags=tags)
+            line(12, 9, 12, 14)
+            oval(11.3, 16.3, 12.7, 17.7, fill=color)
+        elif kind == "undo":
+            c.create_arc(*P(5, 6, 20, 20), start=-90, extent=270, style="arc", outline=color, width=lw, tags=tags)
+            line(5, 7, 8.5, 12.5, 12, 9)
         elif kind == "back":
             line(15, 4, 7, 12, 15, 20)

@@ -42,22 +42,24 @@ class ProfileStore:
                 not isinstance(profile, dict)
                 or not isinstance(profile.get("id"), str)
                 or not isinstance(profile.get("name"), str)
-                or profile.get("role") not in ("Patient", "Doctor")
+                or profile.get("role") not in ("Patient", "Doctor", "Pharmacist")
             ):
                 raise ValueError(f"Invalid profile in {self.path}")
             if profile["id"] in seen_ids:
                 raise ValueError(f"Duplicate profile id in {self.path}: {profile['id']}")
             seen_ids.add(profile["id"])
+            role = "Pharmacist" if profile["role"] == "Doctor" else profile["role"]  # old files said Doctor
             normalized.append({
                 "id": profile["id"],
                 "name": profile["name"],
-                "role": profile["role"],
+                "role": role,
+                "record_id": profile.get("record_id", "maria" if profile["id"] == "patient" else profile["id"]),
                 "description": profile.get("description", ""),
             })
         if not any(profile["role"] == "Patient" for profile in normalized):
             raise ValueError(f"Profile file has no patient account: {self.path}")
-        if not any(profile["role"] == "Doctor" for profile in normalized):
-            raise ValueError(f"Profile file has no doctor account: {self.path}")
+        if not any(profile["role"] == "Pharmacist" for profile in normalized):
+            raise ValueError(f"Profile file has no pharmacist account: {self.path}")
         return normalized
 
     def save(self, profiles):
@@ -77,9 +79,11 @@ class ProfileStore:
         name = name.strip()
         if not name:
             raise ValueError("Patient name cannot be empty.")
+        profile_id = uuid.uuid4().hex
         return {
-            "id": uuid.uuid4().hex,
+            "id": profile_id,
             "name": name,
             "role": "Patient",
-            "description": "Patient dashboard and private chat with Juliez.",
+            "record_id": profile_id,
+            "description": "Local demo patient profile.",
         }

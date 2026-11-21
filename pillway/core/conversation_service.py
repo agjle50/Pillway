@@ -35,6 +35,7 @@ class ConversationService:
         self.timings = []
 
     # ---- simple actions -------------------------------------------------------
+
     def accept_consent(self, patient_id, accepted=True):
         def change(record):
             record["consent"] = {"accepted": accepted, "time": now_iso(), "version": 1}
@@ -82,6 +83,7 @@ class ConversationService:
         return self.store.update(patient_id, change)
 
     # ---- the main entry point --------------------------------------------------
+
     def handle_message(self, patient_id, text, channel="chat", on_update=None):
         """Process one patient message. Blocking (call it from a worker thread)."""
         text = (text or "").strip()
@@ -123,6 +125,7 @@ class ConversationService:
         return self._normal_turn(patient_id, text, layer1, message_id, channel, on_update)
 
     # ---- the three kinds of turn ------------------------------------------------
+
     def _urgent_turn(self, patient_id, text, layer1, message_id, decision, channel, on_update):
         record = self.store.load(patient_id)
         demo_issues = self.brain.demo.reply(record, {"ai_role": None, "advice_key": None, "side_effects": []},
@@ -247,6 +250,7 @@ class ConversationService:
         return record
 
     # ---- care plan ----------------------------------------------------------------
+
     def make_care_plan(self, patient_id, channel="chat"):
         self.busy.add(patient_id)
         try:
@@ -264,6 +268,7 @@ class ConversationService:
             self.busy.discard(patient_id)
 
     # ---- helpers ------------------------------------------------------------------
+
     def _current_question(self, record):
         convo = record["conversation"]
         if convo["stage"] == "questions":

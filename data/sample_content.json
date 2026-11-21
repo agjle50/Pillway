@@ -1,14 +1,10 @@
 {
   "_about": "Made-up sample content for the patient dashboard (orders, banner, starter notifications). Edit freely.",
-  "banner_text": "Get a virtual assistant doctor to help you discover your condition today, live.",
+  "banner_text": "Check in with Sarah, your automated care assistant.",
   "notifications": [
     [
       "Weekly check-in is ready",
       "Foot-care week. Takes 2 minutes."
-    ],
-    [
-      "Reminder",
-      "Check your blood sugar at 8:00 AM."
     ],
     [
       "Order shipped",
@@ -31,5 +27,17 @@
       "Monthly refill  ·  Delivered Nov 18",
       "Delivered"
     ]
-  ]
+  ],
+  "demo_call_lines": {
+    "en": [
+      "Hi Sarah, I checked my feet today.",
+      "The sore on my heel looks a bit bigger and my toes still feel numb.",
+      "No, that's all, thank you."
+    ],
+    "fr": [
+      "Bonjour Sarah, j'ai vérifié mes pieds aujourd'hui.",
+      "La plaie sur mon talon semble un peu plus grande et mes orteils sont encore engourdis.",
+      "Non, c'est tout, merci."
+    ]
+  }
 }

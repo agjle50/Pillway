@@ -101,6 +101,7 @@ class PrescriptionMixin:
         self.clickable("save_prescription", self.save_prescription)
         if self.status:
             self.text(left, action_y + self.S(70), self.status, 14, TEXT_MUTED)
+
     def _prescription_option_card(self, x1, x2, y, height, title, icon, line1, line2):
         tag = f"prescription::{icon}"
         self.rrect(x1, y, x2, y + height, self.S(13), fill=WHITE,
@@ -110,6 +111,7 @@ class PrescriptionMixin:
         self.text(x1 + self.S(70), y + self.S(58), line1, 17, "#4a4a4a", tag=tag)
         self.text(x1 + self.S(70), y + self.S(81), line2, 17, "#4a4a4a", tag=tag)
         self.clickable(tag, lambda selected=title: self.choose_prescription_method(selected))
+
     def add_prescription(self):
         self.prescription_flow = True
         self.prescription_stage = None
@@ -117,17 +119,20 @@ class PrescriptionMixin:
         self.prescription_draft = ""
         self.status = ""
         self.render()
+
     def close_prescription_flow(self):
         self.prescription_flow = False
         self.prescription_stage = None
         self.prescription_draft = ""
         self.status = ""
         self.render()
+
     def choose_prescription_method(self, method):
         self.prescription_stage = method
         self.prescription_draft = ""
         self.status = ""
         self.render()
+
     def choose_prescription_photo(self):
         path = filedialog.askopenfilename(
             parent=self,
@@ -137,6 +142,7 @@ class PrescriptionMixin:
         if path:
             self.prescription_photo = path
             self.render()
+
     def save_prescription(self, _event=None):
         medication = self.prescription_entry.get().strip() if self.prescription_entry else ""
         if not medication:
@@ -157,6 +163,7 @@ class PrescriptionMixin:
         self.prescription_photo = ""
         self.status = ""
         self.render()
+
     def set_prescription_status(self, message):
         self.status = message
         self.render()

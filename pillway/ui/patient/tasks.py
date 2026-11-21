@@ -17,13 +17,22 @@ from ..theme import (
 
 class TasksMixin:
     def draw_tasks(self, x1, x2, y):
+        record = self.record or {"tasks": [], "reminders_consent": {"accepted": False}}
+        self.tasks = [[t["time"], t["ampm"], t.get(f"label_{self.lang}") or t["label_en"], t["on"]] for t in record["tasks"]]
+        self.task_ids = [t["id"] for t in record["tasks"]]
         self.draw_icon("bulb", x1 + self.S(14), y + self.S(14), self.S(22), INK, None)
-        self.text(x1 + self.S(34), y + self.S(14), "Daily care plan", 18, INK, "bold")
+        self.text(x1 + self.S(34), y + self.S(14), self.t("tasks.title"), 18, INK, "bold")
         self.c.create_line(x1, y + self.S(36), x2, y + self.S(36), fill=BORDER)
         y += self.S(36)
-        for i, (time, ampm, label, on) in enumerate(self.tasks):
+        if not self.tasks:
+            self.text((x1 + x2) / 2, y + self.S(80), self.t("tasks.empty"), 16, TEXT_MUTED, anchor="center")
+            return
+        if not record["reminders_consent"]["accepted"]:
+            y = self._draw_reminder_permission(x1, x2, y + self.S(10))
+        row = max(self.S(70), min(self.S(106), (self.h - self.S(30) - y) / max(1, len(self.tasks))))
+        for i, (clock, ampm, label, on) in enumerate(self.tasks):
             col = INK if on else TEXT_OFF
-            t = self.text(x1 + self.S(6), y + self.S(44), time, 46, col, "normal",
+            t = self.text(x1 + self.S(6), y + self.S(44), clock, 46, col, "normal",
                           tag=f"task_time::{i}")
             tx2 = self.c.bbox(t)[2]
             self.text(tx2 + self.S(4), y + self.S(54), ampm, 20, col,
@@ -32,11 +41,37 @@ class TasksMixin:
                       TEXT_MUTED if on else TEXT_OFF, tag=f"task_label::{i}")
             self.toggle(x2 - self.S(84), y + self.S(50), on,
                         f"toggle::{i}", lambda k=i: self.flip_task(k))
-            y += self.S(106)
+            y += row
             self.c.create_line(x1, y, x2, y, fill=BORDER)
+
+    def _draw_reminder_permission(self, x1, x2, y):
+        """CASL: reminders only after the patient says yes. Medication is never a reminder."""
+        self.rrect(x1, y, x2, y + self.S(84), self.S(14), fill="#eef2ff", outline=BORDER)
+        self.c.create_text(x1 + self.S(18), y + self.S(26), text=self.t("tasks.permission"), anchor="w", fill=INK,
+                           font=self.font(13, "bold"), width=x2 - x1 - self.S(230))
+        self.text(x1 + self.S(18), y + self.S(60), self.t("tasks.no_meds"), 11, TEXT_MUTED)
+        bx1 = x2 - self.S(196)
+        self.rrect(bx1, y + self.S(18), x2 - self.S(16), y + self.S(66), self.S(12), fill=RED, outline="", tags="allow_reminders")
+        self.text((bx1 + x2 - self.S(16)) / 2, y + self.S(42), self.t("tasks.allow"), 13, "#ffffff", "bold",
+                  anchor="center", tag="allow_reminders")
+        self.clickable("allow_reminders", self.allow_reminders)
+        return y + self.S(92)
+
+    def allow_reminders(self):
+        from ...storage.patient_store import now_iso
+        self.store.update(self.patient_id, lambda r: r.update(reminders_consent={"accepted": True, "time": now_iso()}))
+        self.flash("Reminders on" if self.lang == "en" else "Rappels activés")
+
     def flip_task(self, i):
         self.tasks[i][3] = not self.tasks[i][3]
         is_on = self.tasks[i][3]
+        task_id = self.task_ids[i] if i < len(getattr(self, "task_ids", [])) else None
+        if task_id:
+            def change(record):
+                for task in record["tasks"]:
+                    if task["id"] == task_id:
+                        task["on"] = is_on
+            self.store.update(self.patient_id, change)
         track_tag = f"toggle::{i}::track"
         knob_tag = f"toggle::{i}::knob"
         track_items = self.c.find_withtag(track_tag)

@@ -21,12 +21,22 @@ NAV_ITEMS = [
     ("FAQ", "question"),
 ]
 
-# Top icon tab bar on the patient dashboard.
+PHARMACIST_NAV_ITEMS = [
+    ("Dashboard", "grid"),
+    ("Settings", "gear"),
+    ("Manage profiles", "person"),
+    None,
+    ("Contact us", "phone"),
+    ("FAQ", "question"),
+]
+
+# Top icon tab bar on the patient dashboard. Labels are translated with data/french_strings.json.
 TABS = [
-    ("Check up", "heart"),
-    ("Medications", "pills"),
-    ("Orders", "box"),
-    ("Tasks", "task"),
+    ("Check up", "heart", "tab.check_up"),
+    ("Medications", "pills", "tab.medications"),
+    ("Orders", "box", "tab.orders"),
+    ("Tasks", "task", "tab.tasks"),
+    ("Care plan", "clipboard", "tab.care_plan"),
 ]
 
 SETTINGS_ITEMS = [

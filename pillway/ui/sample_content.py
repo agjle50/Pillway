@@ -12,3 +12,4 @@ _data = json.loads(get_settings().path("data/sample_content.json").read_text(enc
 BANNER_TEXT = _data["banner_text"]
 NOTIFICATIONS = [tuple(item) for item in _data["notifications"]]
 ORDERS = [tuple(item) for item in _data["orders"]]
+DEMO_CALL_LINES = _data.get("demo_call_lines", {"en": [], "fr": []})

@@ -60,6 +60,7 @@ class PatientStore:
         self._seeds = None
 
     # ---- seeds ---------------------------------------------------------
+
     def seeds(self):
         if self._seeds is None:
             path = get_settings().path(get_settings().demo.seed_patients_file)
@@ -71,6 +72,7 @@ class PatientStore:
         return self.folder / f"{safe}.json"
 
     # ---- reading -------------------------------------------------------
+
     def load(self, patient_id):
         """Return the record, creating it from the seed file the first time."""
         record = read_json(self.path(patient_id))
@@ -92,6 +94,7 @@ class PatientStore:
         return tuple(modified_time(self.path(pid)) for pid in self.ids())
 
     # ---- writing -------------------------------------------------------
+
     def update(self, patient_id, change):
         """Apply change(record) safely. change may edit in place or return a new record."""
         default = blank_record(patient_id, self.seeds().get(patient_id))

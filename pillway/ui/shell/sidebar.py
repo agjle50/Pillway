@@ -13,17 +13,13 @@ from ..theme import (
     RED,
     WHITE,
 )
-from ..navigation import NAV_ITEMS
+from ..navigation import NAV_ITEMS, PHARMACIST_NAV_ITEMS
 
 
 class SidebarMixin:
     def draw_sidebar(self):
-        if (
-            self.section == "Dashboard"
-            and self.profiles[self.active_profile_id]["role"] == "Doctor"
-            and self.doctor_workspace_open
-        ):
-            self.draw_doctor_sidebar()
+        if self.role == "pharmacist" and self.section == "Dashboard" and self.doctor_workspace_open:
+            self.draw_detail_sidebar()  # the black sidebar inside a patient's screen
             return
         c, sw, h = self.c, self.sw, self.h
         c.create_rectangle(0, 0, sw, h, fill=NAVY, outline=NAVY)
@@ -33,7 +29,7 @@ class SidebarMixin:
 
         y = self.S(104)
         row_h = self.S(60)
-        for item in NAV_ITEMS:
+        for item in (PHARMACIST_NAV_ITEMS if self.role == "pharmacist" else NAV_ITEMS):
             if item is None:
                 y += self.S(6)
                 c.create_line(0, y, sw, y, fill=DIVIDER)
@@ -41,7 +37,9 @@ class SidebarMixin:
                 continue
             label, icon = item
             tag = f"nav::{label}"
-            selected = label == self.section
+            selected = label == self.section or (label in ("Medications", "Orders", "Tasks")
+                                                and self.section == "Dashboard" and self.tab == label
+                                                and self.role == "patient")
             bg = WHITE if selected else NAVY
             fg = RED if selected else NAV_TEXT
             ic = RED if selected else NAV_ICON
