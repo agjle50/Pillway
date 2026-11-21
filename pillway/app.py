@@ -25,6 +25,7 @@ from .constants import (
     WHITE,
 )
 from .icons import IconMixin
+from .medical_robot import MedicalRobot
 from .views import DashboardViewMixin, SettingsViewMixin
 
 
@@ -69,8 +70,12 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
         self.prescription_entry = None
         self.chat_open = False
         self.chat_messages = []
+        self.medical_robot = MedicalRobot()
         self.chat_draft = ""
         self.chat_entry = None
+        self.chat_view_frame = None
+        self.chat_message_canvas = None
+        self.chat_scrollbar = None
         self.chat_placeholder = "TYPE YOUR MESSAGE..."
         self.tasks = [                # alarm-style reminders
             ["8:00", "AM", "Check blood sugar", True],
@@ -121,6 +126,11 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
             self.chat_draft = "" if current_text == self.chat_placeholder else current_text
             self.chat_entry.destroy()
             self.chat_entry = None
+        if self.chat_view_frame and self.chat_view_frame.winfo_exists():
+            self.chat_view_frame.destroy()
+        self.chat_view_frame = None
+        self.chat_message_canvas = None
+        self.chat_scrollbar = None
         c.delete("all")
         w, h = max(c.winfo_width(), 1), max(c.winfo_height(), 1)
         self.w, self.h = w, h
@@ -253,6 +263,8 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
 
     def checkup_choice(self, kind):
         if kind == "Chat":
+            if not self.chat_messages:
+                self.chat_messages.append(("Sarah", self.medical_robot.greeting()))
             self.chat_open = True
             self.dropdown = None
             self.render()
@@ -281,10 +293,23 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
         if not message or message == self.chat_placeholder:
             return
         self.chat_messages.append(("You", message))
+        self.chat_messages.append(("Sarah", self.medical_robot.reply(message)))
         if self.chat_entry:
             self.chat_entry.delete(0, tk.END)
         self.chat_draft = ""
         self.render()
+
+    def copy_chat_message(self, message):
+        self.clipboard_clear()
+        self.clipboard_append(message)
+
+    def copy_chat_selection(self, event, fallback):
+        try:
+            selected = event.widget.get("sel.first", "sel.last")
+        except tk.TclError:
+            selected = fallback
+        self.copy_chat_message(selected)
+        return "break"
 
     def flip_task(self, i):
         self.tasks[i][3] = not self.tasks[i][3]

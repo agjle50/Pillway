@@ -1,8 +1,8 @@
 """Canvas views for the Pillway dashboard and secondary pages."""
 
 import os
-import textwrap
 import tkinter as tk
+from tkinter import font as tkfont
 
 from .constants import (
     BORDER,
@@ -143,27 +143,126 @@ class DashboardViewMixin:
                    fill=WHITE, outline=BORDER)
         self.text((x1 + x2) / 2, date_y, "TODAY", 12, TEXT_MUTED, "bold", anchor="center")
 
-        messages = self.chat_messages or [
-            ("Pillway", "Hi! How can we help you today?")
-        ]
-        y = date_y + self.S(32)
-        max_width = (x2 - x1) * 0.72
-        for sender, message in messages:
-            lines = textwrap.wrap(message, max(12, int(max_width / self.S(9))))
-            bubble_h = self.S(52 + max(1, len(lines)) * 20)
-            bubble_w = max_width
-            bx1 = x2 - self.S(28) - bubble_w if sender == "You" else x1 + self.S(28)
-            bx2 = bx1 + bubble_w
-            bg = "#e7e8ee" if sender == "You" else WHITE
-            self.rrect(bx1, y, bx2, y + bubble_h, self.S(18), fill=bg,
-                       outline="" if sender == "You" else BORDER)
-            self.text(bx1 + self.S(18), y + self.S(18), sender, 14, INK, "bold")
-            self.text(bx2 - self.S(18), y + self.S(18), "now", 12, TEXT_MUTED, anchor="e")
-            self.text(bx1 + self.S(18), y + self.S(42), "\n".join(lines), 14, TEXT_DARK)
-            y += bubble_h + self.S(16)
-
         input_h = self.S(58)
         input_y = y2 - self.S(30) - input_h
+        messages_top = date_y + self.S(32)
+        viewport_h = max(self.S(60), input_y - messages_top - self.S(10))
+        viewport_w = x2 - x1 - self.S(16)
+        messages = self.chat_messages or [("Sarah", "Hi! How can we help you today?")]
+
+        self.chat_view_frame = tk.Frame(self, bg="#f3f3f5", bd=0, highlightthickness=0)
+        message_canvas = tk.Canvas(self.chat_view_frame, bg="#f3f3f5",
+                                   bd=0, highlightthickness=0)
+        self.chat_message_canvas = message_canvas
+        content = tk.Frame(message_canvas, bg="#f3f3f5", bd=0)
+        content_window = message_canvas.create_window(0, 0, window=content, anchor="nw")
+        scrollbar = tk.Scrollbar(self.chat_view_frame, orient="vertical", command=message_canvas.yview)
+        self.chat_scrollbar = scrollbar
+
+        def sync_scrollbar(first, last):
+            scrollbar.set(first, last)
+            if float(first) <= 0 and float(last) >= 1:
+                scrollbar.pack_forget()
+            elif not scrollbar.winfo_manager():
+                scrollbar.pack(side="right", fill="y")
+
+        message_canvas.configure(yscrollcommand=sync_scrollbar)
+        message_canvas.pack(side="left", fill="both", expand=True)
+        message_canvas.bind(
+            "<Configure>",
+            lambda event: message_canvas.itemconfigure(content_window, width=event.width),
+        )
+        content.bind(
+            "<Configure>",
+            lambda _event: message_canvas.configure(scrollregion=message_canvas.bbox("all")),
+        )
+
+        def scroll_messages(event):
+            units = int(-event.delta / 120) or (-1 if event.delta > 0 else 1)
+            message_canvas.yview_scroll(units, "units")
+            return "break"
+
+        def bind_scroll(widget):
+            widget.bind("<MouseWheel>", scroll_messages)
+            widget.bind("<Button-4>", lambda _event: message_canvas.yview_scroll(-1, "units"))
+            widget.bind("<Button-5>", lambda _event: message_canvas.yview_scroll(1, "units"))
+
+        bind_scroll(message_canvas)
+
+        bubble_width = int(viewport_w * 0.72)
+        available_text_width = max(1, bubble_width - self.S(36))
+        message_font = tkfont.Font(self, font=self.font(14))
+
+        def display_line_count(message):
+            count = 0
+            for paragraph in message.splitlines() or [""]:
+                line = ""
+                for word in paragraph.split():
+                    candidate = f"{line} {word}".strip()
+                    if line and message_font.measure(candidate) > available_text_width:
+                        count += 1
+                        line = ""
+                    while message_font.measure(word) > available_text_width:
+                        split = len(word)
+                        while split > 1 and message_font.measure(word[:split]) > available_text_width:
+                            split -= 1
+                        count += 1
+                        word = word[split:]
+                    line = f"{line} {word}".strip()
+                count += 1 if line or not paragraph else 0
+            return max(1, count)
+
+        for sender, message in messages:
+            line_count = display_line_count(message)
+            bubble_height = int(self.S(58 + line_count * 20))
+            bubble_bg = "#e7e8ee" if sender == "You" else WHITE
+            row = tk.Frame(content, bg="#f3f3f5")
+            row.pack(fill="x", pady=(0, self.S(14)))
+            bind_scroll(row)
+            bubble = tk.Frame(row, bg=bubble_bg, width=bubble_width, height=bubble_height,
+                              highlightthickness=0)
+            bubble.pack(side="right" if sender == "You" else "left",
+                        padx=self.S(12), anchor="e" if sender == "You" else "w")
+            bubble.pack_propagate(False)
+            bind_scroll(bubble)
+
+            header = tk.Frame(bubble, bg=bubble_bg)
+            header.pack(fill="x", padx=self.S(14), pady=(self.S(9), self.S(5)))
+            bind_scroll(header)
+            sender_label = tk.Label(header, text=sender, bg=bubble_bg, fg=INK,
+                                    font=self.font(14, "bold"))
+            sender_label.pack(side="left")
+            bind_scroll(sender_label)
+            if sender == "Sarah":
+                copy_button = tk.Button(
+                    header, text="Copy", command=lambda body=message: self.copy_chat_message(body),
+                    bg=bubble_bg, fg=TEXT_MUTED, activebackground=bubble_bg,
+                    relief="flat", bd=0, padx=self.S(5), cursor="hand2",
+                    font=self.font(10))
+                copy_button.pack(side="right")
+                bind_scroll(copy_button)
+            time_label = tk.Label(header, text="now", bg=bubble_bg, fg=TEXT_MUTED,
+                                  font=self.font(12))
+            time_label.pack(side="right", padx=(0, self.S(8)))
+            bind_scroll(time_label)
+
+            body = tk.Text(
+                bubble, height=line_count, wrap="word", bd=0, highlightthickness=0,
+                padx=0, pady=0, bg=bubble_bg, fg=TEXT_DARK, font=self.font(14),
+                selectbackground="#c7d2fe", cursor="xterm",
+            )
+            body.insert("1.0", message)
+            body.configure(state="disabled")
+            body.pack(fill="both", expand=True, padx=self.S(14), pady=(0, self.S(12)))
+            body.bind("<Control-c>", lambda event, text=message: self.copy_chat_selection(event, text))
+            body.bind("<Control-C>", lambda event, text=message: self.copy_chat_selection(event, text))
+            bind_scroll(body)
+
+        self.c.create_window(x1 + self.S(8), messages_top, window=self.chat_view_frame,
+                             width=viewport_w, height=viewport_h, anchor="nw")
+        self.after_idle(lambda: message_canvas.yview_moveto(1.0)
+                        if message_canvas.winfo_exists() else None)
+
         self.rrect(x1 + self.S(28), input_y, x2 - self.S(28), input_y + input_h,
                    self.S(16), fill=WHITE, outline=BORDER, width=self.S(1.2))
         entry = tk.Entry(self, relief="flat", bd=0, font=self.font(14), fg=TEXT_DARK,
