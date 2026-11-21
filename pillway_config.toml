@@ -194,7 +194,7 @@ minutes_per_follow_up_high = 15
 #  [storage]  Where the app saves data on this computer.
 # -----------------------------------------------------------------------------
 [storage]
-# Leave blank for the normal place (Windows: AppData\Local\Pillway, Mac: ~/Library/Application Support/Pillway).
+# Leave blank for the normal place (Windows: AppData\Local\Pillway, Mac and Linux: ~/.local/share/Pillway).
 data_folder = ""
 
 

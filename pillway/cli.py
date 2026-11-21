@@ -6,6 +6,7 @@ Called by: Pillway.py.
   --reset-demo        restore Maria (and the other demo patients) to a fresh state
   --role patient|pharmacist   open straight into one side (run two windows side by side)
   --demo              force demo mode for this run (no AI, no internet needed)
+  --rehearse          run the 5-minute stage script without the window and time each reply
 """
 
 import argparse
@@ -22,6 +23,7 @@ def parse_args(argv=None):
     parser.add_argument("--reset-demo", action="store_true", help="restore the demo patients to a fresh state")
     parser.add_argument("--role", choices=["patient", "pharmacist"], help="open straight into one side")
     parser.add_argument("--demo", action="store_true", help="force demo mode (no AI) for this run")
+    parser.add_argument("--rehearse", action="store_true", help="run the stage script in the terminal and time it")
     return parser.parse_args(argv)
 
 
@@ -105,5 +107,9 @@ def run(argv=None):
         return None
     if args.reset_demo:
         reset_demo()
+        return None
+    if args.rehearse:
+        from pillway.rehearse import rehearse
+        rehearse()
         return None
     return args.role or ""

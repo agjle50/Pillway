@@ -4,7 +4,11 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from pillway.app import PillwayApp
+try:
+    import tkinter  # noqa: F401
+    from pillway.app import PillwayApp
+except ImportError:  # no window toolkit on this computer (e.g. a server): skip these UI tests
+    raise unittest.SkipTest("tkinter is not installed")
 from pillway.storage.chat_history import ChatHistoryStore
 from pillway.core.medical_robot import MedicalRobot
 from pillway.storage.profile_store import ProfileStore

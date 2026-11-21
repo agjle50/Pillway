@@ -13,6 +13,7 @@ Every decision is written to the audit log.
 from datetime import datetime, timedelta
 
 from ..storage import audit_log
+from .deidentify import redact_text
 from ..storage.patient_store import new_id, now_iso
 
 AI_OK, AI_UNAVAILABLE, AI_DISABLED = "ok", "unavailable", "disabled"
@@ -112,7 +113,8 @@ def open_flags(record):
 
 def _audit(patient_id, message, decision, layer1, layer2, flag_id, grouped=False):
     audit_log.record(
-        "flag_decision", patient_id, message_id=message["id"], flag_id=flag_id, grouped=grouped,
+        "flag_decision", patient_id, message_id=message["id"], message_text=redact_text(message["text"]),
+        message_time=message.get("time"), flag_id=flag_id, grouped=grouped,
         layer1_tier=layer1.tier, layer1_words=layer1.matched_words, needs_ai_check=layer1.needs_ai_check,
         layer2=layer2, ai_status=decision["ai_status"], final_tier=decision["final_tier"],
     )

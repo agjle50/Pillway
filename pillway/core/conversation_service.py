@@ -204,9 +204,14 @@ class ConversationService:
             else:
                 flagging.apply_flag(record, message, decision, layer1, layer2, source=channel)  # audit only
             ask_specifics = bool(flag and flag["tier"] == 2 and plan["stage_before"] == "questions")
-            if ask_specifics:
+            if ask_specifics or (flag and flag["tier"] == 1):
                 record["conversation"]["pending_flag_followup"] = {"flag_id": flag["id"], "resume": plan["next_question"]}
-            reply, statements, problems = reply_builder.build(record, plan, ai_result, decision if flag else None, ask_specifics)
+            if flag and flag["tier"] == 1:  # the AI found something urgent the word list missed
+                reply, statements = reply_builder.build_tier1(record, decision, ai_result.get("possible_issues", []))
+                problems, ask_specifics = [], True
+            else:
+                reply, statements, problems = reply_builder.build(record, plan, ai_result, decision if flag else None,
+                                                                  ask_specifics)
             if problems:
                 audit_log.record("output_guard_blocked", record["id"], problems=problems, source=source)
                 record["pharmacist_requests"].append({"id": new_id("req"), "time": now_iso(), "status": "open",

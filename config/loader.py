@@ -48,10 +48,15 @@ def _read_toml(path):
 
 
 def _read_dotenv(path):
-    """Tiny .env reader (KEY=value lines). Avoids needing python-dotenv to start."""
+    """Read .env with python-dotenv if installed, otherwise a tiny KEY=value reader."""
     values = {}
     if not path.exists():
         return values
+    try:
+        from dotenv import dotenv_values
+        return {key: value or "" for key, value in dotenv_values(path).items()}
+    except ImportError:
+        pass
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line or line.startswith("#") or "=" not in line:
