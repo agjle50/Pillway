@@ -1,0 +1,35 @@
+{
+  "_about": "Made-up sample content for the patient dashboard (orders, banner, starter notifications). Edit freely.",
+  "banner_text": "Get a virtual assistant doctor to help you discover your condition today, live.",
+  "notifications": [
+    [
+      "Weekly check-in is ready",
+      "Foot-care week. Takes 2 minutes."
+    ],
+    [
+      "Reminder",
+      "Check your blood sugar at 8:00 AM."
+    ],
+    [
+      "Order shipped",
+      "Order #1057 is on its way."
+    ]
+  ],
+  "orders": [
+    [
+      "Order #1063",
+      "Glucose sensors  ·  Processing",
+      "Processing"
+    ],
+    [
+      "Order #1057",
+      "Test strips  ·  Shipped Nov 20",
+      "Shipped"
+    ],
+    [
+      "Order #1042",
+      "Monthly refill  ·  Delivered Nov 18",
+      "Delivered"
+    ]
+  ]
+}

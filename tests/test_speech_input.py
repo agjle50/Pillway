@@ -8,7 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from pillway.speech_input import LocalSpeechInput, MODEL_NAME, ensure_model
+from pillway.voice.speech_input import LocalSpeechInput, MODEL_NAME, ensure_model
 
 
 class ModelResponse(io.BytesIO):
@@ -31,7 +31,7 @@ class SpeechInputTests(unittest.TestCase):
             (f"{MODEL_NAME}/conf/mfcc.conf", "configuration"),
         ))
         with tempfile.TemporaryDirectory() as directory:
-            with patch("pillway.speech_input.urllib.request.urlopen",
+            with patch("pillway.voice.speech_input.urllib.request.urlopen",
                        return_value=ModelResponse(content)):
                 model_path = ensure_model(Path(directory) / "models",
                                           threading.Event(), queue.Queue())
@@ -47,7 +47,7 @@ class SpeechInputTests(unittest.TestCase):
         ))
         with tempfile.TemporaryDirectory() as directory:
             model_root = Path(directory) / "models"
-            with patch("pillway.speech_input.urllib.request.urlopen",
+            with patch("pillway.voice.speech_input.urllib.request.urlopen",
                        return_value=ModelResponse(content)):
                 with self.assertRaisesRegex(ValueError, "unsafe path"):
                     ensure_model(model_root, threading.Event(), queue.Queue())
@@ -90,7 +90,7 @@ class SpeechInputTests(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as directory:
             listener = LocalSpeechInput(Path(directory), events)
-            with patch("pillway.speech_input.ensure_model", return_value=Path(directory)), patch.dict(
+            with patch("pillway.voice.speech_input.ensure_model", return_value=Path(directory)), patch.dict(
                 "sys.modules",
                 {"sounddevice": fake_sounddevice, "vosk": fake_vosk},
             ):

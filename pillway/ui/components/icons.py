@@ -2,7 +2,8 @@
 
 import math
 
-from .constants import FONT, WHITE
+from .. import theme
+from ..theme import WHITE
 
 
 class IconMixin:
@@ -53,7 +54,7 @@ class IconMixin:
         elif kind == "rx":
             rect(4, 5, 20, 19, 2)
             c.create_text(cx, cy, text="Rx", fill=color,
-                          font=(FONT, -max(1, round(7 * u)), "bold"), tags=tags)
+                          font=(theme.FONT, -max(1, round(7 * u)), "bold"), tags=tags)
         elif kind == "stethoscope":
             line(7, 3, 7, 10, 12, 15, 17, 10, 17, 3, smooth=True)
             line(12, 15, 12, 19, 16, 20, 18, 17, smooth=True)
@@ -77,7 +78,7 @@ class IconMixin:
             line(10, 20, 14, 20)
         elif kind == "question":
             c.create_text(cx, cy, text="?", fill=color,
-                          font=(FONT, -max(1, round(20 * u)), "bold"), tags=tags)
+                          font=(theme.FONT, -max(1, round(20 * u)), "bold"), tags=tags)
         elif kind == "bell":
             line(6, 17, 7, 9.5, 12, 4.5, 17, 9.5, 18, 17, smooth=True)
             line(4.5, 17, 19.5, 17)

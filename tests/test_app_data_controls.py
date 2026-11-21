@@ -5,9 +5,9 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from pillway.app import PillwayApp
-from pillway.chat_history import ChatHistoryStore
-from pillway.medical_robot import MedicalRobot
-from pillway.profile_store import ProfileStore
+from pillway.storage.chat_history import ChatHistoryStore
+from pillway.core.medical_robot import MedicalRobot
+from pillway.storage.profile_store import ProfileStore
 
 
 class AppDataControlTests(unittest.TestCase):

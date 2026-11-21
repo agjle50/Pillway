@@ -1,6 +1,6 @@
 """Launch the Pillway desktop application."""
 
-from pillway import PillwayApp
+from pillway.app import PillwayApp
 
 
 if __name__ == "__main__":
