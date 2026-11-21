@@ -3,7 +3,7 @@ import unittest
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from pillway.chat_history import ChatHistoryStore, format_chat_time, local_timestamp
+from pillway.storage.chat_history import ChatHistoryStore, format_chat_time, local_timestamp
 
 
 class ChatHistoryStoreTests(unittest.TestCase):

@@ -1,8 +1,8 @@
 import unittest
 from datetime import datetime
 
-from pillway.medical_robot import MedicalRobot
-from pillway.medical_guidance import MEDICAL_KEYWORDS
+from pillway.core.medical_robot import MedicalRobot
+from pillway.core.medical_guidance import MEDICAL_KEYWORDS
 
 
 class MedicalRobotTests(unittest.TestCase):

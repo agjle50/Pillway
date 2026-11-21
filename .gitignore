@@ -1,0 +1,22 @@
+# Python build junk (never commit these)
+__pycache__/
+*.pyc
+*.pyo
+
+# Secrets: your personal settings and API key live here. NEVER commit them.
+pillway_config.local.toml
+.env
+
+# Local app data created while running the demo
+*.db
+*.db-wal
+*.db-shm
+pillway_data/
+*.lock
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

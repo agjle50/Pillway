@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from pillway.profile_store import ProfileStore
+from pillway.storage.profile_store import ProfileStore
 
 
 class ProfileStoreTests(unittest.TestCase):

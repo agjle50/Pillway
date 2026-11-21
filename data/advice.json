@@ -1,0 +1,282 @@
+{
+  "_about": "Sarah's offline (demo mode) replies, in plain language, based on Diabetes Canada patient resources. Also used as a safe fallback if the AI is down. {curly} words are filled in by the app. French needs review. NO medication advice is allowed in this file.",
+  "sources": {
+    "protein": "https://www.diabetes.ca/nutrition-and-recipes/nutrition/protein-and-diabetes-what-you-need-to-know",
+    "fibre": "https://www.diabetes.ca/nutrition-and-recipes/nutrition/get-the-facts-on-fibre",
+    "foot_care": "https://www.diabetes.ca/living-with-diabetes/tools-and-resources (Foot Health PDF)",
+    "low_blood_sugar": "https://www.diabetes.ca/living-with-diabetes/blood-sugar-management/hypoglycemia",
+    "blood_pressure": "https://www.diabetes.ca/living-with-diabetes/managing-complications/high-blood-pressure"
+  },
+  "greeting": {
+    "en": "Hi {first_name}, I'm {assistant}, {pharmacy}'s automated care assistant.",
+    "fr": "Bonjour {first_name}, je suis {assistant}, l'assistante automatisée de {pharmacy}."
+  },
+  "changes_none": {
+    "en": "Thanks for confirming. Let's do a few quick questions, one at a time.",
+    "fr": "Merci de confirmer. Passons à quelques questions rapides, une à la fois."
+  },
+  "changes_ask_detail": {
+    "en": "Thanks for letting me know. What has changed? For example a new symptom, a new medicine, or a new reading.",
+    "fr": "Merci de me le dire. Qu'est-ce qui a changé? Par exemple, un nouveau symptôme, un nouveau médicament ou une nouvelle mesure."
+  },
+  "changes_unclear": {
+    "en": "I want to make sure I get this right. Could you tell me a bit more about what changed?",
+    "fr": "Je veux être certaine de bien comprendre. Pouvez-vous m'en dire un peu plus sur ce qui a changé?"
+  },
+  "updated_intro": {
+    "en": "Here's what I updated:",
+    "fr": "Voici ce que j'ai mis à jour :"
+  },
+  "side_effect": {
+    "en": "{symptom_cap} can be a common side effect of {medication}, which is on your medication list. I've let your pharmacist know so they can check.",
+    "fr": "{symptom_cap} peut être un effet secondaire courant de {medication}, qui figure sur votre liste de médicaments. J'en ai informé votre pharmacien pour qu'il vérifie."
+  },
+  "new_medication_noted": {
+    "en": "I've noted that you started a new medicine. Your pharmacist will confirm its name and dose with you.",
+    "fr": "J'ai noté que vous avez commencé un nouveau médicament. Votre pharmacien confirmera son nom et sa dose avec vous."
+  },
+  "medication_question": {
+    "en": "That's a great question for your pharmacist, I've sent it to them.",
+    "fr": "C'est une excellente question pour votre pharmacien, je la lui ai transmise."
+  },
+  "tier1_suffix": {
+    "en": "A pharmacist will contact you soon. If you feel very unwell, call 911 or go to the nearest emergency department.",
+    "fr": "Un pharmacien communiquera avec vous bientôt. Si vous vous sentez très mal, composez le 911 ou rendez-vous à l'urgence la plus proche."
+  },
+  "tier1_intro": {
+    "en": "Thank you for telling me. This is important, so I've shared it with your pharmacist right away.",
+    "fr": "Merci de me l'avoir dit. C'est important, alors je l'ai transmis à votre pharmacien immédiatement."
+  },
+  "tier2_suffix": {
+    "en": "I've shared this with your pharmacist so they can keep an eye on it.",
+    "fr": "J'ai transmis ceci à votre pharmacien pour qu'il puisse faire un suivi."
+  },
+  "flag_followup_thanks": {
+    "en": "Thank you, those details will help your pharmacist. A pharmacist will contact you soon.",
+    "fr": "Merci, ces détails aideront votre pharmacien. Un pharmacien communiquera avec vous bientôt."
+  },
+  "possible_issue": {
+    "en": "Based on what you said, you may have {issue}, because {reason}. Your pharmacist will look at this with you.",
+    "fr": "D'après ce que vous dites, vous pourriez avoir {issue}, car {reason}. Votre pharmacien examinera cela avec vous."
+  },
+  "unsure_handoff": {
+    "en": "I'm not sure about that one, and I don't want to guess. I've asked your pharmacist to get back to you.",
+    "fr": "Je ne suis pas certaine pour celle-là, et je ne veux pas deviner. J'ai demandé à votre pharmacien de vous répondre."
+  },
+  "off_topic": {
+    "en": "I'm here to help with your health and your care plan. Let's keep going.",
+    "fr": "Je suis là pour vous aider avec votre santé et votre plan de soins. Continuons."
+  },
+  "diet": {
+    "unsure": {
+      "en": "That's very common when diabetes is new, so you're not alone. A simple start is the plate method: fill half your plate with vegetables, a quarter with protein, and a quarter with whole grains or starchy foods. To give you the right protein advice, I need to check one thing first.",
+      "fr": "C'est très courant quand le diabète est nouveau, vous n'êtes pas seule. Un bon début est la méthode de l'assiette : la moitié de légumes, un quart de protéines et un quart de grains entiers ou de féculents. Pour bien vous conseiller sur les protéines, je dois d'abord vérifier une chose."
+    },
+    "well": {
+      "en": "That's great to hear. Keeping meals regular, about 4 to 6 hours apart, helps keep your blood sugar steady. Before we talk about protein, I need to check one thing.",
+      "fr": "C'est très bien. Garder des repas réguliers, à environ 4 à 6 heures d'intervalle, aide à stabiliser la glycémie. Avant de parler de protéines, je dois vérifier une chose."
+    },
+    "better": {
+      "en": "That's a great goal. One easy change is adding fibre: oats, barley, beans, berries and apples all help with blood sugar and cholesterol. Before we talk about protein, I need to check one thing.",
+      "fr": "C'est un excellent objectif. Un changement facile est d'ajouter des fibres : avoine, orge, légumineuses, petits fruits et pommes aident la glycémie et le cholestérol. Avant de parler de protéines, je dois vérifier une chose."
+    }
+  },
+  "protein": {
+    "target": {
+      "en": "Thanks. Since no doctor has asked you to limit protein, here's your personal target: at {weight} kg, aim for about {low} to {high} g of protein a day (0.8 to 1.0 g for each kg). For example, 2 eggs have about 12 g, 3/4 cup of Greek yogurt about 17 g, a palm-sized piece of chicken or fish about 25 g, and 3/4 cup of lentils about 12 g. Spreading protein over your meals helps keep your blood sugar steadier.",
+      "fr": "Merci. Comme aucun médecin ne vous a demandé de limiter les protéines, voici votre objectif personnel : à {weight} kg, visez environ {low} à {high} g de protéines par jour (0,8 à 1,0 g par kg). Par exemple, 2 œufs contiennent environ 12 g, 3/4 tasse de yogourt grec environ 17 g, un morceau de poulet ou de poisson de la taille de la paume environ 25 g, et 3/4 tasse de lentilles environ 12 g. Répartir les protéines sur vos repas aide à stabiliser votre glycémie."
+    },
+    "limited": {
+      "en": "Thank you for telling me. Because a doctor has asked you to limit protein, I won't suggest a protein amount. Your pharmacist will set the right target with you, and I've let them know.",
+      "fr": "Merci de me le dire. Comme un médecin vous a demandé de limiter les protéines, je ne vous proposerai pas de quantité. Votre pharmacien fixera la bonne cible avec vous, et je l'en ai informé."
+    },
+    "unsure": {
+      "en": "That's okay. To be safe, I won't suggest a protein amount yet. I've asked your pharmacist to check your records and set your target with you.",
+      "fr": "Ce n'est pas grave. Par prudence, je ne vous proposerai pas encore de quantité de protéines. J'ai demandé à votre pharmacien de vérifier votre dossier et de fixer votre cible avec vous."
+    },
+    "no_weight": {
+      "en": "Thanks. To work out your protein target I need your weight. About how much do you weigh, in kg or pounds?",
+      "fr": "Merci. Pour calculer votre cible de protéines, j'ai besoin de votre poids. Combien pesez-vous environ, en kg ou en livres?"
+    }
+  },
+  "feet": {
+    "fine": {
+      "en": "Good. Keep checking your feet every day, including between your toes and the soles (a hand mirror helps). Wash in warm, not hot, water, dry well between the toes, and wear clean socks and shoes that fit.",
+      "fr": "Bien. Continuez de vérifier vos pieds chaque jour, y compris entre les orteils et sous les pieds (un miroir à main aide). Lavez-les à l'eau tiède, pas chaude, séchez bien entre les orteils et portez des chaussettes propres et des chaussures bien ajustées."
+    },
+    "dont_check": {
+      "en": "That's okay, many people don't yet. Diabetes can make it harder to feel small cuts, so a quick daily check really matters. Look at the tops, soles and between your toes each evening; a hand mirror helps.",
+      "fr": "Ce n'est pas grave, beaucoup de gens ne le font pas encore. Le diabète peut rendre plus difficile de sentir les petites coupures, alors une vérification quotidienne est très importante. Regardez le dessus, le dessous et entre les orteils chaque soir; un miroir à main aide."
+    },
+    "noticed": {
+      "en": "Thank you for checking. What did you notice, and where on your foot?",
+      "fr": "Merci d'avoir vérifié. Qu'avez-vous remarqué, et à quel endroit du pied?"
+    }
+  },
+  "blood_sugar": {
+    "reading": {
+      "en": "Thanks, I've noted {reading}{when}. For many adults with diabetes, Diabetes Canada's usual targets are 4 to 7 mmol/L before meals and 5 to 10 two hours after eating. Your pharmacist will confirm your personal target.",
+      "fr": "Merci, j'ai noté {reading}{when}. Pour beaucoup d'adultes diabétiques, les cibles habituelles de Diabète Canada sont de 4 à 7 mmol/L avant les repas et de 5 à 10 deux heures après. Votre pharmacien confirmera votre cible personnelle."
+    },
+    "none": {
+      "en": "That's okay. When you can, try checking before breakfast and 2 hours after a meal, and write down the number and time. It helps your pharmacist see patterns.",
+      "fr": "Ce n'est pas grave. Quand vous le pouvez, essayez de vérifier avant le déjeuner et 2 heures après un repas, et notez le chiffre et l'heure. Cela aide votre pharmacien à voir des tendances."
+    },
+    "ask_number": {
+      "en": "Thanks. Could you tell me the number on your meter, and whether it was before or after a meal?",
+      "fr": "Merci. Pouvez-vous me donner le chiffre de votre lecteur, et si c'était avant ou après un repas?"
+    }
+  },
+  "blood_pressure": {
+    "reading": {
+      "en": "Thanks, I've noted {reading}{when}. Your care plan target is below 130/80. Checking at the same time each day, after sitting quietly for 5 minutes, gives the most useful numbers.",
+      "fr": "Merci, j'ai noté {reading}{when}. La cible de votre plan de soins est inférieure à 130/80. Mesurer à la même heure chaque jour, après 5 minutes assise au calme, donne les chiffres les plus utiles."
+    },
+    "none": {
+      "en": "That's okay. If you can, check once a day at the same time, after sitting quietly for 5 minutes. Many pharmacies have a free machine if you don't have a cuff at home.",
+      "fr": "Ce n'est pas grave. Si possible, mesurez une fois par jour à la même heure, après 5 minutes assise au calme. Beaucoup de pharmacies ont un appareil gratuit si vous n'avez pas de tensiomètre."
+    }
+  },
+  "activity": {
+    "low": {
+      "en": "Thanks for being honest. Small steps count: a 10-minute walk after a meal can lower your blood sugar. Working up to 150 minutes a week (about 20 minutes a day) is the goal.",
+      "fr": "Merci de votre honnêteté. Chaque petit pas compte : une marche de 10 minutes après un repas peut baisser la glycémie. L'objectif est d'arriver à 150 minutes par semaine (environ 20 minutes par jour)."
+    },
+    "medium": {
+      "en": "Good start. The goal is 150 minutes a week, plus 2 short strength sessions, like chair squats or wall push-ups.",
+      "fr": "Bon début. L'objectif est de 150 minutes par semaine, plus 2 courtes séances de renforcement, comme des flexions sur une chaise ou des pompes au mur."
+    },
+    "high": {
+      "en": "That's excellent, you're at or above the 150-minute goal. Adding 2 short strength sessions a week helps even more.",
+      "fr": "Excellent, vous atteignez ou dépassez l'objectif de 150 minutes. Ajouter 2 courtes séances de renforcement par semaine aide encore plus."
+    }
+  },
+  "alcohol": {
+    "low": {
+      "en": "Thanks. Your care plan suggests no more than 2 standard drinks a week, so you're on track.",
+      "fr": "Merci. Votre plan de soins suggère au plus 2 verres standards par semaine, donc vous êtes sur la bonne voie."
+    },
+    "high": {
+      "en": "Thanks for telling me. Your care plan suggests no more than 2 standard drinks a week. Alcohol can also make low blood sugar more likely, so cutting back slowly can help.",
+      "fr": "Merci de me le dire. Votre plan de soins suggère au plus 2 verres standards par semaine. L'alcool peut aussi rendre les baisses de glycémie plus probables; réduire graduellement peut aider."
+    }
+  },
+  "smoking": {
+    "not_thinking": {
+      "en": "Thanks for telling me. Whenever you feel ready, your pharmacist can help, no pressure.",
+      "fr": "Merci de me le dire. Quand vous serez prêt(e), votre pharmacien pourra vous aider, sans pression."
+    },
+    "thinking": {
+      "en": "That's a good first step. Your pharmacist can talk through options that fit you.",
+      "fr": "C'est un bon premier pas. Votre pharmacien peut discuter avec vous des options qui vous conviennent."
+    },
+    "ready": {
+      "en": "That's great. I've let your pharmacist know so they can help you make a plan.",
+      "fr": "C'est formidable. J'en ai informé votre pharmacien pour qu'il vous aide à faire un plan."
+    }
+  },
+  "barriers": {
+    "time": {
+      "en": "That makes sense. Short bursts count: three 10-minute walks are as good as one 30-minute walk. I'll add this to your care plan.",
+      "fr": "C'est compréhensible. Les courtes périodes comptent : trois marches de 10 minutes valent une marche de 30 minutes. Je l'ajoute à votre plan de soins."
+    },
+    "cost": {
+      "en": "That's a real barrier. Frozen vegetables, canned beans and lentils, oats and eggs are low-cost and great for blood sugar. I'll add this to your care plan.",
+      "fr": "C'est un vrai obstacle. Les légumes surgelés, les légumineuses en conserve, l'avoine et les œufs coûtent peu et sont excellents pour la glycémie. Je l'ajoute à votre plan de soins."
+    },
+    "motivation": {
+      "en": "That's very normal. Picking one small goal and tracking it in your Tasks can help. I'll add this to your care plan.",
+      "fr": "C'est très normal. Choisir un petit objectif et le suivre dans vos tâches peut aider. Je l'ajoute à votre plan de soins."
+    },
+    "pain": {
+      "en": "I'm sorry you're dealing with that. Gentle activity like chair exercises or water walking may be easier, and I've let your pharmacist know. I'll add this to your care plan.",
+      "fr": "Je suis désolée que vous viviez cela. Une activité douce, comme des exercices sur chaise ou la marche dans l'eau, peut être plus facile, et j'en ai informé votre pharmacien. Je l'ajoute à votre plan de soins."
+    },
+    "other": {
+      "en": "Thank you for sharing that. I'll add it to your care plan so your pharmacist can help with it.",
+      "fr": "Merci de me le dire. Je l'ajoute à votre plan de soins pour que votre pharmacien puisse vous aider."
+    }
+  },
+  "goal": {
+    "any": {
+      "en": "That's a great goal. I've added it to your care plan.",
+      "fr": "C'est un excellent objectif. Je l'ai ajouté à votre plan de soins."
+    }
+  },
+  "anything_else_more": {
+    "en": "Thank you, I've noted that for your pharmacist.",
+    "fr": "Merci, je l'ai noté pour votre pharmacien."
+  },
+  "care_plan_ready": {
+    "en": "Thank you, {first_name}. Your care plan draft is ready in the Care plan tab, in English and French. It's waiting for your pharmacist's approval. I've also suggested a few daily tasks in Tasks; you can turn any of them off.",
+    "fr": "Merci, {first_name}. L'ébauche de votre plan de soins est prête dans l'onglet Plan de soins, en anglais et en français. Elle attend l'approbation de votre pharmacien. J'ai aussi suggéré quelques tâches quotidiennes dans Tâches; vous pouvez désactiver celles que vous voulez."
+  },
+  "pharmacist_request": {
+    "en": "I've asked a pharmacist to contact you. You can keep chatting with me in the meantime.",
+    "fr": "J'ai demandé à un pharmacien de communiquer avec vous. Vous pouvez continuer à discuter avec moi en attendant."
+  },
+  "after_flow": {
+    "en": "I'm here if you have more questions about your care plan, food, activity or readings.",
+    "fr": "Je suis là si vous avez d'autres questions sur votre plan de soins, l'alimentation, l'activité ou vos mesures."
+  },
+  "update_labels": {
+    "symptom": {
+      "en": "New symptom: {value}",
+      "fr": "Nouveau symptôme : {value}"
+    },
+    "medication": {
+      "en": "New medicine started: {value}",
+      "fr": "Nouveau médicament commencé : {value}"
+    },
+    "reading": {
+      "en": "New reading: {value}",
+      "fr": "Nouvelle mesure : {value}"
+    },
+    "condition": {
+      "en": "New health condition: {value}",
+      "fr": "Nouveau problème de santé : {value}"
+    },
+    "lifestyle": {
+      "en": "Lifestyle change: {value}",
+      "fr": "Changement d'habitude : {value}"
+    },
+    "note": {
+      "en": "Note for your pharmacist: {value}",
+      "fr": "Note pour votre pharmacien : {value}"
+    }
+  },
+  "intake_bits": {
+    "non_smoker": {
+      "en": "you don't smoke",
+      "fr": "vous ne fumez pas"
+    },
+    "smoker": {
+      "en": "you smoke",
+      "fr": "vous fumez"
+    },
+    "no_meds": {
+      "en": "no medications on file yet",
+      "fr": "aucun médicament au dossier pour l'instant"
+    },
+    "and": {
+      "en": "and",
+      "fr": "et"
+    },
+    "name_not_given": {
+      "en": "name not given yet",
+      "fr": "nom pas encore précisé"
+    },
+    "progress": {
+      "en": "Question {n} of {total}",
+      "fr": "Question {n} sur {total}"
+    }
+  },
+  "anything_else_yes": {
+    "en": "Of course. What would you like to tell me?",
+    "fr": "Bien sûr. Que voulez-vous me dire?"
+  },
+  "writing_care_plan": {
+    "en": "Thank you! I'm putting your care plan together now. This takes a moment.",
+    "fr": "Merci! Je prépare votre plan de soins. Cela prend un instant."
+  }
+}

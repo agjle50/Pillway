@@ -1,0 +1,95 @@
+{
+  "_about": "Pillway's Diabetes care plan template, copied from 'diabets care plan.pdf' (pages 3-9): same section titles, same order, same line wording. English first, then French. Line kinds: 'template' = fixed Pillway text; 'target' = a medical target the PHARMACIST fills in (the AI never does); 'computed' = worked out by the app (protein from weight); 'optional' = only included if the pharmacist ticks it. The AI adds personal lifestyle lines under sections marked ai_lifestyle=true. Placeholders: {blank} = empty box for the pharmacist, {protein_low}/{protein_high} = grams, {pharmacy} = pharmacy name. French marked source 'pillway_pdf' is Pillway's own wording; everything else 'needs review'.",
+  "source_pdf": "docs/diabets care plan.pdf",
+  "journey_steps": [
+    {"id": "questionnaire", "en": "Pre-assessment completed", "fr": "Pré-évaluation terminée"},
+    {"id": "check_in", "en": "Check-in with Sarah completed", "fr": "Suivi avec Sarah terminé"},
+    {"id": "draft", "en": "Care plan drafted", "fr": "Plan de soins rédigé"},
+    {"id": "approved", "en": "Care plan provided", "fr": "Plan de soins fourni"},
+    {"id": "follow_up_1", "en": "Follow-up 1 | Fibre", "fr": "Suivi 1 | Fibres"},
+    {"id": "follow_up_2", "en": "Follow-up 2 | Foot care", "fr": "Suivi 2 | Soins des pieds"}
+  ],
+  "readiness_options": [
+    {"id": "motivated", "en": "Patient is motivated and open to making changes to their diabetes management.",
+     "fr": "Le patient est motivé et ouvert à apporter des changements à la gestion de son diabète."},
+    {"id": "contemplating", "en": "Patient is contemplating making changes to their diabetes management but is not ready to make changes at this time.",
+     "fr": "Le patient envisage d'apporter des changements à la gestion de son diabète, mais n'est pas prêt à le faire pour le moment."},
+    {"id": "not_considering", "en": "Patient is not considering making changes to their diabetes management at this time.",
+     "fr": "Le patient n'envisage pas d'apporter des changements à la gestion de son diabète pour le moment."},
+    {"id": "other", "en": "Other:", "fr": "Autre :"}
+  ],
+  "goals_title": {"en": "What are the patient's self-identified health goals?", "fr": "Quels sont les objectifs de santé définis par le patient?"},
+  "care_plan_title": {"en": "Care Plan", "fr": "Plan de soins"},
+  "sections": [
+    {"id": "pharmacist_identified_goals", "en": "Pharmacist identified goals", "fr": "Objectifs identifiés par le pharmacien", "ai_lifestyle": true,
+     "lines": [
+      {"id": "a1c_target", "kind": "target", "en": "A1C target: {blank} %.", "fr": "Objectif A1C : {blank} %.", "fr_source": "pillway_pdf"},
+      {"id": "bp_target", "kind": "template", "en": "Average resting blood pressure target: below 130/80 mmHg", "fr": "Objectif de tension artérielle moyenne au repos : inférieur à 130/80 mmHg.", "fr_source": "pillway_pdf"},
+      {"id": "ldl_target", "kind": "template", "en": "LDL-cholesterol target: below 2.0 mmol/L.", "fr": "Objectif de cholestérol LDL : inférieur à 2,0 mmol/L.", "fr_source": "pillway_pdf"},
+      {"id": "take_meds", "kind": "template", "en": "Take your medications as prescribed and/or directed by your healthcare team.", "fr": "Prenez vos médicaments tel que prescrit et/ou dirigé par votre équipe soignante.", "fr_source": "pillway_pdf"},
+      {"id": "protein", "kind": "computed", "en": "Eat 0.8-1.0 g protein / kg body weight / day = daily target: {protein_target} g.", "fr": "Mangez 0,8 à 1,0 g de protéines/kg de poids corporel/jour = objectif quotidien : {protein_target} g.", "fr_source": "pillway_pdf"},
+      {"id": "fibre", "kind": "template", "en": "Eat 30-50 g of fibre per day with at least a third coming from viscous soluble dietary fibre (e.g., oats, barley, psyllium, apples, berries, and citrus fruits).", "fr": "Mangez 30 à 50 g de fibres par jour, dont au moins un tiers provient de fibres alimentaires visqueuses solubles (par exemple, avoine, orge, psyllium, pommes, baies et agrumes).", "fr_source": "pillway_pdf"},
+      {"id": "alcohol", "kind": "template", "en": "Reduce or eliminate alcohol consumption (max. 2 standard drinks per week).", "fr": "Réduire ou éliminer la consommation d'alcool (max. 2 verres standards par semaine).", "fr_source": "pillway_pdf"},
+      {"id": "fasting_min", "kind": "optional", "en": "Minimum fasting period: 12 hours per day (including overnight).", "fr": "Période de jeûne minimale : 12 heures par jour (y compris la nuit).", "fr_source": "pillway_pdf", "note": "Pharmacist decides: fasting is not safe for everyone (some diabetes medicines)."},
+      {"id": "fasting_target", "kind": "optional", "en": "Target fasting period: 16 hours per day (including overnight).", "fr": "Période de jeûne cible : 16 heures par jour (y compris la nuit).", "fr_source": "pillway_pdf", "note": "Pharmacist decides: fasting is not safe for everyone (some diabetes medicines)."},
+      {"id": "exercise_min", "kind": "template", "en": "Minimum: 150 minutes per week of moderate to vigorous exercise.", "fr": "Minimum : 150 minutes par semaine d'exercice modéré à vigoureux.", "fr_source": "pillway_pdf"},
+      {"id": "exercise_target", "kind": "target", "en": "Target: {blank} minutes per week of moderate to vigorous exercise.", "fr": "Cible : {blank} minutes par semaine d'exercice modéré à vigoureux.", "fr_source": "pillway_pdf"},
+      {"id": "resistance", "kind": "template", "en": "Incorporate at least two resistance workouts per week to your exercise routine.", "fr": "Intégrez au moins deux entraînements de résistance par semaine à votre routine d'exercice.", "fr_source": "pillway_pdf"},
+      {"id": "sedentary", "kind": "template", "en": "Reduce sedentary activities to less than eight hours per day.", "fr": "Réduisez les activités sédentaires à moins de huit heures par jour.", "fr_source": "pillway_pdf"},
+      {"id": "tir", "kind": "target", "en": "Time In Range (TIR) target: above {blank} %.", "fr": "Objectif de temps dans la cible (TIR) : supérieur à {blank} %.", "fr_source": "needs_review", "note": "Pillway's PDF French says 'temps à portée'; 'temps dans la cible' is the usual Canadian term. Needs review."},
+      {"id": "tbr", "kind": "target", "en": "Time Below Range (TBR) target: below {blank} %.", "fr": "Objectif de temps en dessous de la plage (TBR) : inférieur à {blank} %.", "fr_source": "pillway_pdf"},
+      {"id": "tar", "kind": "target", "en": "Time Above Range (TAR) target: below {blank} %.", "fr": "Objectif de temps au-dessus de la plage (TAR) : inférieur à {blank} %.", "fr_source": "pillway_pdf"},
+      {"id": "gmi", "kind": "target", "en": "Glucose Management Indicator (GMI) target: below {blank} %.", "fr": "Cible de l'indicateur de gestion du glucose (IGM) : inférieure à {blank} %.", "fr_source": "pillway_pdf"},
+      {"id": "variability", "kind": "target", "en": "Glucose variability target: below {blank} %CV.", "fr": "Objectif de variabilité du glucose : inférieur à {blank} %CV.", "fr_source": "pillway_pdf"}
+    ]},
+    {"id": "a1c", "en": "A1C", "fr": "A1C", "ai_lifestyle": true,
+     "lines": [
+      {"id": "a1c_monitor", "kind": "template", "en": "Monitor and record your blood glucose levels daily, ideally before and after meals.", "fr": "Surveillez et notez votre glycémie chaque jour, idéalement avant et après les repas.", "fr_source": "needs_review"},
+      {"id": "a1c_libre", "kind": "optional", "en": "If you are using Freestyle Libre Sensors, you can share your readings with your {pharmacy} pharmacy team by entering the code {blank} in your Libreview account.", "fr": "Si vous utilisez des capteurs Freestyle Libre, vous pouvez partager vos lectures avec l'équipe de votre pharmacie {pharmacy} en entrant le code {blank} dans votre compte LibreView.", "fr_source": "needs_review"},
+      {"id": "a1c_every_3", "kind": "template", "en": "Get your A1C checked every 3 months.", "fr": "Faites vérifier votre A1C tous les 3 mois.", "fr_source": "needs_review"},
+      {"id": "a1c_section_target", "kind": "target", "en": "Target: {blank}", "fr": "Cible : {blank}", "fr_source": "pillway_pdf"}
+    ]},
+    {"id": "blood_pressure", "en": "Blood pressure", "fr": "Tension artérielle", "ai_lifestyle": true,
+     "lines": [
+      {"id": "bp_daily", "kind": "template", "en": "Check your blood pressure at least once a day at the same time.", "fr": "Vérifiez votre tension artérielle au moins une fois par jour, à la même heure.", "fr_source": "needs_review"},
+      {"id": "bp_section_target", "kind": "template", "en": "Target: below 130/80 mmHg", "fr": "Cible : inférieure à 130/80 mmHg", "fr_source": "needs_review"},
+      {"id": "bp_sodium", "kind": "template", "en": "Maintain a low-sodium diet and reduce processed foods.", "fr": "Adoptez une alimentation faible en sodium et réduisez les aliments transformés.", "fr_source": "needs_review"},
+      {"id": "bp_high", "kind": "template", "en": "If you notice your blood pressure readings are consistently high, please contact your doctor or pharmacist.", "fr": "Si vos lectures de tension artérielle sont souvent élevées, communiquez avec votre médecin ou votre pharmacien.", "fr_source": "needs_review"}
+    ]},
+    {"id": "cholesterol", "en": "Cholesterol", "fr": "Cholestérol", "ai_lifestyle": false,
+     "lines": [
+      {"id": "chol_diet", "kind": "template", "en": "Adopt a heart-healthy, high fibre diet.", "fr": "Adoptez une alimentation bonne pour le cœur et riche en fibres.", "fr_source": "needs_review"},
+      {"id": "chol_ldl", "kind": "template", "en": "Target: LDL below 2 mmol/L or 50% reduction from baseline", "fr": "Cible : LDL inférieur à 2 mmol/L ou réduction de 50 % par rapport à la valeur de départ", "fr_source": "needs_review"},
+      {"id": "chol_hdl", "kind": "template", "en": "Target HDL: above 1.0 mmol/L", "fr": "Cible HDL : supérieur à 1,0 mmol/L", "fr_source": "needs_review"},
+      {"id": "chol_tg", "kind": "template", "en": "Target Triglyceride below 1.5 mmol/L", "fr": "Cible des triglycérides : inférieure à 1,5 mmol/L", "fr_source": "needs_review"},
+      {"id": "chol_panel", "kind": "template", "en": "Cholesterol panel should be conducted every 6 months or as recommended by your primary care provider.", "fr": "Un bilan lipidique devrait être fait tous les 6 mois ou selon la recommandation de votre prestataire de soins primaires.", "fr_source": "needs_review"}
+    ]},
+    {"id": "medications", "en": "Medications", "fr": "Médicaments", "ai_lifestyle": false, "filled_by_pharmacist": true,
+     "lines": [
+      {"id": "med_take", "kind": "template", "en": "Take your medications as prescribed by your doctor. If you need help organizing, we can also pre-sort or automate your medication deliveries.", "fr": "Prenez vos médicaments tel que prescrit par votre médecin. Si vous avez besoin d'aide pour vous organiser, nous pouvons aussi préparer vos médicaments à l'avance ou automatiser vos livraisons.", "fr_source": "needs_review"},
+      {"id": "med_side_effects", "kind": "template", "en": "If you notice any side effects from your medication or feel they are not working as they should, please contact a {pharmacy} pharmacist to further investigate.", "fr": "Si vous remarquez des effets secondaires ou si vous trouvez que vos médicaments ne fonctionnent pas comme ils le devraient, communiquez avec un pharmacien de {pharmacy}.", "fr_source": "needs_review"},
+      {"id": "med_changes", "kind": "template", "en": "Please communicate all medication changes (new medication, dose change, discontinuation of medication) to your pharmacist.", "fr": "Informez votre pharmacien de tout changement de médicament (nouveau médicament, changement de dose, arrêt d'un médicament).", "fr_source": "needs_review"},
+      {"id": "med_insulin", "kind": "optional", "en": "Monitor your blood sugar while taking insulin and talk to your doctor or a {pharmacy} pharmacist to adjust your dose to prevent highs and lows.", "fr": "Surveillez votre glycémie pendant que vous prenez de l'insuline et parlez à votre médecin ou à un pharmacien de {pharmacy} pour ajuster votre dose afin d'éviter les hausses et les baisses.", "fr_source": "needs_review", "note": "Only for patients on insulin."},
+      {"id": "med_pharmacist_notes", "kind": "target", "en": "Pharmacist notes: {blank}", "fr": "Notes du pharmacien : {blank}", "fr_source": "needs_review"}
+    ]},
+    {"id": "exercise", "en": "Exercise", "fr": "Exercice", "ai_lifestyle": true,
+     "lines": [
+      {"id": "ex_150", "kind": "template", "en": "Engage in at least 150 minutes weekly of moderate to vigorous exercise (heart rate elevated and sweating) with 300 minutes being the target.", "fr": "Faites au moins 150 minutes par semaine d'exercice modéré à vigoureux (fréquence cardiaque élevée et transpiration), avec 300 minutes comme cible.", "fr_source": "needs_review"},
+      {"id": "ex_resistance", "kind": "template", "en": "Incorporate resistance training twice weekly into your routine.", "fr": "Intégrez des exercices de résistance deux fois par semaine à votre routine.", "fr_source": "needs_review"},
+      {"id": "ex_enjoy", "kind": "template", "en": "Find physical activities you enjoy, whether it's walking, swimming, or dancing.", "fr": "Trouvez des activités physiques que vous aimez, comme la marche, la natation ou la danse.", "fr_source": "needs_review"},
+      {"id": "ex_sedentary", "kind": "template", "en": "Reduce sedentary activities to less than 8 hours a day. For example, take a walk or do some light weight exercises during workday instead of sitting for entirety.", "fr": "Réduisez les activités sédentaires à moins de 8 heures par jour. Par exemple, faites une marche ou quelques exercices légers avec des poids pendant la journée au lieu de rester assis tout le temps.", "fr_source": "needs_review"},
+      {"id": "ex_bmi", "kind": "target", "en": "Target BMI {blank}", "fr": "IMC cible : {blank}", "fr_source": "needs_review", "note": "Pillway's PDF says 18.9-24.9 (usual range is 18.5-24.9). Ask Pillway. Left for the pharmacist; skipped when 'Avoid weight talk' is on."}
+    ]},
+    {"id": "freestyle_libre", "en": "Freestyle Libre", "fr": "Libreview", "ai_lifestyle": false,
+     "lines": [
+      {"id": "libre_save", "kind": "optional", "en": "Save an additional $22 per Freestyle Libre sensor at {pharmacy} pharmacy if you have a prescription and getting it filled at our pharmacy. Share your readings with your {pharmacy} pharmacist by entering the code {blank} in your LibreView account.", "fr": "Économisez 22 $ de plus par capteur Freestyle Libre à la pharmacie {pharmacy} si vous avez une ordonnance et la faites exécuter chez nous. Partagez vos lectures avec votre pharmacien de {pharmacy} en entrant le code {blank} dans votre compte LibreView.", "fr_source": "needs_review", "note": "For sensor users only."},
+      {"id": "libre_tir", "kind": "target", "en": "Targets: Time in range above {blank} %", "fr": "Cibles : temps dans la cible supérieur à {blank} %", "fr_source": "needs_review", "note": "Pillway's PDF says 'Time in range below 70%'. Probably a typo (usual target is above 70%). Ask Pillway."},
+      {"id": "libre_tar", "kind": "target", "en": "Time above range under {blank} %", "fr": "Temps au-dessus de la cible inférieur à {blank} %", "fr_source": "needs_review"},
+      {"id": "libre_tbr", "kind": "target", "en": "Time below range under {blank} %", "fr": "Temps sous la cible inférieur à {blank} %", "fr_source": "needs_review"},
+      {"id": "libre_cv", "kind": "target", "en": "Glucose variability under {blank} %", "fr": "Variabilité du glucose inférieure à {blank} %", "fr_source": "needs_review"},
+      {"id": "libre_gmi", "kind": "target", "en": "GMI below {blank} %", "fr": "IGM inférieur à {blank} %", "fr_source": "needs_review"}
+    ]}
+  ],
+  "barriers_title": {"en": "What are the barriers to achieving the patient's goals and how can they be overcome?", "fr": "Quels sont les obstacles à l'atteinte des objectifs du patient et comment les surmonter?"},
+  "barrier_columns": {"en": ["Barriers to achieving the goals", "Care plan to overcome the barrier"], "fr": ["Obstacles à l'atteinte des objectifs", "Plan pour surmonter l'obstacle"]}
+}

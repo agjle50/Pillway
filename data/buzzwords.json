@@ -1,0 +1,617 @@
+{
+  "_about": "Danger words that layer 1 (core/safety_rules.py) looks for in every patient message. Works with no internet and no AI. Tier 1 = urgent, Tier 2 = watch, Tier 3 = background context only (never an alert). To add a word: add it to the 'phrases' list of the right rule, save, restart. Plurals are matched automatically (sore = sores). Pharmacists can also add words per patient in the app.",
+  "tier1": [
+    {
+      "topic": "vomiting",
+      "phrases": [
+        "vomiting",
+        "vomit",
+        "throwing up",
+        "threw up"
+      ],
+      "ask_next": "How many times have you vomited, and since when? Can you keep any fluids down?"
+    },
+    {
+      "topic": "nausea",
+      "phrases": [
+        "nausea",
+        "nauseous",
+        "nauseated"
+      ],
+      "ask_next": "Since when have you felt sick to your stomach? Have you checked your blood sugar? What was the number?"
+    },
+    {
+      "topic": "stomach pain",
+      "phrases": [
+        "stomach pain",
+        "abdominal pain",
+        "belly pain",
+        "stomach ache",
+        "stomachache"
+      ],
+      "ask_next": "Where is the pain, how bad is it from 1 to 10, and is it getting worse?"
+    },
+    {
+      "topic": "fruity breath",
+      "phrases": [
+        "fruity breath",
+        "sweet-smelling breath",
+        "sweet smelling breath",
+        "acetone breath",
+        "breath smells sweet",
+        "breath smells fruity"
+      ],
+      "ask_next": "Since when has your breath smelled like this? Have you checked your blood sugar? What was the number?"
+    },
+    {
+      "topic": "breathing problems",
+      "phrases": [
+        "heavy breathing",
+        "deep breathing",
+        "gasping",
+        "short of breath",
+        "shortness of breath",
+        "trouble breathing",
+        "difficulty breathing",
+        "can't breathe",
+        "cannot breathe",
+        "hard to breathe"
+      ],
+      "ask_next": "Is it hard to breathe right now, or did it happen earlier? Is it getting worse?"
+    },
+    {
+      "topic": "confusion",
+      "phrases": [
+        "confused",
+        "confusion",
+        "disoriented",
+        "foggy",
+        "slurred",
+        "slurred speech"
+      ],
+      "ask_next": "When did this start? Is someone with you right now?"
+    },
+    {
+      "topic": "drowsiness or fainting",
+      "phrases": [
+        "drowsy",
+        "hard to wake",
+        "lethargic",
+        "passing out",
+        "passed out",
+        "fainting",
+        "fainted",
+        "unconscious"
+      ],
+      "ask_next": "When did this happen, and is someone with you right now?"
+    },
+    {
+      "topic": "severe dehydration",
+      "phrases": [
+        "severely dehydrated",
+        "can't keep fluids down",
+        "cannot keep fluids down",
+        "can't keep water down"
+      ],
+      "ask_next": "Since when have you been unable to keep fluids down?"
+    },
+    {
+      "topic": "foot wound or sore",
+      "phrases": [
+        "foot sore",
+        "sore on my foot",
+        "sore on my feet",
+        "sore on my toe",
+        "sores on my feet",
+        "wound",
+        "ulcer",
+        "blister that won't heal",
+        "blister that will not heal",
+        "cut on my foot",
+        "foot infection",
+        "black toe",
+        "toe is black"
+      ],
+      "ask_next": "Where on your foot is the sore? How long has it been there? Is it getting bigger, red, warm or leaking? How bad is it from 1 to 10?"
+    },
+    {
+      "topic": "numb feet",
+      "phrases": [
+        "numb feet",
+        "numb foot",
+        "numb toes",
+        "feet are numb",
+        "foot is numb",
+        "toes are numb",
+        "toes feel numb",
+        "feet feel numb",
+        "foot feels numb",
+        "can't feel my feet",
+        "can't feel my toes",
+        "cannot feel my feet",
+        "cannot feel my toes",
+        "can't feel my foot"
+      ],
+      "ask_next": "Which part of your feet feels numb, and since when? Is it getting worse? Do you also have any sores or cuts?"
+    },
+    {
+      "topic": "chest pain",
+      "phrases": [
+        "chest pain",
+        "chest pressure",
+        "chest tightness",
+        "pain in my chest"
+      ],
+      "ask_next": "Is the chest pain happening right now? If yes, please call 911 now."
+    },
+    {
+      "topic": "signs of stroke",
+      "phrases": [
+        "face drooping",
+        "face is drooping",
+        "one-sided weakness",
+        "one sided weakness",
+        "weak on one side",
+        "can't lift my arm",
+        "arm is weak"
+      ],
+      "ask_next": "When did this start? If it is happening now, please call 911 right away."
+    },
+    {
+      "topic": "seizure",
+      "phrases": [
+        "seizure",
+        "convulsion",
+        "had a fit"
+      ],
+      "ask_next": "When did the seizure happen, and is someone with you now?"
+    },
+    {
+      "topic": "severe allergic reaction",
+      "phrases": [
+        "severe allergic reaction",
+        "throat closing",
+        "tongue swelling",
+        "throat swelling"
+      ],
+      "ask_next": "Is this happening right now? If yes, call 911 now."
+    }
+  ],
+  "tier2": [
+    {
+      "topic": "frequent urination",
+      "phrases": [
+        "peeing a lot",
+        "frequent urination",
+        "urinating constantly",
+        "going to the bathroom every hour",
+        "peeing all the time"
+      ],
+      "ask_next": "Since when have you been peeing more? Have you checked your blood sugar? What was the number?"
+    },
+    {
+      "topic": "night-time urination",
+      "phrases": [
+        "waking up to pee",
+        "peeing at night",
+        "nocturia",
+        "up at night to pee"
+      ],
+      "ask_next": "How many times a night do you get up to pee, and since when?"
+    },
+    {
+      "topic": "bedwetting",
+      "phrases": [
+        "bedwetting",
+        "wetting the bed",
+        "wet the bed"
+      ],
+      "ask_next": "Since when has this been happening?"
+    },
+    {
+      "topic": "extreme thirst",
+      "phrases": [
+        "always thirsty",
+        "constantly thirsty",
+        "extreme thirst",
+        "can't quench my thirst",
+        "cannot quench my thirst",
+        "drinking gallons",
+        "so thirsty"
+      ],
+      "ask_next": "Since when have you felt this thirsty? What was your last blood sugar reading?"
+    },
+    {
+      "topic": "dry mouth",
+      "phrases": [
+        "dry mouth",
+        "cotton mouth",
+        "parched"
+      ],
+      "ask_next": "Since when has your mouth felt dry?"
+    },
+    {
+      "topic": "extreme hunger",
+      "phrases": [
+        "always hungry",
+        "starving all the time",
+        "extreme hunger",
+        "eating constantly"
+      ],
+      "ask_next": "Since when have you felt this hungry?"
+    },
+    {
+      "topic": "unexplained weight loss",
+      "phrases": [
+        "losing weight",
+        "weight loss",
+        "clothes are loose",
+        "dropping pounds",
+        "lost weight"
+      ],
+      "requires_any": [
+        "without trying",
+        "unexplained",
+        "unintentional",
+        "not trying",
+        "for no reason"
+      ],
+      "ask_next": "About how much weight have you lost, and over how long?"
+    },
+    {
+      "topic": "tiredness or weakness",
+      "phrases": [
+        "exhausted",
+        "fatigued",
+        "fatigue",
+        "no energy",
+        "drained",
+        "always tired",
+        "weak"
+      ],
+      "ask_next": "Since when have you felt this tired? Is it getting worse?"
+    },
+    {
+      "topic": "vision changes",
+      "phrases": [
+        "blurry vision",
+        "blurred vision",
+        "fuzzy vision",
+        "trouble focusing",
+        "eyesight changing",
+        "vision is blurry"
+      ],
+      "ask_next": "Since when is your vision blurry? Is it one eye or both?"
+    },
+    {
+      "topic": "yeast infection",
+      "phrases": [
+        "yeast infection",
+        "thrush"
+      ],
+      "ask_next": "Since when have you noticed this?"
+    },
+    {
+      "topic": "urinary infection",
+      "phrases": [
+        "uti",
+        "urinary tract infection",
+        "bladder infection",
+        "burning when i pee"
+      ],
+      "ask_next": "Since when have you had these symptoms? Do you have a fever?"
+    },
+    {
+      "topic": "slow healing",
+      "phrases": [
+        "slow healing",
+        "cuts won't heal",
+        "cuts will not heal",
+        "sores won't heal",
+        "sores will not heal",
+        "scabs taking forever",
+        "won't heal",
+        "will not heal"
+      ],
+      "tier1_if_also": [
+        "foot",
+        "feet",
+        "toe",
+        "toes",
+        "heel",
+        "sole"
+      ],
+      "ask_next": "Where is the cut or sore, and how long has it been there?"
+    },
+    {
+      "topic": "skin infection",
+      "phrases": [
+        "skin infection",
+        "boils",
+        "boil"
+      ],
+      "ask_next": "Where is it, and since when? Is it red, warm or leaking?"
+    },
+    {
+      "topic": "tingling or numbness",
+      "phrases": [
+        "tingling",
+        "pins and needles",
+        "numb",
+        "numbness",
+        "burning feet",
+        "burning hands"
+      ],
+      "tier1_if_also": [
+        "foot",
+        "feet",
+        "toe",
+        "toes",
+        "heel",
+        "sole"
+      ],
+      "ask_next": "Where do you feel it, and since when? Is it getting worse?"
+    },
+    {
+      "topic": "dark skin patches",
+      "phrases": [
+        "dark patches",
+        "velvety skin",
+        "dark neck",
+        "dark armpits"
+      ],
+      "ask_next": "Where are the patches, and since when have you noticed them?"
+    },
+    {
+      "topic": "possible low blood sugar",
+      "phrases": [
+        "shaky",
+        "sweaty",
+        "pounding heart",
+        "heart racing",
+        "heart is racing"
+      ],
+      "tier1_if_also": [
+        "low",
+        "hypo",
+        "sugar is low",
+        "low sugar"
+      ],
+      "ask_next": "Can you check your blood sugar right now? What is the number?"
+    },
+    {
+      "topic": "dizziness",
+      "phrases": [
+        "dizzy",
+        "dizziness",
+        "lightheaded",
+        "light-headed"
+      ],
+      "ask_next": "When do you feel dizzy, for example when you stand up? Since when?"
+    },
+    {
+      "topic": "foot pain",
+      "phrases": [
+        "foot pain",
+        "foot hurts",
+        "feet hurt",
+        "toe hurts",
+        "toes hurt",
+        "burning in my feet"
+      ],
+      "ask_next": "Where on your foot does it hurt, since when, and how bad is it from 1 to 10?"
+    }
+  ],
+  "tier3": [
+    {
+      "topic": "prediabetes history",
+      "phrases": [
+        "prediabetes",
+        "pre-diabetes",
+        "borderline diabetes",
+        "high sugar",
+        "impaired glucose",
+        "a1c"
+      ]
+    },
+    {
+      "topic": "pregnancy history",
+      "phrases": [
+        "gestational diabetes",
+        "diabetes during pregnancy",
+        "pregnancy diabetes",
+        "big baby",
+        "heavy baby",
+        "9 pound baby",
+        "10 pound baby",
+        "macrosomia"
+      ]
+    },
+    {
+      "topic": "PCOS",
+      "phrases": [
+        "pcos",
+        "polycystic ovary"
+      ]
+    },
+    {
+      "topic": "heart and blood vessel history",
+      "phrases": [
+        "high blood pressure",
+        "hypertension",
+        "high cholesterol",
+        "high triglycerides",
+        "low hdl",
+        "heart disease",
+        "stroke",
+        "heart attack",
+        "vascular disease"
+      ]
+    },
+    {
+      "topic": "pancreas or liver history",
+      "phrases": [
+        "pancreatitis",
+        "pancreas",
+        "fatty liver"
+      ]
+    },
+    {
+      "topic": "medicines that can affect blood sugar",
+      "phrases": [
+        "prednisone",
+        "steroids",
+        "corticosteroids",
+        "dexamethasone",
+        "antipsychotic",
+        "olanzapine",
+        "quetiapine",
+        "risperidone",
+        "aripiprazole",
+        "clozapine",
+        "statin",
+        "atorvastatin",
+        "rosuvastatin",
+        "lipitor",
+        "crestor",
+        "hiv meds",
+        "antiretroviral",
+        "immunosuppressant",
+        "anti-rejection",
+        "tacrolimus",
+        "cyclosporine"
+      ]
+    },
+    {
+      "topic": "age",
+      "phrases": [
+        "over 40",
+        "40s",
+        "50s",
+        "60s",
+        "70s",
+        "80s"
+      ]
+    },
+    {
+      "topic": "family history",
+      "phrases": [
+        "family history",
+        "runs in the family",
+        "mom has diabetes",
+        "mum has diabetes",
+        "mother has diabetes",
+        "dad has diabetes",
+        "father has diabetes",
+        "parent has diabetes",
+        "sibling has diabetes",
+        "brother has diabetes",
+        "sister has diabetes"
+      ]
+    },
+    {
+      "topic": "weight history",
+      "phrases": [
+        "overweight",
+        "obese",
+        "belly fat",
+        "gained weight",
+        "high bmi"
+      ]
+    },
+    {
+      "topic": "smoking",
+      "phrases": [
+        "smoker",
+        "smoking",
+        "cigarettes",
+        "vaping"
+      ]
+    },
+    {
+      "topic": "background",
+      "phrases": [
+        "indigenous",
+        "first nations",
+        "métis",
+        "metis",
+        "inuit",
+        "south asian",
+        "asian",
+        "african",
+        "black",
+        "arab",
+        "hispanic",
+        "latino",
+        "latina"
+      ]
+    }
+  ],
+  "negation_words": [
+    "no",
+    "not",
+    "never",
+    "without",
+    "denies",
+    "don't",
+    "dont",
+    "do not",
+    "doesn't",
+    "doesnt",
+    "does not",
+    "isn't",
+    "isnt",
+    "aren't",
+    "haven't",
+    "hasn't",
+    "didn't",
+    "none",
+    "nothing"
+  ],
+  "foot_combo": {
+    "_about": "Catches foot problems the phrase list misses: a foot word and a symptom word in the same sentence. A 'no/doesn't' in that sentence marks it 'needs AI check' instead of urgent.",
+    "body": [
+      "foot",
+      "feet",
+      "toe",
+      "toes",
+      "heel",
+      "heels",
+      "sole",
+      "soles",
+      "ankle"
+    ],
+    "tier1_symptoms": [
+      "sore",
+      "wound",
+      "ulcer",
+      "blister",
+      "cut",
+      "numb",
+      "numbness",
+      "black",
+      "pus",
+      "leaking",
+      "infected",
+      "infection",
+      "swollen",
+      "swelling",
+      "red",
+      "warm",
+      "bleeding",
+      "can't feel"
+    ],
+    "tier2_symptoms": [
+      "hurt",
+      "hurts",
+      "pain",
+      "painful",
+      "tingling",
+      "tingle",
+      "burning",
+      "ache",
+      "aches",
+      "cold"
+    ]
+  }
+}

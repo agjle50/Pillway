@@ -1,0 +1,43 @@
+{
+  "_about": "Made-up sample content for the patient dashboard (orders, banner, starter notifications). Edit freely.",
+  "banner_text": "Check in with Sarah, your automated care assistant.",
+  "notifications": [
+    [
+      "Weekly check-in is ready",
+      "Foot-care week. Takes 2 minutes."
+    ],
+    [
+      "Order shipped",
+      "Order #1057 is on its way."
+    ]
+  ],
+  "orders": [
+    [
+      "Order #1063",
+      "Glucose sensors  ·  Processing",
+      "Processing"
+    ],
+    [
+      "Order #1057",
+      "Test strips  ·  Shipped Nov 20",
+      "Shipped"
+    ],
+    [
+      "Order #1042",
+      "Monthly refill  ·  Delivered Nov 18",
+      "Delivered"
+    ]
+  ],
+  "demo_call_lines": {
+    "en": [
+      "Hi Sarah, I checked my feet today.",
+      "The sore on my heel looks a bit bigger and my toes still feel numb.",
+      "No, that's all, thank you."
+    ],
+    "fr": [
+      "Bonjour Sarah, j'ai vérifié mes pieds aujourd'hui.",
+      "La plaie sur mon talon semble un peu plus grande et mes orteils sont encore engourdis.",
+      "Non, c'est tout, merci."
+    ]
+  }
+}

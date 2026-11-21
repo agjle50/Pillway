@@ -1,0 +1,68 @@
+{
+  "_about": "MADE-UP demo patients. No real patient data. 'maria' is the stage demo patient. Which patients appear is set by [demo] visible_patients in pillway_config.toml.",
+  "patients": {
+    "maria": {
+      "profile": {
+        "first_name": "Maria", "last_name": "Rossi", "date_of_birth": "1968-03-14", "age": 58, "sex": "Female",
+        "phone": "(416) 555-0198", "email": "maria.demo@example.com", "address": "12 Example St, Brampton ON",
+        "health_card": "1234-567-890-AB", "language": "en", "pharmacy": "Pillway", "prescriber": "Dr. A. Chen (made up)",
+        "weight_kg": 78, "height_cm": 162, "conditions": ["Type 2 diabetes (newly diagnosed)", "High blood pressure"],
+        "diabetes_type": "Type 2", "diagnosis_date": "2026-09-02", "monitoring": "Finger prick",
+        "last_bp": "142/90", "last_a1c": "7.4%", "smoker": false, "quit_readiness": "", "allergies": ["Penicillin"],
+        "alcohol": "1-2 drinks a week", "activity": "Walks sometimes"
+      },
+      "medications": [
+        {"id": "med-1", "name": "Metformin", "dose": "500 mg", "frequency": "Twice a day with meals", "indication": "Type 2 diabetes", "notes": "",
+         "common_side_effects": ["upset stomach", "nausea", "diarrhea", "metallic taste"]},
+        {"id": "med-2", "name": "Ramipril", "dose": "5 mg", "frequency": "Once a day", "indication": "High blood pressure", "notes": "",
+         "common_side_effects": ["dizziness", "lightheaded", "dry cough", "tiredness"]}
+      ],
+      "check_ins": {"last_check_in": null, "watching": true, "topic_week": "Fibre"}
+    },
+    "james": {
+      "profile": {
+        "first_name": "James", "last_name": "Okafor", "date_of_birth": "1961-07-02", "age": 65, "sex": "Male",
+        "phone": "(905) 555-0144", "email": "james.demo@example.com", "address": "40 Sample Ave, Mississauga ON",
+        "health_card": "9876-543-210-CD", "language": "en", "pharmacy": "Pillway", "prescriber": "Dr. B. Singh (made up)",
+        "weight_kg": 92, "height_cm": 178, "conditions": ["Type 2 diabetes", "High blood pressure"],
+        "diabetes_type": "Type 2", "diagnosis_date": "2019-05-10", "monitoring": "CGM (Freestyle Libre)",
+        "last_bp": "134/84", "last_a1c": "7.9%", "smoker": true, "quit_readiness": "Thinking about it", "allergies": [],
+        "alcohol": "3-5 drinks a week", "activity": "Low"
+      },
+      "medications": [
+        {"id": "med-1", "name": "Metformin", "dose": "1000 mg", "frequency": "Twice a day", "indication": "Type 2 diabetes", "notes": "",
+         "common_side_effects": ["upset stomach", "nausea", "diarrhea"]}
+      ],
+      "check_ins": {"last_check_in": "2026-11-17T19:05:00-05:00", "watching": true, "topic_week": "Foot care"}
+    },
+    "priya": {
+      "profile": {
+        "first_name": "Priya", "last_name": "Nair", "date_of_birth": "1993-11-30", "age": 33, "sex": "Female",
+        "phone": "(647) 555-0111", "email": "priya.demo@example.com", "address": "7 Demo Cres, Brampton ON",
+        "health_card": "5555-111-222-EF", "language": "en", "pharmacy": "Pillway", "prescriber": "Dr. C. Roy (made up)",
+        "weight_kg": 70, "height_cm": 160, "conditions": ["Gestational diabetes (28 weeks)"],
+        "diabetes_type": "Gestational", "diagnosis_date": "2026-10-20", "monitoring": "Finger prick",
+        "last_bp": "118/76", "last_a1c": "", "smoker": false, "quit_readiness": "", "allergies": [],
+        "alcohol": "None", "activity": "Walks daily"
+      },
+      "medications": [],
+      "check_ins": {"last_check_in": "2026-11-20T08:15:00-05:00", "watching": true, "topic_week": "Meal planning"}
+    },
+    "luc": {
+      "profile": {
+        "first_name": "Luc", "last_name": "Tremblay", "date_of_birth": "1957-01-22", "age": 69, "sex": "Male",
+        "phone": "(514) 555-0177", "email": "luc.demo@example.com", "address": "3 rue Exemple, Gatineau QC",
+        "health_card": "TREL-5701-2299", "language": "fr", "pharmacy": "Pillway", "prescriber": "Dre D. Gagnon (fictive)",
+        "weight_kg": 84, "height_cm": 172, "conditions": ["Hypertension"],
+        "diabetes_type": "", "diagnosis_date": "", "monitoring": "",
+        "last_bp": "150/95", "last_a1c": "", "smoker": false, "quit_readiness": "", "allergies": [],
+        "alcohol": "2 drinks a week", "activity": "Moderate"
+      },
+      "medications": [
+        {"id": "med-1", "name": "Amlodipine", "dose": "5 mg", "frequency": "Once a day", "indication": "High blood pressure", "notes": "",
+         "common_side_effects": ["ankle swelling", "flushing", "headache", "dizziness"]}
+      ],
+      "check_ins": {"last_check_in": "2026-11-14T18:30:00-05:00", "watching": true, "topic_week": "Salt"}
+    }
+  }
+}
