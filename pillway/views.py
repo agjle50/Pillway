@@ -4,11 +4,13 @@ import os
 import tkinter as tk
 from tkinter import font as tkfont
 
+from .chat_history import format_chat_time, local_date_label, local_timestamp
 from .constants import (
     BORDER,
     INK,
     NAVY,
     NAVY_DARK,
+    ORANGE,
     ORDERS,
     RED,
     SETTINGS_ITEMS,
@@ -96,8 +98,15 @@ class DashboardViewMixin:
         self.text(self.S(105), header_h / 2, "|", 18, TEXT_MUTED)
         self.text(self.S(121), header_h / 2, "Care Plan", 17, RED, "bold")
         if self.doctor_status:
-            self.text(w - self.S(330), header_h / 2, self.doctor_status,
+            self.text(w - self.S(402), header_h / 2, self.doctor_status,
                       10, TEXT_MUTED, anchor="e")
+        patients_tag = "doctor_all_patients"
+        self.rrect(w - self.S(390), self.S(9), w - self.S(290),
+                   header_h - self.S(9), self.S(8), fill=WHITE,
+                   outline=BORDER, width=self.S(1), tags=patients_tag)
+        self.text(w - self.S(340), header_h / 2, "All patients", 11,
+                  INK, "bold", anchor="center", tag=patients_tag)
+        self.clickable(patients_tag, self.return_to_doctor_patient_list)
         save_tag = "doctor_save"
         self.rrect(w - self.S(240), self.S(9), w - self.S(150), header_h - self.S(9),
                    self.S(8), fill=RED, outline="", tags=save_tag)
@@ -114,6 +123,168 @@ class DashboardViewMixin:
         self.text(w - self.S(20), header_h / 2, "...", 16, TEXT_MUTED,
                   "bold", anchor="center", tag=profile_tag)
         self.clickable(profile_tag, lambda: self.toggle_dropdown("profile"))
+
+    def draw_doctor_patient_picker(self):
+        x1, y1, x2, y2 = self.panel_box()
+        self.rrect(x1, y1, x2, y2, self.S(16), fill=WHITE, outline=BORDER,
+                   width=self.S(1.2))
+        title_y = y1 + self.S(42)
+        self.text(x1 + self.S(30), title_y, "Your patients", 24, INK, "bold")
+        self.text(x1 + self.S(30), title_y + self.S(31),
+                  "Select a patient to open their care plan.", 13, TEXT_MUTED)
+        add_tag = "doctor_add_patient"
+        button_w, button_h = self.S(190), self.S(44)
+        bx1, by1 = x2 - self.S(30) - button_w, y1 + self.S(22)
+        self.rrect(bx1, by1, bx1 + button_w, by1 + button_h, self.S(10),
+                   fill=ORANGE, outline="", tags=add_tag)
+        self.text(bx1 + button_w / 2, by1 + button_h / 2, "Add patient profile",
+                  12, WHITE, "bold", anchor="center", tag=add_tag)
+        self.clickable(add_tag, self.add_patient_profile)
+        if self.profile_status:
+            self.text(x1 + self.S(30), title_y + self.S(57),
+                      self.profile_status, 11, TEXT_MUTED)
+
+        patients = [
+            (profile_id, profile)
+            for profile_id, profile in self.profiles.items()
+            if profile["role"] == "Patient"
+        ]
+        grid_x = x1 + self.S(24)
+        grid_y = y1 + self.S(112)
+        grid_w = x2 - x1 - self.S(48)
+        grid_h = max(self.S(100), y2 - grid_y - self.S(16))
+        max_card = self.S(250)
+        gap = self.S(20)
+        columns = max(1, min(4, int((grid_w + gap) / (max_card + gap))))
+        card_size = min(max_card, (grid_w - gap * (columns - 1)) / columns)
+        rows = (len(patients) + columns - 1) // columns
+        content_h = max(grid_h, rows * (card_size + gap) + gap)
+        content_w = grid_w
+
+        self.doctor_patients_frame = tk.Frame(
+            self, bg=WHITE, bd=0, highlightthickness=0,
+        )
+        patient_canvas = tk.Canvas(
+            self.doctor_patients_frame, bg=WHITE, bd=0, highlightthickness=0,
+            yscrollincrement=max(1, int(self.S(24))),
+        )
+        patient_scrollbar = tk.Scrollbar(
+            self.doctor_patients_frame, orient="vertical", command=patient_canvas.yview,
+        )
+        patient_canvas.configure(yscrollcommand=patient_scrollbar.set)
+        patient_canvas.pack(side="left", fill="both", expand=True)
+        if content_h > grid_h:
+            patient_scrollbar.pack(side="right", fill="y")
+        patient_canvas.configure(
+            scrollregion=(0, 0, int(content_w), int(content_h)),
+            width=max(1, int(content_w)),
+            height=max(1, int(grid_h)),
+        )
+        patient_canvas.bind(
+            "<MouseWheel>",
+            lambda event: self._scroll_doctor_patient_grid(patient_canvas, event),
+        )
+        patient_canvas.bind(
+            "<Button-4>", lambda _event: patient_canvas.yview_scroll(-1, "units"),
+        )
+        patient_canvas.bind(
+            "<Button-5>", lambda _event: patient_canvas.yview_scroll(1, "units"),
+        )
+
+        avatar_fills = ("#eef2ff", "#fff0e5", "#e8f5ef", "#fcebea")
+        avatar_inks = ("#4c5ba8", "#bd6b24", "#37825c", "#b54b4b")
+        for index, (profile_id, profile) in enumerate(patients):
+            column, row = index % columns, index // columns
+            row_items = min(columns, len(patients) - row * columns)
+            row_width = row_items * card_size + (row_items - 1) * gap
+            row_start = max(0, (content_w - row_width) / 2)
+            card_x = row_start + column * (card_size + gap)
+            card_y = gap + row * (card_size + gap)
+            tag = f"doctor_patient::{index}"
+            patient_canvas.create_rectangle(
+                card_x + self.S(3), card_y + self.S(4),
+                card_x + card_size + self.S(3), card_y + card_size + self.S(4),
+                fill=SHADOW, outline="", tags=tag,
+            )
+            patient_canvas.create_rectangle(
+                card_x, card_y, card_x + card_size, card_y + card_size,
+                fill=WHITE, outline=BORDER, width=max(1, int(self.S(1.2))), tags=tag,
+            )
+            center_x = card_x + card_size / 2
+            avatar_y = card_y + self.S(48)
+            avatar_radius = self.S(30)
+            palette_index = index % len(avatar_fills)
+            patient_canvas.create_oval(
+                center_x - avatar_radius, avatar_y - avatar_radius,
+                center_x + avatar_radius, avatar_y + avatar_radius,
+                fill=avatar_fills[palette_index], outline="", tags=tag,
+            )
+            initials = "".join(
+                part[0] for part in profile["name"].split()[:2]
+            ).upper() or "P"
+            patient_canvas.create_text(
+                center_x, avatar_y, text=initials, fill=avatar_inks[palette_index],
+                font=self.font(18, "bold"), anchor="center", tags=tag,
+            )
+            patient_canvas.create_text(
+                center_x, card_y + self.S(91), text=profile["name"],
+                fill=INK, font=self.font(14, "bold"), anchor="center",
+                width=card_size - self.S(22), tags=tag,
+            )
+            patient_canvas.create_text(
+                center_x, card_y + self.S(117), text="PATIENT",
+                fill=TEXT_MUTED, font=self.font(9, "bold"), anchor="center", tags=tag,
+            )
+            patient_canvas.create_text(
+                center_x, card_y + self.S(148), text="Diabetes · Hypertension",
+                fill=TEXT_DARK, font=self.font(11), anchor="center",
+                width=card_size - self.S(20), tags=tag,
+            )
+            messages = self.chat_logs.get(profile_id, [])
+            message_count = len(messages)
+            patient_canvas.create_text(
+                center_x, card_y + self.S(172),
+                text=f"{message_count} chat messages",
+                fill=TEXT_MUTED, font=self.font(10), anchor="center", tags=tag,
+            )
+            latest_patient_message = next(
+                (str(message[1]) for message in reversed(messages)
+                 if len(message) >= 2 and message[0] == "You"),
+                "",
+            )
+            if latest_patient_message:
+                preview = latest_patient_message
+                if len(preview) > 48:
+                    preview = preview[:45].rstrip() + "..."
+                preview = f"Latest: {preview}"
+            else:
+                preview = "No patient messages yet"
+            patient_canvas.create_text(
+                center_x, card_y + card_size - self.S(26), text=preview,
+                fill=TEXT_MUTED, font=self.font(9), anchor="center",
+                width=card_size - self.S(22), tags=tag,
+            )
+            patient_canvas.tag_bind(
+                tag, "<Button-1>",
+                lambda _event, selected=profile_id: self.select_doctor_patient(selected),
+            )
+            patient_canvas.tag_bind(
+                tag, "<Enter>", lambda _event: patient_canvas.configure(cursor="hand2"),
+            )
+            patient_canvas.tag_bind(
+                tag, "<Leave>", lambda _event: patient_canvas.configure(cursor=""),
+            )
+
+        self.c.create_window(
+            grid_x, grid_y, window=self.doctor_patients_frame, anchor="nw",
+            width=max(1, int(grid_w)), height=max(1, int(grid_h)),
+        )
+
+    @staticmethod
+    def _scroll_doctor_patient_grid(canvas, event):
+        units = int(-event.delta / 120) or (-1 if event.delta > 0 else 1)
+        canvas.yview_scroll(units, "units")
+        return "break"
 
     def draw_doctor_dashboard(self):
         x1, y1, x2, y2 = self.panel_box()
@@ -399,7 +570,10 @@ class DashboardViewMixin:
 
     def _draw_doctor_summary_page(self, x, y, width, patient):
         messages = self.chat_logs.get(self.selected_patient_id, [])
-        latest = next((message for sender, message in reversed(messages) if sender == "You"), "")
+        latest = next(
+            (message for sender, message, _timestamp in reversed(messages) if sender == "You"),
+            "",
+        )
         self._doctor_card(x, y, width, self.S(118), "Reason for visit")
         self.c.create_text(
             x + self.S(18), y + self.S(50),
@@ -463,8 +637,8 @@ class DashboardViewMixin:
         log_scrollbar.pack(side="right", fill="y")
         messages = self.chat_logs.get(self.selected_patient_id, [])
         if messages:
-            for sender, message in messages:
-                log.insert("end", f"{sender}\n", "sender")
+            for sender, message, timestamp in messages:
+                log.insert("end", f"{sender} · {format_chat_time(timestamp)}\n", "sender")
                 log.insert("end", f"{message}\n\n")
         else:
             log.insert("end", "No chat history yet for this patient.")
@@ -562,30 +736,42 @@ class DashboardViewMixin:
         self.text(cx, avatar_y, "P", 32, WHITE, "bold", anchor="center")
         self.text(cx, avatar_y + self.S(68), "Pillway care team", 19, WHITE, "bold",
                   anchor="center")
-        self.text(cx, avatar_y + self.S(96), "Calling is not connected", 11, "#c8cede",
-                  anchor="center")
+        self.text(cx, avatar_y + self.S(96), "Local speech preview · no call placed",
+                  10, "#c8cede", anchor="center")
 
         status_y = avatar_y + self.S(145)
-        self.c.create_oval(cx - self.S(5), status_y - self.S(5),
-                           cx + self.S(5), status_y + self.S(5),
-                           fill="#f3b45b", outline="")
-        self.text(cx + self.S(15), status_y, "Preview only", 11, "#f3b45b",
-                  anchor="w")
-        self.text(cx, status_y + self.S(32), "--:--", 16, WHITE, "bold",
-                  anchor="center")
+        self.text(cx, status_y, self.call_status, 9,
+                  RED if self.call_mic_state == "error" else "#c8cede",
+                  anchor="center", tag="call_status")
+        self.text(
+            cx, status_y + self.S(54),
+            self.call_transcript[-180:] or "Your on-device transcript will appear here.",
+            9, "#f3f5fa", anchor="n", tag="call_transcript",
+        )
+        self.c.itemconfigure("call_status", width=phone_w - self.S(44))
+        self.c.itemconfigure("call_transcript", width=phone_w - self.S(44))
 
         controls_y = sy2 - self.S(106)
         mic_x = cx - self.S(58)
-        self.c.create_oval(mic_x - self.S(24), controls_y - self.S(24),
-                           mic_x + self.S(24), controls_y + self.S(24),
-                           fill="#303955", outline="")
+        mic_tag = "call_mic_control"
+        self.c.create_oval(
+            mic_x - self.S(25), controls_y - self.S(25),
+            mic_x + self.S(25), controls_y + self.S(25),
+            fill=RED if self.call_mic_state == "listening" else "#303955",
+            outline="", tags=(mic_tag, "call_mic_button"),
+        )
         self.draw_icon("mic", mic_x, controls_y, self.S(22), "#c8cede",
-                       "call_mic_inactive", bg="#303955")
+                       mic_tag, bg="#303955")
         self.c.create_line(mic_x - self.S(14), controls_y + self.S(14),
                            mic_x + self.S(14), controls_y - self.S(14),
-                           fill=RED, width=self.S(2))
-        self.text(mic_x, controls_y + self.S(39), "Mic off", 9, "#c8cede",
-                  anchor="center")
+                           fill=RED, width=self.S(2),
+                           tags=(mic_tag, "call_mic_slash"))
+        self.text(mic_x, controls_y + self.S(39),
+                  "Stop mic" if self.call_mic_state in (
+                      "preparing", "downloading", "listening", "stopping",
+                  ) else "Start mic",
+                  9, "#c8cede", anchor="center", tag="call_mic_label")
+        self.clickable(mic_tag, self.toggle_call_microphone)
 
         end_x = cx + self.S(58)
         end_tag = "end_call_preview"
@@ -594,11 +780,12 @@ class DashboardViewMixin:
                            fill=RED, outline="", tags=end_tag)
         self.draw_icon("phone", end_x, controls_y, self.S(23), WHITE, end_tag, bg=RED)
         self.clickable(end_tag, self.close_call_preview)
-        self.text(end_x, controls_y + self.S(39), "Close preview", 9, "#c8cede",
+        self.text(end_x, controls_y + self.S(39), "End preview", 9, "#c8cede",
                   anchor="center", tag=end_tag)
 
-        self.text(cx, sy2 - self.S(16), "No audio is captured or transmitted.",
+        self.text(cx, sy2 - self.S(16), "On-device only · audio is not saved or uploaded.",
                   9, "#c8cede", anchor="center")
+        self._update_call_preview()
 
     def draw_checkup(self, x1, x2, y):
         self.text((x1 + x2) / 2, y + self.S(14), "How would you like to check in?", 20, INK,
@@ -666,14 +853,17 @@ class DashboardViewMixin:
         self.rrect((x1 + x2) / 2 - self.S(70), date_y - self.S(18),
                    (x1 + x2) / 2 + self.S(70), date_y + self.S(18), self.S(18),
                    fill=WHITE, outline=BORDER)
-        self.text((x1 + x2) / 2, date_y, "TODAY", 12, TEXT_MUTED, "bold", anchor="center")
+        self.text((x1 + x2) / 2, date_y, local_date_label(), 10,
+                  TEXT_MUTED, "bold", anchor="center")
 
         input_h = self.S(58)
         input_y = y2 - self.S(30) - input_h
         messages_top = date_y + self.S(32)
         viewport_h = max(self.S(60), input_y - messages_top - self.S(10))
         viewport_w = x2 - x1 - self.S(16)
-        messages = self.chat_messages or [("Juliez", "Hi! How can I help you today?")]
+        messages = self.chat_messages or [
+            ("Juliez", "Hi! How can I help you today?", local_timestamp())
+        ]
 
         self.chat_view_frame = tk.Frame(self, bg="#f3f3f5", bd=0, highlightthickness=0)
         message_canvas = tk.Canvas(self.chat_view_frame, bg="#f3f3f5",
@@ -755,7 +945,7 @@ class DashboardViewMixin:
                 count += 1 if line or not paragraph else 0
             return max(1, count)
 
-        for sender, message in messages:
+        for sender, message, timestamp in messages:
             line_count = display_line_count(message)
             bubble_height = int(self.S(58 + line_count * 20))
             alert_message = sender == "You" and self.medical_robot.has_alert_keyword(message)
@@ -785,7 +975,8 @@ class DashboardViewMixin:
                     font=self.font(10))
                 copy_button.pack(side="right")
                 bind_scroll(copy_button)
-            time_label = tk.Label(header, text="now", bg=bubble_bg, fg=TEXT_MUTED,
+            time_label = tk.Label(header, text=format_chat_time(timestamp),
+                                  bg=bubble_bg, fg=TEXT_MUTED,
                                   font=self.font(12))
             time_label.pack(side="right", padx=(0, self.S(8)))
             bind_scroll(time_label)
@@ -946,11 +1137,14 @@ class DashboardViewMixin:
         y += self.S(36)
         for i, (time, ampm, label, on) in enumerate(self.tasks):
             col = INK if on else TEXT_OFF
-            t = self.text(x1 + self.S(6), y + self.S(44), time, 46, col, "normal")
+            t = self.text(x1 + self.S(6), y + self.S(44), time, 46, col, "normal",
+                          tag=f"task_time::{i}")
             tx2 = self.c.bbox(t)[2]
-            self.text(tx2 + self.S(4), y + self.S(54), ampm, 20, col)
-            self.text(x1 + self.S(8), y + self.S(84), label, 14, TEXT_MUTED if on else TEXT_OFF)
-            self.toggle(x2 - self.S(70), y + self.S(50), on,
+            self.text(tx2 + self.S(4), y + self.S(54), ampm, 20, col,
+                      tag=f"task_ampm::{i}")
+            self.text(x1 + self.S(8), y + self.S(84), label, 14,
+                      TEXT_MUTED if on else TEXT_OFF, tag=f"task_label::{i}")
+            self.toggle(x2 - self.S(84), y + self.S(50), on,
                         f"toggle::{i}", lambda k=i: self.flip_task(k))
             y += self.S(106)
             self.c.create_line(x1, y, x2, y, fill=BORDER)
@@ -960,14 +1154,17 @@ class DashboardViewMixin:
         self.c.create_line(x1, y + self.S(38), x2, y + self.S(38), fill=BORDER)
 
     def toggle(self, x, cy, on, tag, func):
-        w, h = self.S(68), self.S(40)
+        w, h = self.S(84), self.S(48)
+        track_tag = f"{tag}::track"
+        knob_tag = f"{tag}::knob"
         self.rrect(x, cy - h / 2, x + w, cy + h / 2, h / 2,
-                   fill=RED if on else TOGGLE_OFF, outline="", tags=tag)
+                   fill=RED if on else TOGGLE_OFF, outline="", tags=(tag, track_tag))
         r = h / 2 - self.S(3)
         kx = x + w - h / 2 if on else x + h / 2
         self.c.create_oval(kx - r, cy - r + self.S(1.5), kx + r, cy + r + self.S(1.5),
-                           fill="#c4c9d4", outline="", tags=tag)
-        self.c.create_oval(kx - r, cy - r, kx + r, cy + r, fill=WHITE, outline="", tags=tag)
+                           fill="#c4c9d4", outline="", tags=(tag, knob_tag))
+        self.c.create_oval(kx - r, cy - r, kx + r, cy + r,
+                           fill=WHITE, outline="", tags=(tag, knob_tag))
         self.clickable(tag, func)
 
     def draw_dropdown(self):

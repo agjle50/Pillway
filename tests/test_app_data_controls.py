@@ -11,12 +11,38 @@ from pillway.profile_store import ProfileStore
 
 
 class AppDataControlTests(unittest.TestCase):
+    def test_selecting_a_doctor_patient_opens_the_care_plan_workspace(self):
+        app = SimpleNamespace(
+            profiles={"patient": {"id": "patient", "role": "Patient"}},
+            selected_patient_id="patient",
+            doctor_workspace_open=False,
+            render=Mock(),
+        )
+
+        PillwayApp.select_doctor_patient(app, "patient")
+
+        self.assertTrue(app.doctor_workspace_open)
+        app.render.assert_called_once_with()
+
+    def test_returning_to_patient_list_closes_the_care_plan_workspace(self):
+        app = SimpleNamespace(
+            doctor_workspace_open=True,
+            render=Mock(),
+        )
+
+        PillwayApp.return_to_doctor_patient_list(app)
+
+        self.assertFalse(app.doctor_workspace_open)
+        app.render.assert_called_once_with()
+
     def test_call_choice_opens_a_preview_without_claiming_to_connect(self):
         app = SimpleNamespace(
             call_open=False,
             chat_open=True,
             status="Connecting...",
             render=Mock(),
+            _cancel_checkup_animation=Mock(),
+            _stop_call_input=Mock(),
         )
 
         PillwayApp.checkup_choice(app, "Call")

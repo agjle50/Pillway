@@ -1,11 +1,13 @@
 """Core application setup and interaction state for Pillway."""
 
 import ctypes
+import queue
 import sys
+import time
 import tkinter as tk
 from tkinter import filedialog, messagebox, simpledialog
 
-from .chat_history import ChatHistoryStore
+from .chat_history import ChatHistoryStore, local_timestamp
 from .constants import (
     BASE_H,
     BASE_W,
@@ -23,11 +25,14 @@ from .constants import (
     SHADOW,
     TEXT_DARK,
     TEXT_MUTED,
+    TEXT_OFF,
+    TOGGLE_OFF,
     WHITE,
 )
 from .icons import IconMixin
 from .medical_robot import MedicalRobot
 from .profile_store import ProfileStore
+from .speech_input import LocalSpeechInput
 from .views import DashboardViewMixin, SettingsViewMixin
 
 
@@ -52,9 +57,12 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
         self.geometry("1500x900")
         self.minsize(900, 560)
         self.configure(bg=WHITE)
+        self.protocol("WM_DELETE_WINDOW", self.close_application)
 
         self.c = tk.Canvas(self, bg=WHITE, highlightthickness=0, bd=0)
         self.c.pack(fill="both", expand=True)
+        self._click_targets = []
+        self.c.bind("<Button-1>", self._dispatch_expanded_click, add="+")
 
         # UI state
         self.section = "Dashboard"
@@ -62,12 +70,15 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
         self.banner = True
         self.dropdown = None          # None | "notifications" | "profile"
         self.anim = 1.0               # 0 -> 1 slide-in for the Check up bars
+        self._checkup_animation_job = None
+        self._checkup_animation_started = None
         self.status = ""              # small message under Check up bars
         self.prescriptions = []
         self.notifications = list(NOTIFICATIONS)
         self.profile_status = ""
         self.doctor_status = ""
         self.doctor_section = "User account information"
+        self.doctor_workspace_open = False
         self.profile_store = ProfileStore()
         stored_profiles = self.profile_store.load()
         self.profiles = {profile["id"]: profile for profile in stored_profiles}
@@ -90,6 +101,13 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
         self.prescription_entry = None
         self.chat_open = False
         self.call_open = False
+        self.call_mic_state = "off"
+        self.call_status = "Mic off. First use downloads a ~40 MB offline model."
+        self.call_transcript = ""
+        self.call_partial = ""
+        self.call_listener = None
+        self.call_events = None
+        self._call_poll_job = None
         self.medical_robot = self.medical_robots[self.active_profile_id]
         self.chat_draft = ""
         self.chat_focus_requested = False
@@ -99,6 +117,7 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
         self.chat_scrollbar = None
         self.doctor_tabs_frame = None
         self.doctor_log_frame = None
+        self.doctor_patients_frame = None
         self.profiles_view_frame = None
         self.chat_placeholder = "TYPE YOUR MESSAGE..."
         self.tasks = [                # alarm-style reminders
@@ -107,6 +126,7 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
             ["12:30", "PM", "15-minute walk", False],
             ["7:00", "PM", "Log dinner", False],
         ]
+        self._task_toggle_jobs = {}
 
         self._job = None
         self.c.bind("<Configure>", self._schedule_render)
@@ -130,9 +150,35 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
         return self.c.create_polygon(pts, smooth=True, **kw)
 
     def clickable(self, tag, func):
-        self.c.tag_bind(tag, "<Button-1>", lambda e: func())
+        bounds = self.c.bbox(tag)
+        if bounds:
+            padding = max(4, round(self.S(8)))
+            x1, y1, x2, y2 = bounds
+            self._click_targets.append((
+                x1 - padding, y1 - padding, x2 + padding, y2 + padding,
+                bounds, func,
+            ))
+        self.c.tag_bind(tag, "<Button-1>", lambda _event: self._invoke_clickable(func))
         self.c.tag_bind(tag, "<Enter>", lambda e: self.c.configure(cursor="hand2"))
         self.c.tag_bind(tag, "<Leave>", lambda e: self.c.configure(cursor=""))
+
+    @staticmethod
+    def _invoke_clickable(func):
+        func()
+        return "break"
+
+    def _dispatch_expanded_click(self, event):
+        candidates = []
+        for x1, y1, x2, y2, bounds, func in self._click_targets:
+            bx1, by1, bx2, by2 = bounds
+            inside = x1 <= event.x <= x2 and y1 <= event.y <= y2
+            inside_original = bx1 <= event.x <= bx2 and by1 <= event.y <= by2
+            if inside and not inside_original:
+                area = (x2 - x1) * (y2 - y1)
+                candidates.append((area, func))
+        if candidates:
+            _, func = min(candidates, key=lambda candidate: candidate[0])
+            return self._invoke_clickable(func)
 
     def text(self, x, y, txt, size, color, weight="normal", anchor="w", tag=None, slant="roman"):
         return self.c.create_text(x, y, text=txt, fill=color, anchor=anchor,
@@ -141,6 +187,10 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
     def render(self):
         self._job = None
         c = self.c
+        self._click_targets = []
+        for job in self._task_toggle_jobs.values():
+            self.after_cancel(job)
+        self._task_toggle_jobs.clear()
         restore_chat_focus = self.chat_focus_requested
         self.chat_focus_requested = False
         if self.prescription_entry and self.prescription_entry.winfo_exists():
@@ -156,7 +206,10 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
         if self.chat_view_frame and self.chat_view_frame.winfo_exists():
             self.chat_view_frame.destroy()
         self.chat_view_frame = None
-        for attribute in ("doctor_tabs_frame", "doctor_log_frame", "profiles_view_frame"):
+        for attribute in (
+            "doctor_tabs_frame", "doctor_log_frame", "profiles_view_frame",
+            "doctor_patients_frame",
+        ):
             frame = getattr(self, attribute)
             if frame and frame.winfo_exists():
                 frame.destroy()
@@ -173,7 +226,10 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
         self.draw_header()
         if self.section == "Dashboard":
             if self.profiles[self.active_profile_id]["role"] == "Doctor":
-                self.draw_doctor_dashboard()
+                if self.doctor_workspace_open:
+                    self.draw_doctor_dashboard()
+                else:
+                    self.draw_doctor_patient_picker()
             else:
                 self.draw_dashboard()
         elif self.section == "Settings":
@@ -193,6 +249,7 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
         if (
             self.section == "Dashboard"
             and self.profiles[self.active_profile_id]["role"] == "Doctor"
+            and self.doctor_workspace_open
         ):
             self.draw_doctor_sidebar()
             return
@@ -227,6 +284,7 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
         if (
             self.section == "Dashboard"
             and self.profiles[self.active_profile_id]["role"] == "Doctor"
+            and self.doctor_workspace_open
         ):
             self.draw_doctor_header()
             return
@@ -273,6 +331,8 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
         self.clickable(tag, func)
 
     def go(self, section):
+        self._cancel_checkup_animation()
+        self._stop_call_input()
         self.section = section
         self.dropdown = None
         self.chat_open = False
@@ -285,10 +345,13 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
     def switch_profile(self, profile_id):
         if profile_id not in self.profiles:
             raise ValueError(f"Unknown profile: {profile_id}")
+        self._cancel_checkup_animation()
+        self._stop_call_input()
         self.chat_history.save(self.chat_logs)
         self.active_profile_id = profile_id
         self.chat_messages = self.chat_logs[profile_id]
         if self.profiles[profile_id]["role"] == "Doctor":
+            self.doctor_workspace_open = False
             patients = [key for key, profile in self.profiles.items()
                         if profile["role"] == "Patient"]
             if self.selected_patient_id not in patients:
@@ -306,9 +369,10 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
     def open_profile_chat(self):
         if self.profiles[self.active_profile_id]["role"] != "Patient":
             raise RuntimeError("The Doctor profile has no chatbot.")
+        self._cancel_checkup_animation()
         self.call_open = False
         if not self.chat_messages:
-            self.chat_messages.append(("Juliez", self.medical_robot.greeting()))
+            self.chat_messages.append(("Juliez", self.medical_robot.greeting(), local_timestamp()))
             self.chat_history.save(self.chat_logs)
         self.chat_open = True
         self.dropdown = None
@@ -323,6 +387,8 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
         self.render()
 
     def select_tab(self, name):
+        self._cancel_checkup_animation()
+        self._stop_call_input()
         self.tab = name
         self.chat_open = False
         self.call_open = False
@@ -330,30 +396,56 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
         self.status = ""
         if name == "Check up":
             self.anim = 0.0
+            self.render()
+            self._checkup_animation_started = time.monotonic()
             self._animate()
         else:
             self.anim = 1.0
             self.render()
 
+    def _cancel_checkup_animation(self):
+        if self._checkup_animation_job:
+            self.after_cancel(self._checkup_animation_job)
+            self._checkup_animation_job = None
+        self._checkup_animation_started = None
+        self.anim = 1.0
+
     def _animate(self):
-        self.anim = min(1.0, self.anim + 0.1)
-        eased = 1 - (1 - self.anim) ** 3
-        keep = self.anim
-        self.anim = eased
-        self.render()
-        self.anim = keep
-        if keep < 1.0 and self.tab == "Check up" and self.section == "Dashboard":
-            self.after(16, self._animate)
+        self._checkup_animation_job = None
+        if (
+            self._checkup_animation_started is None
+            or self.tab != "Check up"
+            or self.section != "Dashboard"
+            or self.chat_open
+            or self.call_open
+        ):
+            self._checkup_animation_started = None
+            self.anim = 1.0
+            return
+        previous = self.anim
+        elapsed = time.monotonic() - self._checkup_animation_started
+        progress = min(1.0, elapsed / 0.36)
+        self.anim = 1 - (1 - progress) ** 3
+        delta = self.anim - previous
+        for index, title in enumerate(("Call", "Chat")):
+            self.c.move(f"bar::{title}", 0, -delta * self.S(70) * (index + 1))
+        if progress < 1.0:
+            self._checkup_animation_job = self.after(16, self._animate)
         else:
             self.anim = 1.0
-            self.render()
+            self._checkup_animation_started = None
 
     def checkup_choice(self, kind):
         if kind == "Chat":
             self.open_profile_chat()
             return
         if kind == "Call":
+            self._cancel_checkup_animation()
             self.call_open = True
+            self.call_mic_state = "off"
+            self.call_status = "Mic off. First use downloads a ~40 MB offline model."
+            self.call_transcript = ""
+            self.call_partial = ""
             self.chat_open = False
             self.status = ""
             self.render()
@@ -362,8 +454,113 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
         self.render()
 
     def close_call_preview(self):
+        self._stop_call_input()
         self.call_open = False
+        self.call_transcript = ""
+        self.call_status = "Microphone off."
         self.render()
+
+    def toggle_call_microphone(self):
+        if self.call_mic_state == "stopping":
+            return
+        if self.call_listener and self.call_listener.is_alive():
+            self.call_listener.stop()
+            self.call_mic_state = "stopping"
+            self.call_status = "Stopping microphone..."
+            self._update_call_preview()
+            return
+
+        self.call_mic_state = "preparing"
+        self.call_status = "Preparing on-device speech recognition..."
+        self.call_transcript = ""
+        self.call_partial = ""
+        self.call_events = queue.Queue()
+        model_root = self.chat_history.path.parent / "models"
+        self.call_listener = LocalSpeechInput(model_root, self.call_events)
+        self.call_listener.start()
+        self._update_call_preview()
+        self._poll_call_events()
+
+    def _poll_call_events(self):
+        self._call_poll_job = None
+        if not self.call_open or self.call_events is None:
+            return
+        while True:
+            try:
+                event, value = self.call_events.get_nowait()
+            except queue.Empty:
+                break
+            if event == "state":
+                if value == "preparing":
+                    self.call_mic_state = "preparing"
+                    self.call_status = "Preparing on-device speech recognition..."
+                elif value == "listening":
+                    self.call_mic_state = "listening"
+                    self.call_status = "Listening; speech is processed on this device."
+                elif value == "stopped":
+                    self.call_mic_state = "off"
+                    self.call_status = "Microphone off."
+                    self.call_listener = None
+            elif event == "status":
+                self.call_status = value
+                if value.startswith("Downloading offline model"):
+                    self.call_mic_state = "downloading"
+            elif event == "partial":
+                self.call_partial = value
+            elif event == "final":
+                self.call_transcript = " ".join(
+                    part for part in (self.call_transcript, value) if part
+                )
+                self.call_partial = ""
+            elif event == "error":
+                self.call_mic_state = "error"
+                self.call_status = f"Microphone error: {value}"
+                self.call_listener = None
+        self._update_call_preview()
+        if self.call_listener is not None:
+            self._call_poll_job = self.after(75, self._poll_call_events)
+
+    def _update_call_preview(self):
+        listening = self.call_mic_state == "listening"
+        active = self.call_mic_state in ("preparing", "downloading", "listening", "stopping")
+        button_text = "Stop mic" if active else "Start mic"
+        self.c.itemconfigure("call_mic_label", text=button_text)
+        self.c.itemconfigure("call_mic_button", fill=RED if listening else "#303955")
+        self.c.itemconfigure(
+            "call_mic_slash", state="hidden" if listening else "normal",
+        )
+        self.c.itemconfigure(
+            "call_status",
+            text=self.call_status,
+            fill=RED if self.call_mic_state == "error" else "#c8cede",
+        )
+        transcript = " ".join(part for part in (self.call_transcript, self.call_partial) if part)
+        self.c.itemconfigure(
+            "call_transcript",
+            text=transcript[-180:] if transcript else "Your on-device transcript will appear here.",
+        )
+
+    def _stop_call_input(self):
+        if self.call_listener:
+            self.call_listener.stop()
+        if self._call_poll_job:
+            self.after_cancel(self._call_poll_job)
+            self._call_poll_job = None
+        self.call_listener = None
+        self.call_events = None
+        self.call_mic_state = "off"
+        self.call_partial = ""
+
+    def close_application(self):
+        listener = self.call_listener
+        self._stop_call_input()
+        if listener and listener.is_alive():
+            listener.thread.join(timeout=1)
+        self._cancel_checkup_animation()
+        for job in self._task_toggle_jobs.values():
+            self.after_cancel(job)
+        self._task_toggle_jobs.clear()
+        self.destroy()
 
     def close_chat(self):
         self.chat_open = False
@@ -387,8 +584,8 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
         message = self.chat_entry.get().strip() if self.chat_entry else ""
         if not message or message == self.chat_placeholder:
             return
-        self.chat_messages.append(("You", message))
-        self.chat_messages.append(("Juliez", self.medical_robot.reply(message)))
+        self.chat_messages.append(("You", message, local_timestamp()))
+        self.chat_messages.append(("Juliez", self.medical_robot.reply(message), local_timestamp()))
         self.chat_history.save(self.chat_logs)
         if self.chat_entry:
             self.chat_entry.delete(0, tk.END)
@@ -401,6 +598,11 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
         if not profile or profile["role"] != "Patient":
             raise ValueError(f"Unknown patient profile: {profile_id}")
         self.selected_patient_id = profile_id
+        self.doctor_workspace_open = True
+        self.render()
+
+    def return_to_doctor_patient_list(self):
+        self.doctor_workspace_open = False
         self.render()
 
     def select_doctor_section(self, section):
@@ -567,6 +769,7 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
         patient_ids = [key for key, item in self.profiles.items() if item["role"] == "Patient"]
         self.active_profile_id = patient_ids[0]
         self.selected_patient_id = patient_ids[0]
+        self.doctor_workspace_open = False
         self.chat_messages = self.chat_logs[self.active_profile_id]
         self.medical_robots = {
             key: MedicalRobot()
@@ -596,7 +799,58 @@ class PillwayApp(DashboardViewMixin, SettingsViewMixin, IconMixin, tk.Tk):
 
     def flip_task(self, i):
         self.tasks[i][3] = not self.tasks[i][3]
-        self.render()
+        is_on = self.tasks[i][3]
+        track_tag = f"toggle::{i}::track"
+        knob_tag = f"toggle::{i}::knob"
+        track_items = self.c.find_withtag(track_tag)
+        track_bounds = self.c.bbox(track_tag)
+        knob_bounds = self.c.bbox(knob_tag)
+        if not track_items or not track_bounds or not knob_bounds:
+            self.render()
+            return
+
+        old_job = self._task_toggle_jobs.pop(i, None)
+        if old_job:
+            self.after_cancel(old_job)
+        track_x1, track_y1, track_x2, track_y2 = track_bounds
+        current_x = [(knob_bounds[0] + knob_bounds[2]) / 2]
+        starting_x = current_x[0]
+        radius = (track_y2 - track_y1) / 2
+        target_x = track_x2 - radius if is_on else track_x1 + radius
+        start_color = self.c.itemcget(track_items[0], "fill")
+        target_color = RED if is_on else TOGGLE_OFF
+        started = time.monotonic()
+
+        def animate_toggle():
+            self._task_toggle_jobs.pop(i, None)
+            progress = min(1.0, (time.monotonic() - started) / 0.18)
+            eased = 1 - (1 - progress) ** 3
+            next_x = starting_x + (target_x - starting_x) * eased
+            self.c.move(knob_tag, next_x - current_x[0], 0)
+            current_x[0] = next_x
+            self.c.itemconfigure(track_tag, fill=self._blend_color(
+                start_color, target_color, eased,
+            ))
+            self.c.itemconfigure(f"task_time::{i}", fill=INK if is_on else TEXT_OFF)
+            self.c.itemconfigure(f"task_ampm::{i}", fill=INK if is_on else TEXT_OFF)
+            self.c.itemconfigure(
+                f"task_label::{i}", fill=TEXT_MUTED if is_on else TEXT_OFF,
+            )
+            if progress < 1:
+                self._task_toggle_jobs[i] = self.after(16, animate_toggle)
+            else:
+                self.c.itemconfigure(track_tag, fill=target_color)
+
+        animate_toggle()
+
+    def _blend_color(self, start, end, amount):
+        start_rgb = self.winfo_rgb(start)
+        end_rgb = self.winfo_rgb(end)
+        channels = [
+            round(first + (last - first) * amount) // 257
+            for first, last in zip(start_rgb, end_rgb)
+        ]
+        return "#{:02x}{:02x}{:02x}".format(*channels)
 
     def add_prescription(self):
         self.prescription_flow = True
