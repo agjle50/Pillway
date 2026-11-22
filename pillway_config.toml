@@ -16,24 +16,32 @@
 #  [ai]  The settings people change most: which AI model does which job.
 # -----------------------------------------------------------------------------
 [ai]
-# Which company's AI to use: Google Gemini (key from https://aistudio.google.com/apikey).
-provider = "gemini"
+# Which company's AI to use. Change this ONE line to switch:
+#   "deepseek" = DeepSeek (key from https://platform.deepseek.com/api_keys, starts with "sk-")
+#   "gemini"   = Google Gemini (key from https://aistudio.google.com/apikey, starts with "AIza";
+#                also run: python -m pip install google-genai)
+# If a model below belongs to the other company, that company's usual model is used instead.
+provider = "deepseek"
 
 # One model per job. Change any one line to switch that job's model.
-#   "gemini-3.8-flash"        Google's most capable Flash model (chat, calls, care plans)
-#   "gemini-3.5-flash-lite"   fastest and cheapest (safety checks, memory, cheap dev work)
-#   "gemini-3.1-pro-preview"  deeper reasoning, slower (preview)
-chat_model = "gemini-3.8-flash"        # Sarah's replies to the patient
-flag_model = "gemini-3.5-flash-lite"   # layer 2 safety check on every patient message (must be fast)
-care_plan_model = "gemini-3.8-flash"   # writes the lifestyle parts of the care plan
-summary_model = "gemini-3.8-flash"     # recaps for the pharmacist and weekly summaries
-call_model = "gemini-3.5-flash-lite"   # Sarah on phone calls: Lite answers much faster (set "gemini-3.8-flash" for richer replies)
-memory_model = "gemini-3.5-flash-lite" # keeps Sarah's compact memory of each patient up to date
+#   "deepseek-flash"   fast and cheap: chats, calls, safety checks, memory
+#   "deepseek-v4-pro"  stronger and slower, about 4x the price: the care plan
+#   (Gemini names, if provider = "gemini": "gemini-3.8-flash", "gemini-3.5-flash-lite")
+chat_model = "deepseek-flash"        # Sarah's replies to the patient
+flag_model = "deepseek-flash"        # layer 2 safety check on every patient message (must be fast)
+care_plan_model = "deepseek-v4-pro"  # writes the care plan (SMART goals, suggested values)
+summary_model = "deepseek-flash"     # recaps for the pharmacist and weekly summaries
+call_model = "deepseek-flash"        # Sarah on phone calls (must be fast)
+memory_model = "deepseek-flash"      # keeps Sarah's compact memory of each patient up to date
 # "natural"  = Sarah converses freely (small talk welcome) and weaves the check-in questions in.
 # "scripted" = the original fixed question order with a short AI paragraph between questions.
 conversation_style = "natural"
-# How much the model "thinks" before replying: "low" = quickest replies (best for calls).
-thinking_level = "low"
+# How much the model "thinks" before replying in chats. "off" = quickest replies (best for a live
+# demo). Calls and safety checks never think (speed).
+thinking_level = "off"
+# Should the care plan model "think" first? "off" (recommended: deepseek-v4-pro writes a good plan
+# in about 6 seconds), "low" or "high" (slower: up to a minute; only if the plans need more care).
+care_plan_thinking = "off"
 
 # Longest reply the AI may write (in "tokens", about 3/4 of a word each). Example: 900
 max_tokens = 2048
@@ -50,7 +58,7 @@ ai_safety_layer_enabled = true
 # true = names, phone numbers, emails, health card numbers are removed before anything goes to the AI. Keep true.
 deidentify_before_ai = true
 # The name of the environment variable that holds the API key.
-api_key_env_var = "GEMINI_API_KEY"
+api_key_env_var = "DEEPSEEK_API_KEY"
 
 
 # -----------------------------------------------------------------------------

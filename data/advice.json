@@ -208,8 +208,8 @@
     "fr": "Merci, je l'ai noté pour votre pharmacien."
   },
   "care_plan_ready": {
-    "en": "Thank you, {first_name}. Your care plan draft is ready in the Care plan tab, in English and French. It's waiting for your pharmacist's approval. I've also suggested a few daily tasks in Tasks; you can turn any of them off.",
-    "fr": "Merci, {first_name}. L'ébauche de votre plan de soins est prête dans l'onglet Plan de soins, en anglais et en français. Elle attend l'approbation de votre pharmacien. J'ai aussi suggéré quelques tâches quotidiennes dans Tâches; vous pouvez désactiver celles que vous voulez."
+    "en": "Thank you, {first_name}. Your care plan draft is ready in the Care plan tab. Your pharmacist will check it first, including the targets I suggested. I've also added a few daily tasks in Tasks; you can turn any of them off. You can keep asking me questions here any time.",
+    "fr": "Merci, {first_name}. L'ébauche de votre plan de soins est prête dans l'onglet Plan de soins. Votre pharmacien va d'abord la vérifier, y compris les cibles que j'ai suggérées. J'ai aussi ajouté quelques tâches quotidiennes dans Tâches; vous pouvez désactiver celles que vous voulez. Vous pouvez continuer à me poser des questions ici en tout temps."
   },
   "pharmacist_request": {
     "en": "I've asked a pharmacist to contact you. You can keep chatting with me in the meantime.",
@@ -278,5 +278,11 @@
   "writing_care_plan": {
     "en": "Thank you! I'm putting your care plan together now. This takes a moment.",
     "fr": "Merci! Je prépare votre plan de soins. Cela prend un instant."
+  },
+  "concerns": {
+    "any": {
+      "en": "Thank you for telling me. I'll make sure your care plan focuses on that, and your pharmacist will see it too.",
+      "fr": "Merci de me l'avoir dit. Je m'assure que votre plan de soins en tienne compte, et votre pharmacien le verra aussi."
+    }
   }
 }

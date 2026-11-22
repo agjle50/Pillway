@@ -41,7 +41,9 @@ SCHEMAS = {
         "ask_next": (str, False, None),
     },
     "care_plan": {
-        "sections": (dict, True, None),
+        "smart_goals": (list, False, ("en", "fr")),
+        "values": (list, False, ("id", "value", "reason")),
+        "recommendations": (list, False, None),
         "barrier_plans": (list, False, ("barrier_en", "plan_en", "barrier_fr", "plan_fr")),
     },
     "summary": {
@@ -102,6 +104,8 @@ def validate(data, schema_name):
         clean["answered"] = [a for a in clean.get("answered", []) if a["id"].strip()][:6]
     if schema_name == "memory":
         clean["memory"] = clean["memory"].strip()[:2000]
+    if schema_name == "care_plan":
+        clean["recommendations"] = [str(r).strip()[:40] for r in clean.get("recommendations", [])][:8]
     if schema_name == "summary":
         clean["recap"] = [str(line)[:200] for line in clean["recap"]][:3]
     return clean

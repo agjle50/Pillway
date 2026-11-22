@@ -171,3 +171,46 @@ class NeverPresumeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CheckInAndCarePlanTests(unittest.TestCase):
+    def setUp(self):
+        use_temp_settings()
+        self.service = ConversationService()
+        self.service.submit_intake("maria", GOOD_FORM)
+        self.service.accept_consent("maria")
+
+    def test_sarah_opens_the_check_in_with_the_intake_and_asks_about_changes(self):
+        from pillway.ui.patient.check_in_popup import check_in_needed
+        self.assertTrue(check_in_needed(self.service.store.load("maria")))
+        self.assertTrue(self.service.start_check_in("maria"))
+        record = self.service.store.load("maria")
+        first = record["messages"][-1]["text"]
+        self.assertIn("148/94", first)                 # from her questionnaire
+        self.assertIn("Has anything changed", first)
+        self.assertEqual(record["conversation"]["stage"], "changes")
+        self.assertFalse(self.service.start_check_in("maria"))   # never twice
+
+    def test_intake_results_decide_which_questions_matter_most(self):
+        record = self.service.store.load("maria")
+        priority = intake.priority_questions(record)
+        self.assertIn("blood_pressure", priority)
+        self.assertIn("smoking", priority)
+        self.assertEqual(self.service._checklist(record)["priority_from_intake"], priority)
+
+    def test_the_ai_can_only_pick_recommendations_from_pillways_list(self):
+        from pillway.core import care_plan
+        record = self.service.store.load("maria")
+        ai_plan = {"smart_goals": [{"en": "Walk 15 minutes after lunch, 5 days a week, for 4 weeks.", "fr": "Marchez."}],
+                   "values": [{"id": "a1c_target", "value": "7.5", "reason": "newly diagnosed, start gently"},
+                              {"id": "made_up_line", "value": "9", "reason": "x"}],
+                   "recommendations": ["dietitian", "buy_supplements"], "barrier_plans": []}
+        plan = care_plan.build_draft(record, ai_plan, "ai")
+        ids = [l["id"] for s in plan["sections"] for l in s["lines"]]
+        self.assertIn("rec_dietitian", ids)
+        self.assertNotIn("rec_buy_supplements", ids)
+        self.assertNotIn("made_up_line", ids)
+        a1c = care_plan.find_line(plan, "a1c_target")
+        self.assertEqual((a1c["value"], a1c["ai"], a1c["confirmed"]), ("7.5", True, False))
+        self.assertIn("rec_quit_smoking", ids)          # she's thinking about quitting (rules)
+        self.assertTrue(care_plan.find_line(plan, "goal_0")["ai"])

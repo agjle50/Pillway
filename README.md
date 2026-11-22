@@ -60,19 +60,25 @@ Useful options (add them after `python Pillway.py`):
 
 ## Add your API key
 
-Sarah's brain is **Google Gemini**. You need a free Gemini API key from <https://aistudio.google.com/apikey>
-(it starts with `AIza`). The free tier has limits; beyond them Google bills usage.
+Sarah's brain is **DeepSeek** (`deepseek-flash` for chats, calls and safety checks; `deepseek-v4-pro`
+for the care plan). You need a DeepSeek API key from <https://platform.deepseek.com/api_keys> (it starts
+with `sk-`). DeepSeek is pay-as-you-go: top up a small balance first. A whole stage run costs well under
+about 4 US cents at peak prices, half that off-peak (`python Pillway.py --check-config` prints an estimate). Nothing extra to install.
+
+**Switching company is one line** in `pillway_config.toml`: `provider = "deepseek"` or
+`provider = "gemini"` (then use a Gemini key starting with `AIza` and run `python -m pip install google-genai`).
+Models that belong to the other company are swapped for that company's usual ones automatically.
 
 **Easiest:** start the app (`python Pillway.py`, without `--demo`), go to **Settings → AI connection**,
 paste the key and press **Save and connect**. It tests the connection for you.
 
 **Or by hand:**
 1. Copy `pillway_config.local.example.toml` and name the copy `pillway_config.local.toml`.
-2. Open it and paste your key between the quotes: `api_key = "AIza..."`
+2. Open it and paste your key between the quotes: `api_key = "sk-..."`
 3. Run `python Pillway.py --check-config` to confirm.
 
 `pillway_config.local.toml` is in `.gitignore`, so the key never goes to GitHub. (You can also set
-the environment variable `GEMINI_API_KEY`, or copy `.env.example` to `.env`.)
+the environment variable `DEEPSEEK_API_KEY`, or copy `.env.example` to `.env`.)
 **Never** start the app with `--demo` if you want the real AI: that forces scripted replies.
 
 ## Demo mode and Reset demo
@@ -94,10 +100,12 @@ the environment variable `GEMINI_API_KEY`, or copy `.env.example` to `.env`.)
 | Manage profiles | Separate patient and pharmacist profile categories, each with a **Switch profile** button and an options menu | Choose **Edit profile** or **Delete profile** from the menu; add patient profiles or delete saved data |
 | Edit profile | Personal, health-card, insurance, insurance-photo, and delivery-address pages | Swipe horizontally, use the page dots or section selector, then **Save changes** |
 | Health questionnaire | Shown first for a **brand-new account (no chats yet)**, and kept in **Tasks** until done. Pillway's intake sheet: weight/height (optional), blood pressure, tobacco. Says up front that Sarah only keeps key medical details and shares them only with the pharmacist / care team. Sarah then builds a **health profile**: what's known, what was kept private, and "areas to explore" (guesses she checks by *asking*, never states as fact) | Fill in and **Save and continue**, or **Do this later**. Edit any time from **Tasks → Edit answers** |
+| Necessary check-in popup | Appears after the questionnaire until the first check-in is done. Sarah opens the chat herself: what she knows from the questionnaire → "Has anything changed?" → the questions that matter most for this patient (chosen from the questionnaire results; DeepSeek writes the follow-ups) → main concerns → one goal | **Start check-in** (or **Later**) |
 | Check up | Choose how to check in | **Call** or **Chat** |
 | Consent | Shown once before the first chat or call (includes the privacy note) | **I agree** |
 | Chat | Sarah: summary → "any changes?" → one question at a time → wrap-up → care plan | Returning patients can ask for a recap, continue, or raise a new concern; Sarah won't expect them to remember the last chat. Type or tap quick replies. |
 | Call | iPhone-style voice check-in: name, timer, green voice ring, mute, end | **Hold** the green button and talk. With no microphone (or in demo mode) tap it to "say" the next scripted line. |
+| Care plan | **Simple** plan in the patient's language: SMART goals, targets, "Recommended for you" (only items from Pillway's guideline list that fit their answers), every-day habits, medications. Values the AI suggested say "(your pharmacist will confirm)" | Read it; **Save as text** gives English + French |
 | Medications | Medicines on file (entered by the pharmacist) + prescriptions the patient adds | **Add prescription** |
 | Orders | Made-up orders | – |
 | Tasks | Alarm-style daily tasks made from the care plan (never medication) | **Allow reminders**, then flip any toggle |
@@ -145,8 +153,10 @@ Everything lives in **`pillway_config.toml`** (heavily commented). Save, then re
 
 | I want to… | Edit this line |
 |---|---|
-| Use a cheaper model for development | `chat_model = "gemini-3.5-flash-lite"` (also `care_plan_model`, `summary_model`) |
-| Change the safety-check model | `flag_model = "gemini-3.5-flash-lite"` |
+| Use the cheapest model for everything | `care_plan_model = "deepseek-flash"` (the others already use it) |
+| Change the safety-check model | `flag_model = "deepseek-v4-pro"` (stronger, slower) |
+| Switch to Google Gemini | `provider = "gemini"` + a Gemini key + `python -m pip install google-genai` |
+| Make the care plan "think" first | `care_plan_thinking = "low"` (slower: up to a minute) |
 | Faster or deeper replies | `thinking_level = "low"` (fastest) / `"medium"` / `"high"` |
 | Change the monthly follow-up topics | edit `data/follow_up_topics.json` (one topic per follow-up call) |
 | Run with no AI | `demo_mode = true` |
@@ -161,7 +171,8 @@ Everything lives in **`pillway_config.toml`** (heavily commented). Save, then re
 
 | Problem | Fix |
 |---|---|
-| **"API key not found"** / always demo mode | Check `pillway_config.local.toml` exists (no `.example` in the name) and `python Pillway.py --check-config`. Also `pip install -r requirements.txt` (the `google-genai` package). |
+| **"API key not found"** / always demo mode | Check `pillway_config.local.toml` exists (no `.example` in the name) and `python Pillway.py --check-config`. A DeepSeek key starts with `sk-`; a Gemini key (`AIza...`) won't work while `provider = "deepseek"` (the app says so). |
+| **"402 ... no balance left"** | Your DeepSeek account is empty: top up at platform.deepseek.com. The app keeps working with the scripted backup replies meanwhile. |
 | **Voice not working (read-aloud or microphone)** | First run **`python Pillway.py --check-voice`**. It speaks a test sentence, listens for 4 seconds, and prints **PROBLEM** lines with the fix for each one. |
 | **Microphone hears nothing** | Windows: **Settings → Privacy & security → Microphone** → turn on *Microphone access* **and** *Let desktop apps access your microphone*, then restart VS Code. Mac: **System Settings → Privacy & Security → Microphone** → allow Terminal / VS Code. |
 | **Speech-to-text never types anything** | The first use downloads a ~40 MB offline model (needs internet once; do it before the venue). On Windows, if that can't work, the app switches to Windows' built-in speech recognition automatically (`speech_to_text_engine = "auto"` in `pillway_config.toml`; set `"windows"` to force it). You can always tap **Switch to chat**. |
@@ -251,7 +262,7 @@ tools/generate_french_review.py  rebuilds docs/french_review.md
                                                      │ 2. LAYER 1 core/safety_rules.py  (instant, offline)
                                                      │      urgent? ──► red bubble + flag on dashboard NOW
                                                      │ 3. core/conversation_flow.py decides the next step
-                                                     │ 4. ai/brain.py ──► ai/client.py ──► Gemini API  
+                                                     │ 4. ai/brain.py ──► ai/client.py ──► DeepSeek API  
                                                      │      (de-identified; falls back to ai/demo_mode.py)
                                                      │      • LAYER 2 flag check (Haiku)  • Sarah's paragraph (Opus)
                                                      │ 5. core/flagging.py: AI may add/raise, never clear Tier 1

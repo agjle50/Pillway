@@ -97,28 +97,9 @@ class DemoBrain:
     # ---- care plan lifestyle lines --------------------------------------------
 
     def care_plan_lifestyle(self, record):
+        """Backup for the AI's part of the plan: the rules' SMART goals, no value changes."""
+        from ..core.care_plan import rule_goals
         answers = record["conversation"]["answers"]
-        lines = {"pharmacist_identified_goals": [], "a1c": [], "blood_pressure": [], "exercise": []}
-        diet = answers.get("diet", {}).get("value")
-        if diet == "unsure":
-            lines["pharmacist_identified_goals"].append({
-                "en": "Use the plate method at meals: half vegetables, a quarter protein, a quarter whole grains.",
-                "fr": "Utilisez la méthode de l'assiette : moitié légumes, un quart protéines, un quart grains entiers."})
-        sugar = answers.get("blood_sugar", {}).get("value")
-        lines["a1c"].append({"en": "Write down each reading with the time and whether it was before or after a meal."
-                                   + (f" Your last reading was {sugar}." if sugar and sugar != "no reading" else ""),
-                             "fr": "Notez chaque mesure avec l'heure et si c'était avant ou après un repas."
-                                   + (f" Votre dernière mesure était de {sugar}." if sugar and sugar != "no reading" else "")})
-        lines["blood_pressure"].append({"en": "Check your blood pressure at the same time each morning, after sitting quietly for 5 minutes.",
-                                        "fr": "Mesurez votre tension chaque matin à la même heure, après 5 minutes assise au calme."})
-        activity = answers.get("activity", {}).get("value", "")
-        bucket = parse.activity_bucket(activity) if activity else "low"
-        walk = {"low": ("Start with a 10-minute walk after dinner, 5 days a week.", "Commencez par une marche de 10 minutes après le souper, 5 jours par semaine."),
-                "medium": ("Add one 20-minute walk on most days to reach 150 minutes a week.", "Ajoutez une marche de 20 minutes la plupart des jours pour atteindre 150 minutes par semaine."),
-                "high": ("Keep up your walks and add 2 short strength sessions a week.", "Continuez vos marches et ajoutez 2 courtes séances de renforcement par semaine.")}[bucket]
-        lines["exercise"].append({"en": walk[0], "fr": walk[1]})
-        lines["exercise"].append({"en": "Check your feet every evening, including between your toes.",
-                                  "fr": "Vérifiez vos pieds chaque soir, y compris entre les orteils."})
         barrier = answers.get("barriers", {}).get("value")
         barrier_plans = []
         if barrier:
@@ -126,7 +107,7 @@ class DemoBrain:
             barrier_plans.append({"barrier_en": barrier, "barrier_fr": barrier,
                                   "plan_en": advice(plan_key, "en").replace(" I'll add this to your care plan.", ""),
                                   "plan_fr": advice(plan_key, "fr").replace(" Je l'ajoute à votre plan de soins.", "")})
-        return {"sections": lines, "barrier_plans": barrier_plans}
+        return {"smart_goals": rule_goals(record), "values": [], "recommendations": [], "barrier_plans": barrier_plans}
 
     # ---- pharmacist recap --------------------------------------------------------
 

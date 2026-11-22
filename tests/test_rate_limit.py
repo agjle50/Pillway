@@ -46,7 +46,7 @@ class RateLimitTests(unittest.TestCase):
         self.assertEqual(second, (None, "unavailable"))
         self.assertEqual(sdk.calls, 1)                    # no instant retry, no second request in the pause
         self.assertLess(time.monotonic() - started, 0.5)  # the patient isn't kept waiting
-        self.assertIn("free-tier limit", out.getvalue())
+        self.assertIn("rate limit reached", out.getvalue())
         self.assertNotIn("AIzaSyFAKE", out.getvalue())    # the key is never printed
         self.assertNotIn("AIzaSyFAKE", client.last_error)
 

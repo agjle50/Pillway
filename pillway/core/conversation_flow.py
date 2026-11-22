@@ -30,7 +30,8 @@ def question_list(record):
     kept = [q for q in questions
             if not any(profile.get(key) == value for key, value in q.get("skip_if", {}).items())]
     limit = settings.patient.max_questions_per_check_in
-    must_keep = {"feet"} if record["bot_settings"].get("ask_feet_every_check_in") else set()
+    # goals and main concerns shape the care plan, so the question limit never drops them
+    must_keep = ({"feet"} if record["bot_settings"].get("ask_feet_every_check_in") else set()) | {"concerns", "goal"}
     trimmed = kept[:limit]
     ids = [q["id"] for q in trimmed]
     by_id = {q["id"]: q for q in kept}
@@ -39,6 +40,7 @@ def question_list(record):
     for q in kept[limit:]:
         if q["id"] in must_keep and q not in trimmed:
             trimmed.append(q)
+    trimmed.sort(key=lambda q: [k["id"] for k in kept].index(q["id"]))
     return trimmed
 
 
@@ -237,6 +239,10 @@ def _answer_barriers(record, text, plan, lang):
     plan.update(advice_key=f"barriers.{bucket or 'other'}", answer_value=text.strip())
 
 
+def _answer_concerns(record, text, plan, lang):
+    plan.update(advice_key="concerns.any", answer_value=text.strip())
+
+
 def _answer_goal(record, text, plan, lang):
     plan.update(advice_key="goal.any", answer_value=text.strip())
 
@@ -248,7 +254,7 @@ def _generic_answer(record, text, plan, lang):
 ANSWER_HANDLERS = {"diet": _answer_diet, "protein_limit": _answer_protein, "feet": _answer_feet,
                    "blood_sugar": _answer_blood_sugar, "blood_pressure": _answer_blood_pressure,
                    "activity": _answer_activity, "alcohol": _answer_alcohol, "smoking": _answer_smoking,
-                   "barriers": _answer_barriers, "goal": _answer_goal}
+                   "barriers": _answer_barriers, "concerns": _answer_concerns, "goal": _answer_goal}
 
 
 def go_back(record):

@@ -96,7 +96,11 @@ class SpeechFallbackTests(unittest.TestCase):
     def test_without_backup_a_clear_error_is_shown(self):
         events = queue.Queue()
         listener = speech_input.LocalSpeechInput("/nowhere", events, transcribe=True)
+        from pillway.voice import whisper_input
+        # no engine at all: Whisper, Vosk and Windows speech all unavailable (BUG FIX: the test used to
+        # depend on Whisper not being installed on the computer running it)
         with patch.dict(sys.modules, {"vosk": None}), \
+                patch.object(whisper_input, "available", return_value=False), \
                 patch.object(windows_speech, "available", return_value=False):
             listener._run()
         kind, message = events.get_nowait()

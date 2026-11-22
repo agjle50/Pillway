@@ -59,6 +59,37 @@ class ConversationService:
         audit_log.record("consent", patient_id, accepted=accepted)
         return record
 
+    def start_check_in(self, patient_id, channel="chat"):
+        """Sarah opens the check-in herself (the "Necessary check-in" popup, or opening the chat).
+
+        Only for a patient who agreed to the consent screen and hasn't started the check-in yet:
+        she greets them, says back ONLY what's known (questionnaire + pharmacy file), and asks
+        whether anything has changed. Returns True if she spoke.
+        """
+        from .. import debug_log
+        from .patient_summary import intake_summary
+        spoke = [False]
+
+        def change(record):
+            convo, lang = record["conversation"], record["language"]
+            if not record["consent"]["accepted"] or convo["stage"] not in ("consent", "greeting"):
+                return
+            settings = get_settings().branding
+            intro = load_questions_intro()
+            greeting = advice("greeting", lang, first_name=record["profile"].get("first_name", ""),
+                              assistant=settings.assistant_name, pharmacy=settings.pharmacy_name)
+            check_in = ("C'est votre suivi nécessaire avant votre plan de soins. Ça prend environ 5 minutes."
+                        if lang == "fr" else
+                        "This is your check-in before your care plan. It takes about 5 minutes.")
+            text = "\n\n".join([greeting + " " + check_in, intake_summary(record, lang), intro[f"changes_{lang}"]])
+            convo["stage"] = "changes"
+            self._add_sarah(record, text, quick=intro[f"changes_quick_{lang}"], source="code", channel=channel)
+            spoke[0] = True
+        self.store.update(patient_id, change)
+        if spoke[0]:
+            debug_log.log("checkin", "Sarah opened the check-in", patient=patient_id)
+        return spoke[0]
+
     def submit_intake(self, patient_id, form, lang="en"):
         """Save the first-visit questionnaire and build the health profile.
 
@@ -230,7 +261,7 @@ class ConversationService:
             if (self.brain.live and get_settings().ai.conversation_style == "natural"
                     and self._turns_since_memory[patient_id] >= MEMORY_EVERY_N_TURNS):
                 # update Sarah's memory in the background, without making the patient wait.
-                # Only every few messages: the free Gemini tier allows few requests per minute.
+                # Only every few messages: it saves AI calls (and free tiers allow few requests per minute).
                 self._turns_since_memory[patient_id] = 0
                 threading.Thread(target=self._safe_refresh_memory, args=(patient_id,), daemon=True).start()
             self.timings.append(round(time.monotonic() - started, 2))
@@ -344,6 +375,11 @@ class ConversationService:
                          if done and profile.get(key) not in (None, "")}
         base = {"off_topic_turns": convo.get("off_topic_turns", 0),
                 "questionnaire_done": done,
+                "priority_from_intake": intake.priority_questions(record),
+                "last_asked": convo.get("last_asking"),
+                # problems already sent to the pharmacist WITH details: never ask about them again
+                "already_flagged": [f.get("topic", "") for f in record.get("flags", [])
+                                    if f.get("details") and f.get("status") != "resolved"],
                 "already_in_questionnaire": questionnaire}
         if convo["stage"] == "done":
             topic = self._follow_up_topic(record)
@@ -469,6 +505,15 @@ class ConversationService:
             from .content import load as load_content
             optional = {q["id"] for q in load_content("questions")["questions"] if q.get("optional")}
             known = ({q["id"] for q in question_list(record)} | optional) if convo["stage"] != "done" else set()
+            # Safety net: the patient's message answers the question Sarah just asked. If the AI forgot
+            # to report it, record their words, so the same question is never asked twice in a row.
+            last = convo.get("last_asking")
+            reported = {item["id"].strip() for item in talk.get("answered", [])}
+            if (last and last in known and last not in convo["answers"] and last not in reported
+                    and not talk.get("small_talk") and not talk.get("medication_question")):
+                talk.setdefault("answered", []).append({"id": last, "value": heard.strip()})
+                from .. import debug_log
+                debug_log.log("checkin", "answer recorded by the safety net (AI didn't report it)", question=last)
             for item in talk.get("answered", []):
                 qid, value = item["id"].strip(), (item.get("value") or heard).strip()
                 if qid == "changes" and convo["stage"] in ("changes", "changes_detail"):
@@ -518,6 +563,7 @@ class ConversationService:
                           for i in talk.get("possible_issues", [])[:2]]
             self._save_issues(record, statements, message_id)
             asking = talk.get("asking")
+            convo["last_asking"] = asking if asking in known and asking not in convo["answers"] else None
             index = next((n for n, q in enumerate(questions) if q["id"] == asking), None)
             payload = question_payload(record, index, lang) if index is not None else None
             self._add_sarah(record, reply, quick=(payload or {}).get("quick"),
@@ -652,7 +698,12 @@ class ConversationService:
     def make_care_plan(self, patient_id, channel="chat"):
         self.busy.add(patient_id)
         try:
-            lifestyle, source = self.brain.care_plan_lifestyle(self.store.load(patient_id))
+            try:
+                lifestyle, source = self.brain.care_plan_lifestyle(self.store.load(patient_id))
+            except Exception as error:   # never lose the check-in over the AI: the backup rules write it
+                from .. import debug_log
+                debug_log.log("careplan", "AI care plan failed: backup rules used", error=f"{type(error).__name__}: {error}")
+                lifestyle, source = self.brain.demo.care_plan_lifestyle(self.store.load(patient_id)), "offline"
 
             def change(record):
                 record["care_plan"] = care_plan_logic.build_draft(record, lifestyle, source)

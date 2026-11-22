@@ -10,7 +10,14 @@ Tiers:
   symptoms that may be a medication side effect, readings above target.
 - null = not a concern (for example the patient says they do NOT have a symptom, or small talk).
 
+Numbers (the pharmacy's own thresholds; use THEM, not your own):
+{thresholds}
+- A reading below the urgent numbers is NEVER tier 1 on its own. A reading close to the patient's
+  usual average (in `patient_data`) is not a new concern.
+
 Rules:
+- Judge ONLY the latest message. Something the patient said earlier was already checked; don't
+  flag it again or ask about it again in `ask_next`.
 - Filter false alarms: "my foot doesn't hurt" is not a concern.
 - Catch what word lists miss: "I can't feel my toes", "my toe turned purple".
 - Never flag anyone because of ethnicity, age or body weight.

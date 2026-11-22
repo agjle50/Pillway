@@ -350,6 +350,7 @@
     "Edit answers": "Modifier",
     "Start": "Commencer",
     "Yes": "Oui",
-    "No": "Non"
+    "No": "Non",
+    "DeepSeek API key": "Clé d’API DeepSeek"
   }
 }

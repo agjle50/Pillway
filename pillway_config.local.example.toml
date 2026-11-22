@@ -3,8 +3,8 @@
 # =============================================================================
 #  1. Copy this file and name the copy:   pillway_config.local.toml
 #     (just remove ".example" from the name)
-#  2. Paste your Gemini API key between the quotes below.
-#     Get one free at https://aistudio.google.com/apikey (it starts with "AIza").
+#  2. Paste your DeepSeek API key between the quotes below.
+#     Get one at https://platform.deepseek.com/api_keys (it starts with "sk-").
 #     Or simply use the app: Settings > AI connection.
 #  3. Save and run:  python Pillway.py --check-config
 #
@@ -15,10 +15,11 @@
 [ai]
 api_key = ""
 
-# Optional: cheaper models while you develop (uncomment by removing the #).
-# chat_model = "gemini-3.5-flash-lite"
-# care_plan_model = "gemini-3.5-flash-lite"
-# summary_model = "gemini-3.5-flash-lite"
+# Optional: the cheapest model for everything while you develop (uncomment by removing the #).
+# care_plan_model = "deepseek-flash"
+
+# Optional: use Google Gemini instead (then paste a Gemini key above, starting with "AIza").
+# provider = "gemini"
 
 # Optional: always use the offline demo on your laptop.
 # demo_mode = true

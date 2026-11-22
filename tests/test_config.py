@@ -23,12 +23,13 @@ class ConfigTests(unittest.TestCase):
 
     def test_real_repo_config_loads(self):
         settings = load_settings(ROOT, env={})
-        self.assertEqual(settings.ai.flag_model, "gemini-3.5-flash-lite")
+        self.assertEqual(settings.ai.provider, "deepseek")
+        self.assertEqual(settings.ai.flag_model, "deepseek-flash")
         self.assertTrue(settings.ai.deidentify_before_ai)
 
     def test_defaults_when_file_is_empty(self):
         settings = load_settings(self.make_root(), env={})
-        self.assertEqual(settings.ai.chat_model, "gemini-3.8-flash")
+        self.assertEqual(settings.ai.chat_model, "deepseek-flash")
         self.assertEqual(settings.branding.assistant_name, "Sarah")
 
     def test_typo_gives_plain_english_error_naming_the_setting(self):
@@ -44,11 +45,21 @@ class ConfigTests(unittest.TestCase):
 
     def test_key_lookup_order(self):
         root = self.make_root(local=f'[ai]\napi_key = "{FAKE_KEY}"\n',
-                              dotenv="GEMINI_API_KEY=from-dotenv\n")
-        self.assertEqual(load_settings(root, env={"GEMINI_API_KEY": "from-env"}).api_key, "from-env")
+                              dotenv="DEEPSEEK_API_KEY=from-dotenv\n")
+        self.assertEqual(load_settings(root, env={"DEEPSEEK_API_KEY": "from-env"}).api_key, "from-env")
         self.assertEqual(load_settings(root, env={}).api_key, FAKE_KEY)
         (root / "pillway_config.local.toml").write_text("", encoding="utf-8")
         self.assertEqual(load_settings(root, env={}).api_key, "from-dotenv")
+
+    def test_switching_provider_is_one_line(self):
+        from pillway.ai.client import model_for
+        root = self.make_root('[ai]\nprovider = "gemini"\nchat_model = "deepseek-flash"\n')
+        settings = load_settings(root, env={"GEMINI_API_KEY": "from-env"})
+        self.assertEqual(settings.api_key, "from-env")             # the provider's usual variable
+        self.assertEqual(model_for("chat", settings.ai), "gemini-3.8-flash")   # not a DeepSeek model
+        settings.ai.provider = "deepseek"
+        self.assertEqual(model_for("chat", settings.ai), "deepseek-flash")
+        self.assertEqual(model_for("care_plan", settings.ai), "deepseek-v4-pro")
 
     def test_no_key_means_empty_key(self):
         settings = load_settings(self.make_root(), env={})
