@@ -111,7 +111,6 @@ class PillwayApp(
         self._click_targets = []
         self.c.bind("<Button-1>", self._dispatch_expanded_click, add="+")
         self.c.bind("<Button-1>", self.close_dropdown_on_outside_click, add="+")
-        self.bind_all("<Button-1>", self._sound_on_native_button_click, add="+")
 
         # shared data (one source of truth for both roles)
         self.store = PatientStore()
