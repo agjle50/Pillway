@@ -35,6 +35,27 @@ def system_prompt(lang="en"):
     return text + "\n\n# Worked examples\n\n" + _examples()
 
 
+def conversation_system_prompt(lang="en"):
+    """Natural mode: the same persona and hard rules, but Sarah writes the whole reply."""
+    full = system_prompt(lang)
+    head = full.split("# Your job in each turn")[0]
+    tail = full.split("# Existing Sarah guidance", 1)[1] if "# Existing Sarah guidance" in full else ""
+    job = (PROMPTS / "conversation.md").read_text(encoding="utf-8").replace("{{", "{").replace("}}", "}")
+    return head + job + "\n\n# Existing Sarah guidance" + tail
+
+
+MEMORY_PROMPT = """You keep a compact memory for a pharmacy care assistant, so she remembers each patient
+like a person would. You get the current memory and the latest exchange. Return an updated memory.
+
+Keep (most important first): health facts and readings with dates, new symptoms and how they
+changed, medicines mentioned, worries, what they found hard, goals, what was already covered in the
+check-in, open questions for the pharmacist, and personal details they shared in small talk (family,
+hobbies, plans, mood) that a caring person would remember. Drop greetings and filler. Merge, don't
+repeat. Never invent anything. Use "Patient A" for the patient. At most 200 words, short lines.
+
+Answer ONLY with JSON: {"memory": "the updated memory"}"""
+
+
 def patient_context(record, limit=8):
     """Only the facts the AI needs, de-identified. Shown by --show-ai-payload."""
     profile = record["profile"]
@@ -80,6 +101,7 @@ def patient_context(record, limit=8):
         "pharmacist_settings": record["bot_settings"],
         "recent_messages": recent,
         "session_opening": len(patient_turns) == 1,
+        "memory": (record.get("memory") or {}).get("text", ""),
         "previous_interaction": previous_interaction,
     }
 
@@ -101,6 +123,36 @@ class Brain:
         user = (f"<patient_data>\n{payload}\n</patient_data>\n\nTASK: {task}\n\n"
                 f"<patient_message>\n{redact_text(message, record['profile'])}\n</patient_message>")
         return self.client.complete(job, system, user, schema, profile=record["profile"])
+
+    def converse(self, record, text, channel, checklist, facts):
+        """Natural mode: Sarah's whole reply, written freely. Returns (data, status)."""
+        if not self.live:
+            return None, "unavailable"
+        context = patient_context(record, limit=14)
+        context.update(channel=channel, checklist=checklist, facts=facts)
+        payload = json.dumps(context, ensure_ascii=False, indent=1)
+        user = (f"<patient_data>\n{payload}\n</patient_data>\n\n"
+                f"TASK: Reply to the patient's latest message as {get_settings().branding.assistant_name}.\n\n"
+                f"<patient_message>\n{redact_text(text, record['profile'])}\n</patient_message>")
+        job = "call" if channel == "call" else "chat"
+        data, status = self.client.complete(job, conversation_system_prompt(record["language"]), user, "converse",
+                                            profile=record["profile"],
+                                            temperature=get_settings().ai.conversation_temperature)
+        if status == OK:
+            data["reply"] = restore_name(data["reply"], record["profile"])
+            data["heard_as"] = restore_name(data.get("heard_as", ""), record["profile"])
+        return data, status
+
+    def update_memory(self, record, exchange):
+        """Fold the latest exchange into the patient's compact memory. Returns the new text or None."""
+        if not self.live:
+            return None
+        current = (record.get("memory") or {}).get("text", "") or "(empty: first conversation)"
+        lines = "\n".join(f"{who}: {redact_text(said, record['profile'])}" for who, said in exchange)
+        user = f"<current_memory>\n{current}\n</current_memory>\n\n<latest_exchange>\n{lines}\n</latest_exchange>"
+        data, status = self.client.complete("memory", MEMORY_PROMPT, user, "memory", profile=record["profile"],
+                                            temperature=0.2)
+        return data["memory"] if status == OK else None
 
     def flag_check(self, record, text, layer1):
         if not get_settings().ai.ai_safety_layer_enabled:

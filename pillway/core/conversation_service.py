@@ -11,6 +11,7 @@ What happens to one message:
   5. layer 2 updates the flag card when it arrives; every decision goes to the audit log
 """
 
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
@@ -24,7 +25,15 @@ from . import answer_parsing as parse
 from . import care_plan as care_plan_logic
 from . import flagging, reply_builder, tasks
 from .content import advice
-from .conversation_flow import go_back, plan_turn, question_payload
+from .conversation_flow import (ANSWER_HANDLERS, _generic_answer, empty_plan, go_back, plan_turn,
+                                protein_targets, question_list, question_payload)
+from .output_guard import check_reply
+from .patient_summary import detect_changes
+
+
+def load_questions_intro():
+    from .content import load
+    return load("questions")["intro"]
 from .safety_rules import check_message
 
 
@@ -185,6 +194,9 @@ class ConversationService:
             return self._handle(patient_id, text, channel, on_update or (lambda: None), started)
         finally:
             self.busy.discard(patient_id)
+            if self.brain.live and get_settings().ai.conversation_style == "natural":
+                # update Sarah's memory in the background, without making the patient wait
+                threading.Thread(target=self._safe_refresh_memory, args=(patient_id,), daemon=True).start()
             self.timings.append(round(time.monotonic() - started, 2))
             if get_settings().dev.dev_mode:
                 print(f"[timing] reply for {patient_id} in {self.timings[-1]}s")
@@ -271,6 +283,184 @@ class ConversationService:
         convo = record["conversation"]
         if convo.get("pending_flag_followup"):
             return self._flag_followup_turn(patient_id, text, message_id, channel, on_update)
+        if self._natural_mode(record):
+            return self._natural_turn(patient_id, text, layer1, message_id, channel, on_update)
+        return self._scripted_turn(patient_id, text, layer1, message_id, channel, on_update)
+
+    # ---- natural conversation (the AI writes the whole reply) ---------------------
+
+    def _natural_mode(self, record):
+        return (get_settings().ai.conversation_style == "natural" and self.brain.live
+                and record["conversation"]["stage"] not in ("consent", "greeting"))
+
+    def _checklist(self, record):
+        """What the check-in still needs, as gentle guidance for the AI (not a script)."""
+        convo, lang = record["conversation"], record["language"]
+        intro = load_questions_intro()
+        remaining = []
+        if convo["stage"] in ("changes", "changes_detail"):
+            remaining.append({"id": "changes", "about": "anything new since their questionnaire",
+                              "example_question": intro[f"changes_{lang}"]})
+        for question in question_list(record):
+            if question["id"] not in convo["answers"]:
+                remaining.append({"id": question["id"], "about": question["topic"],
+                                  "example_question": question.get(lang) or question["en"]})
+        return {"stage": convo["stage"], "remaining": remaining,
+                "suggested_next": remaining[0]["id"] if remaining else "anything_else",
+                "already_answered": {qid: a.get("value") for qid, a in convo["answers"].items()}}
+
+    @staticmethod
+    def _facts(record):
+        """Numbers the app computed; the AI must use them exactly."""
+        facts = {}
+        weight = record["profile"].get("weight_kg")
+        if weight:
+            low, high = protein_targets(weight)
+            facts["protein_target_grams_per_day"] = f"{low} to {high} (0.8 to 1.0 g per kg; only after protein_limit is answered 'no')"
+        if record["profile"].get("last_bp"):
+            facts["last_blood_pressure"] = record["profile"]["last_bp"]
+        return facts
+
+    def _natural_turn(self, patient_id, text, layer1, message_id, channel, on_update):
+        record = self.store.load(patient_id)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            flag_job = pool.submit(self.brain.flag_check, record, text, layer1)
+            talk_job = pool.submit(self.brain.converse, record, text, channel, self._checklist(record),
+                                   self._facts(record))
+            layer2, flag_status = flag_job.result()
+            talk, status = talk_job.result()
+        lang = record["language"]
+        if status != "ok" or not (talk or {}).get("reply") or check_reply(talk["reply"], lang, allow_short=True):
+            if talk and talk.get("reply"):
+                audit_log.record("output_guard_blocked", patient_id, problems=check_reply(talk["reply"], lang, True),
+                                 source="ai")
+            return self._scripted_turn(patient_id, text, layer1, message_id, channel, on_update)
+
+        # The AI's best reading of a speech-to-text message gets the same word-list safety check.
+        heard = talk.get("heard_as") or text
+        if heard.strip().lower() != text.strip().lower():
+            second = check_message(heard, extra_words=record.get("custom_flag_words", []))
+            if second.is_alert and (not layer1.is_alert or (second.tier or 9) < (layer1.tier or 9)):
+                layer1 = second
+                if layer1.tier == 1:
+                    quick = flagging.decide(layer1, None, "pending")
+
+                    def flag_now(record):
+                        message = next(m for m in record["messages"] if m["id"] == message_id)
+                        message["heard_as"] = heard
+                        if not message.get("flag_id"):
+                            quick["ai_status"] = "pending"
+                            flag = flagging.apply_flag(record, message, quick, layer1, None, source=channel)
+                            message.update(tier=flag["tier"], flag_id=flag["id"])
+                    self.store.update(patient_id, flag_now)
+                    return self._urgent_turn(patient_id, heard, layer1, message_id, quick, channel, on_update)
+        decision = flagging.decide(layer1, layer2, flag_status)
+        wants_care_plan = [False]
+
+        def change(record):
+            convo, lang = record["conversation"], record["language"]
+            message = next(m for m in record["messages"] if m["id"] == message_id)
+            if heard != text:
+                message["heard_as"] = heard
+            flag = None
+            if decision["final_tier"]:
+                if message.get("flag_id"):
+                    flag = flagging.upgrade_with_layer2(record, message["flag_id"], layer1, layer2, flag_status)
+                else:
+                    flag = flagging.apply_flag(record, message, decision, layer1, layer2, source=channel)
+                message.update(tier=flag["tier"], flag_id=flag["id"])
+            else:
+                flagging.apply_flag(record, message, decision, layer1, layer2, source=channel)  # audit only
+            if flag and flag["tier"] == 1:  # the AI safety check found something urgent
+                reply, statements = reply_builder.build_tier1(record, decision, talk.get("possible_issues", []))
+                convo["pending_flag_followup"] = {"flag_id": flag["id"], "resume": None}
+                self._save_issues(record, statements, message_id)
+                self._add_sarah(record, reply, tier=1, source="code", channel=channel)
+                return
+
+            known = {q["id"] for q in question_list(record)}
+            for item in talk.get("answered", []):
+                qid, value = item["id"].strip(), (item.get("value") or heard).strip()
+                if qid == "changes" and convo["stage"] in ("changes", "changes_detail"):
+                    for update in detect_changes(heard, record):
+                        talk.setdefault("summary_updates", []).append(update)
+                    convo["stage"] = "questions"
+                elif qid in known and qid not in convo["answers"]:
+                    plan = empty_plan("questions")
+                    plan["answer_to"] = qid
+                    if ANSWER_HANDLERS.get(qid, _generic_answer)(record, value, plan, lang):
+                        continue  # e.g. protein needs their weight first: still open
+                    convo["answers"][qid] = {"value": plan.get("answer_value") or value, "text": heard,
+                                             "time": now_iso()}
+                    if plan.get("handoff"):
+                        record["pharmacist_requests"].append({"id": new_id("req"), "time": now_iso(),
+                                                              "status": "open", "reason": plan["handoff"]})
+            seen = {u["text"].lower() for u in record["summary_updates"]}
+            for update in talk.get("summary_updates", []):
+                line = f"{update['type'].title()}: {update['value']}"
+                if line.lower() not in seen:
+                    record["summary_updates"].append({"time": now_iso(), "type": update["type"], "text": line})
+                    seen.add(line.lower())
+            if convo["stage"] in ("changes", "changes_detail") and talk.get("asking") in known:
+                convo["stage"] = "questions"  # they've moved on to the check-in questions
+            questions = question_list(record)
+            remaining = [q for q in questions if q["id"] not in convo["answers"]]
+            if convo["stage"] == "questions":
+                if remaining:
+                    convo["question_index"] = questions.index(remaining[0])
+                else:
+                    convo["stage"] = "wrap_up"
+            if talk.get("finished") and not remaining and convo["stage"] in ("questions", "wrap_up"):
+                convo["stage"] = "done"
+                wants_care_plan[0] = True
+
+            reply = talk["reply"]
+            if talk.get("medication_question"):
+                record["pharmacist_requests"].append({"id": new_id("req"), "time": now_iso(), "status": "open",
+                                                      "reason": "Medication question: " + heard[:140]})
+                line = advice("medication_question", lang)
+                if line.split(",")[0].lower() not in reply.lower():
+                    reply += " " + line
+            if flag and flag["tier"] == 2:  # always tell them the pharmacist will see it
+                reply += "\n\n" + advice("tier2_suffix", lang)
+            statements = [{"issue": i["issue"], "reason": i["reason"],
+                           "statement": advice("possible_issue", lang, issue=i["issue"], reason=i["reason"])}
+                          for i in talk.get("possible_issues", [])[:2]]
+            self._save_issues(record, statements, message_id)
+            asking = talk.get("asking")
+            index = next((n for n, q in enumerate(questions) if q["id"] == asking), None)
+            payload = question_payload(record, index, lang) if index is not None else None
+            self._add_sarah(record, reply, quick=(payload or {}).get("quick"),
+                            progress=(payload or {}).get("progress", ""), source="ai",
+                            tier=decision["final_tier"], channel=channel)
+        self.store.update(patient_id, change)
+        on_update()
+        if wants_care_plan[0]:
+            self.make_care_plan(patient_id, channel)
+            on_update()
+        return self.store.load(patient_id)
+
+    # ---- memory: a compact note Sarah reads before every reply --------------------
+
+    def refresh_memory(self, patient_id):
+        """Fold the latest exchange into the patient's compact memory (runs in the background)."""
+        record = self.store.load(patient_id)
+        messages = record["messages"]
+        last_patient = max((n for n, m in enumerate(messages) if m["role"] == "patient"), default=None)
+        if last_patient is None:
+            return
+        exchange = [("Patient", messages[last_patient].get("heard_as") or messages[last_patient]["text"])]
+        exchange += [("Assistant", m["text"]) for m in messages[last_patient + 1:] if m["role"] == "sarah"]
+        text = self.brain.update_memory(record, exchange)
+        if text:
+            def save(record):
+                record["memory"] = {"text": text, "updated": now_iso()}
+            self.store.update(patient_id, save)
+
+    # ---- the original scripted turn (fixed question order) ------------------------
+
+    def _scripted_turn(self, patient_id, text, layer1, message_id, channel, on_update):
+        record = self.store.load(patient_id)
         plan = plan_turn(record, text)  # works on a copy; re-applied inside update() below
         task = reply_builder.task_for_ai(plan, text, record)
         with ThreadPoolExecutor(max_workers=2) as pool:
@@ -343,6 +533,12 @@ class ConversationService:
         record = self.store.update(patient_id, change)
         on_update()
         return record
+
+    def _safe_refresh_memory(self, patient_id):
+        try:
+            self.refresh_memory(patient_id)
+        except Exception as error:  # memory is a nice-to-have; never break the chat
+            print(f"[memory] {type(error).__name__}: {error}")
 
     # ---- care plan ----------------------------------------------------------------
 

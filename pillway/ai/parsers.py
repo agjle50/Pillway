@@ -17,6 +17,20 @@ SCHEMAS = {
         "medication_question": (bool, False, None),
         "needs_pharmacist": (bool, False, None),
     },
+    "converse": {
+        "reply": (str, True, None),
+        "heard_as": (str, False, None),
+        "answered": (list, False, ("id", "value")),
+        "asking": ((str, type(None)), False, None),
+        "small_talk": (bool, False, None),
+        "finished": (bool, False, None),
+        "possible_issues": (list, False, ("issue", "reason")),
+        "summary_updates": (list, False, ("type", "value")),
+        "medication_question": (bool, False, None),
+    },
+    "memory": {
+        "memory": (str, True, None),
+    },
     "flag": {
         "is_concern": (bool, True, None),
         "tier": ((int, type(None)), False, None),
@@ -78,6 +92,13 @@ def validate(data, schema_name):
     if schema_name == "reply":
         clean["summary_updates"] = [u for u in clean.get("summary_updates", []) if u["type"] in UPDATE_TYPES]
         clean["advice"] = clean["advice"].strip()[:1200]
+    if schema_name == "converse":
+        clean["summary_updates"] = [u for u in clean.get("summary_updates", []) if u["type"] in UPDATE_TYPES]
+        clean["reply"] = clean["reply"].strip()[:1500]
+        clean["heard_as"] = clean.get("heard_as", "").strip()[:600]
+        clean["answered"] = [a for a in clean.get("answered", []) if a["id"].strip()][:6]
+    if schema_name == "memory":
+        clean["memory"] = clean["memory"].strip()[:2000]
     if schema_name == "summary":
         clean["recap"] = [str(line)[:200] for line in clean["recap"]][:3]
     return clean

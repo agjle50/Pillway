@@ -238,7 +238,8 @@ class CallMixin:
             prefix = ("Vous : " if self.lang == "fr" else "You: ") if mine else ""
             if message.get("tier"):
                 prefix = "⚑ " + prefix
-            text = " ".join(message["text"].split())
+            # show the AI's corrected reading of what speech recognition heard, when there is one
+            text = " ".join((message.get("heard_as") or message["text"]).split())
             room = max(60, int((bottom - y) / self.S(26)) * 62)
             if len(text) > room:
                 text = text[:room].rsplit(" ", 1)[0] + "…"

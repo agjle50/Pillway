@@ -29,6 +29,12 @@ chat_model = "claude-opus-5-5"        # Sarah's replies to the patient
 flag_model = "claude-haiku-5-5"       # layer 2 safety check on every patient message (must be fast)
 care_plan_model = "claude-opus-5-5"   # writes the lifestyle parts of the care plan
 summary_model = "claude-sonnet-5-5"   # recaps for the pharmacist and weekly summaries
+call_model = "claude-sonnet-5-5"      # Sarah on phone calls (faster, so the call feels natural)
+memory_model = "claude-haiku-5-5"     # keeps Sarah's compact memory of each patient up to date
+# "natural"  = Sarah converses freely (small talk welcome) and weaves the check-in questions in.
+# "scripted" = the original fixed question order with a short AI paragraph between questions.
+conversation_style = "natural"
+conversation_temperature = 0.7        # a little more lively than the 0.3 used for safety jobs
 
 # How creative the AI is: 0.0 = very consistent, 1.0 = very varied. Example: 0.3
 temperature = 0.3
@@ -136,8 +142,8 @@ call_enabled = true
 # "windows" = only Windows' built-in speech recognition (no download needed).
 # "none"    = no microphone; the call uses the scripted demo lines.
 speech_to_text_engine = "auto"
-# Whisper model size: "base" (fast, good) or "small" (more accurate, slower on old laptops).
-whisper_model = "base"
+# Whisper model size: "small" (accurate; ~460 MB download once) or "base" (faster on old laptops).
+whisper_model = "small"
 # Leave blank to use the system default, or select a device under Settings > Microphone.
 microphone_device = ""
 # "continuous" listens while the microphone is unmuted; mute to pause listening.
