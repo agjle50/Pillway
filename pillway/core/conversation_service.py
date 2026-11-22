@@ -14,6 +14,7 @@ What happens to one message:
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
+
 from datetime import datetime
 
 from config import get_settings
@@ -30,6 +31,8 @@ from .conversation_flow import (ANSWER_HANDLERS, _generic_answer, empty_plan, go
 from .output_guard import check_reply
 from .patient_summary import detect_changes
 
+MEMORY_EVERY_N_TURNS = 3   # refresh Sarah's compact memory every 3rd patient message
+
 
 def load_questions_intro():
     from .content import load
@@ -42,6 +45,7 @@ class ConversationService:
         self.store = store or PatientStore()
         self.brain = brain or Brain()
         self.busy = set()           # patient ids Sarah is currently "typing" for
+        self._turns_since_memory = {}   # patient id -> messages since Sarah's memory was refreshed
         self.timings = []
 
     # ---- simple actions -------------------------------------------------------
@@ -194,8 +198,12 @@ class ConversationService:
             return self._handle(patient_id, text, channel, on_update or (lambda: None), started)
         finally:
             self.busy.discard(patient_id)
-            if self.brain.live and get_settings().ai.conversation_style == "natural":
-                # update Sarah's memory in the background, without making the patient wait
+            self._turns_since_memory[patient_id] = self._turns_since_memory.get(patient_id, MEMORY_EVERY_N_TURNS - 1) + 1
+            if (self.brain.live and get_settings().ai.conversation_style == "natural"
+                    and self._turns_since_memory[patient_id] >= MEMORY_EVERY_N_TURNS):
+                # update Sarah's memory in the background, without making the patient wait.
+                # Only every few messages: the free Gemini tier allows few requests per minute.
+                self._turns_since_memory[patient_id] = 0
                 threading.Thread(target=self._safe_refresh_memory, args=(patient_id,), daemon=True).start()
             self.timings.append(round(time.monotonic() - started, 2))
             if get_settings().dev.dev_mode:
