@@ -7,7 +7,7 @@ import os
 import tkinter as tk
 from tkinter import filedialog
 
-from ..theme import (
+from ..theme import (RED_TEXT, 
     BORDER,
     INK,
     RED,
@@ -71,7 +71,7 @@ class PrescriptionMixin:
             return
 
         method = self.prescription_stage
-        self.text(left, top + self.S(52), f"{method} a prescription", 20, RED, "bold")
+        self.text(left, top + self.S(52), f"{method} a prescription", 20, RED_TEXT, "bold")
         self.text(left, top + self.S(90), "Medication name", 16, TEXT_MUTED)
         entry = tk.Entry(self, relief="flat", bd=0, font=self.font(16), fg=TEXT_DARK,
                          insertbackground=INK)
@@ -88,7 +88,7 @@ class PrescriptionMixin:
             selected = os.path.basename(self.prescription_photo) if self.prescription_photo else "Choose a photo"
             self.rrect(left, action_y, left + self.S(240), action_y + self.S(46),
                        self.S(8), fill=WHITE, outline=RED, width=self.S(1.2), tags="choose_photo")
-            self.text(left + self.S(120), action_y + self.S(23), selected, 15, RED,
+            self.text(left + self.S(120), action_y + self.S(23), selected, 15, RED_TEXT,
                       "bold", anchor="center", tag="choose_photo")
             self.clickable("choose_photo", self.choose_prescription_photo)
             action_y += self.S(64)
@@ -107,7 +107,7 @@ class PrescriptionMixin:
         self.rrect(x1, y, x2, y + height, self.S(13), fill=WHITE,
                    outline=RED, width=self.S(1.2), tags=tag)
         self.draw_icon(icon, x1 + self.S(35), y + self.S(34), self.S(24), RED, tag)
-        self.text(x1 + self.S(70), y + self.S(31), title, 22, RED, "bold", tag=tag)
+        self.text(x1 + self.S(70), y + self.S(31), title, 22, RED_TEXT, "bold", tag=tag)
         self.text(x1 + self.S(70), y + self.S(58), line1, 17, "#4a4a4a", tag=tag)
         self.text(x1 + self.S(70), y + self.S(81), line2, 17, "#4a4a4a", tag=tag)
         self.clickable(tag, lambda selected=title: self.choose_prescription_method(selected))

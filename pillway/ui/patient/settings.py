@@ -11,7 +11,7 @@ from config import get_settings
 from ...storage import app_state
 from ...storage.paths import data_folder
 from ...voice.speech_input import LocalSpeechInput, input_devices, resolve_input_device
-from ..theme import (
+from ..theme import (RED_TEXT, 
     RED,
     BORDER,
     INK,
@@ -29,7 +29,7 @@ class SettingsMixin:
         self.draw_icon("back", self.sw + self.S(36), y, self.S(26), INK, "back")
         self.clickable("back", lambda: self.go(back_to))
         self.text(self.sw + self.S(70), y, title, 22, INK, tag="page_title")
-        self.c.create_line(self.sw, y + self.S(36), self.w, y + self.S(36), fill=BORDER)
+        self.c.create_line(self.sw + self.S(14), y + self.S(36), self.w - self.S(14), y + self.S(36), fill=BORDER)
         return y + self.S(36)
 
     def draw_settings(self):
@@ -76,7 +76,7 @@ class SettingsMixin:
         try:
             devices = input_devices()
         except RuntimeError as error:
-            self.text(x1, y, str(error), 14, RED)
+            self.text(x1, y, str(error), 14, RED_TEXT)
             return
 
         settings = get_settings().call
@@ -109,7 +109,7 @@ class SettingsMixin:
                 lambda device=index: self.set_microphone_device(device),
             )
         if not devices:
-            self.text(x1, y + self.S(12), "No compatible microphone inputs were found.", 14, RED)
+            self.text(x1, y + self.S(12), "No compatible microphone inputs were found.", 14, RED_TEXT)
             y += self.S(38)
         self.c.create_text(
             x1, y + self.S(18),

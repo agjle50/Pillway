@@ -171,9 +171,10 @@ pharmacy_name = "Pillway"
 navy = "#0a0f42"
 navy_dark = "#080c38"
 red = "#ef3f3f"
-text_dark = "#4a566f"
-text_muted = "#768197"
-border = "#dde2ea"
+# Text colours meet WCAG AA contrast (4.5:1+) on white and on the light page background.
+text_dark = "#1f2a44"
+text_muted = "#4f5a70"
+border = "#c9d0dc"
 logo_path = ""
 
 

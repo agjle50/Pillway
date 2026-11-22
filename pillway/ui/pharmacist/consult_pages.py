@@ -4,7 +4,7 @@ Called by: ui/pharmacist/workspace_router.py.
 """
 
 
-from ..theme import (
+from ..theme import (RED_TEXT, 
     BORDER,
     RED,
     TEXT_DARK,
@@ -176,7 +176,7 @@ class ConsultPagesMixin:
         focus_y = y + card_h + gap
         self.rrect(x, focus_y, x + width, focus_y + self.S(100), self.S(10),
                    fill="#fff1ed", outline="#f4cfc5", width=self.S(1))
-        self.text(x + self.S(18), focus_y + self.S(24), "Clinical focus", 13, RED, "bold")
+        self.text(x + self.S(18), focus_y + self.S(24), "Clinical focus", 13, RED_TEXT, "bold")
         self.c.create_text(
             x + self.S(18), focus_y + self.S(45),
             text="Conditions: " + self._patient_value(profile.get("conditions")) +

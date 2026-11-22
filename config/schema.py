@@ -96,9 +96,9 @@ SCHEMA = {
         "navy": ("#0a0f42", str, "colour"),
         "navy_dark": ("#080c38", str, "colour"),
         "red": ("#ef3f3f", str, "colour"),
-        "text_dark": ("#4a566f", str, "colour"),
-        "text_muted": ("#768197", str, "colour"),
-        "border": ("#dde2ea", str, "colour"),
+        "text_dark": ("#1f2a44", str, "colour"),
+        "text_muted": ("#4f5a70", str, "colour"),
+        "border": ("#c9d0dc", str, "colour"),
         "logo_path": ("", str, None),
     },
     "demo": {

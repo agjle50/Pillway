@@ -9,6 +9,7 @@ from ..theme import (
     BORDER,
     NAVY_DARK,
     RED,
+    RED_TEXT,
     TEXT_MUTED,
     WHITE,
 )
@@ -21,7 +22,7 @@ class PatientDashboardMixin:
 
     def draw_dashboard(self):
         px1, py1, px2, py2 = self.panel_box()
-        self.rrect(px1, py1, px2, py2, self.S(16), fill=WHITE, outline=BORDER, width=self.S(1.2))
+        self.rrect(px1, py1, px2, py2, self.S(28), fill=WHITE, outline=WHITE)  # white sheet on the tinted window
         if self.call_open:
             self.draw_call_preview(px1, py1, px2, py2)
             return
@@ -38,15 +39,15 @@ class PatientDashboardMixin:
             x = pcx + (i - (len(TABS) - 1) / 2) * gap
             tag = "tab::" + "_".join(name.split())
             sel = name == self.tab
-            col = RED if sel else TEXT_MUTED
+            col = RED_TEXT if sel else TEXT_MUTED
             self.c.create_rectangle(x - gap / 2 + self.S(6), py1 + self.S(8), x + gap / 2 - self.S(6),
                                     py1 + self.S(96), fill=WHITE, outline=WHITE, tags=tag)
             self.draw_icon(icon, x, py1 + self.S(40), self.S(32), col, tag)
             self.text(x, py1 + self.S(76), self.t(label_key), 14, col, "bold" if sel else "normal",
                       anchor="center", tag=tag)
             if sel:
-                self.rrect(x - self.S(26), py1 + self.S(92), x + self.S(26), py1 + self.S(96),
-                           self.S(2), fill=RED, outline="", tags=tag)
+                self.rrect(x - self.S(30), py1 + self.S(92), x + self.S(30), py1 + self.S(97),
+                           self.S(3), fill=RED, outline="", tags=tag)
             self.clickable(tag, lambda n=name: self.select_tab(n))
         self.c.create_line(px1, py1 + self.S(98), px2, py1 + self.S(98), fill=BORDER)
 
