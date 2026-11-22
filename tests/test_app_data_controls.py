@@ -206,7 +206,10 @@ class AppDataControlTests(unittest.TestCase):
             call_state={"spoken": set(), "speaker_enabled": False},
             call_caption_lines=Mock(return_value=[message]),
             lang="en",
+            call_listener=None,
+            _background_errors=[],
         )
+        app._speak_on_call = lambda text: PillwayApp._speak_on_call(app, text)
 
         with patch("pillway.ui.patient.call_audio.speak") as speak:
             PillwayApp._speak_new_replies(app)
@@ -215,7 +218,8 @@ class AppDataControlTests(unittest.TestCase):
             message["id"] = "reply-2"
             PillwayApp._speak_new_replies(app)
 
-        speak.assert_called_once_with("Hello.", "en")
+        speak.assert_called_once()
+        self.assertEqual(speak.call_args.args, ("Hello.", "en"))
 
     def test_voice_typing_starts_local_transcription(self):
         app = SimpleNamespace(

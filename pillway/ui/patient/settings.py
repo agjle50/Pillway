@@ -83,12 +83,12 @@ class SettingsMixin:
         try:
             selected = resolve_input_device(settings.microphone_device)
             selection_error = ""
-        except (RuntimeError, ValueError) as error:
+        except (RuntimeError, ValueError, OSError) as error:
             selected = None
             selection_error = f"Current microphone selection is unavailable: {error}"
         try:
             default_index = resolve_input_device()
-        except (RuntimeError, ValueError):
+        except (RuntimeError, ValueError, OSError):
             default_index = None
         if selection_error:
             self.c.create_text(
@@ -164,7 +164,7 @@ class SettingsMixin:
 
         try:
             device = resolve_input_device(get_settings().call.microphone_device)
-        except (RuntimeError, ValueError) as error:
+        except (RuntimeError, ValueError, OSError) as error:
             self.microphone_test_error = True
             self.microphone_test_status = str(error)
             self.render()

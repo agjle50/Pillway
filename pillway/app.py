@@ -35,6 +35,7 @@ from .ui.patient.chat_actions import ChatActionsMixin
 from .ui.patient.check_up import CheckUpMixin
 from .ui.patient.consent import ConsentMixin
 from .ui.patient.dashboard import PatientDashboardMixin
+from .ui.patient.info_pages import InfoPagesMixin, has_info_page
 from .ui.patient.manage_profiles import ManageProfilesMixin
 from .ui.patient.medications import MedicationsMixin
 from .ui.patient.orders import OrdersMixin
@@ -77,7 +78,7 @@ class PillwayApp(
     LoginMixin, LiveSyncMixin,
     # patient screens
     PatientDashboardMixin, CheckUpMixin, CallMixin, CallAudioMixin, ChatMixin, ChatActionsMixin, ConsentMixin,
-    MedicationsMixin, PrescriptionMixin, OrdersMixin, TasksMixin, PatientCarePlanMixin, SettingsMixin,
+    MedicationsMixin, PrescriptionMixin, OrdersMixin, TasksMixin, PatientCarePlanMixin, SettingsMixin, InfoPagesMixin,
     ManageProfilesMixin, ProfileActionsMixin,
     # pharmacist screens
     PharmacistDashboardMixin, PatientDetailMixin, FlagsMixin, HighlightsMixin, LogMixin,
@@ -120,6 +121,8 @@ class PillwayApp(
         self.banner = True
         self.dropdown = None              # None | "notifications" | "profile"
         self.dropdown_frame = None
+        self.dropdown_menu = None
+        self.notification_prefs = {}      # Settings > Notifications switches (this session only)
         self.anim = 1.0                   # 0 -> 1 slide-in for the Check up bars
         self._checkup_animation_job = None
         self._checkup_animation_started = None
@@ -279,8 +282,8 @@ class PillwayApp(
             self.draw_manage_profiles()
         elif self.section == "Microphone":
             self.draw_microphone_settings()
-        elif self.section in ("See a doctor", "Contact us", "Account tour", "FAQ"):
-            self.draw_placeholder_page(self.section)
+        elif self.section != "FAQ" and has_info_page(self.section):
+            self.draw_info_page(self.section)
         else:
             self.draw_placeholder_page(self.section)
         if self.toast:
@@ -313,8 +316,11 @@ class PillwayApp(
         self.render()
 
     def toggle_dropdown(self, which):
-        self.dropdown = None if which is None or self.dropdown == which else which
-        self.render()
+        self.dropdown = None
+        if which is None:
+            self.render()
+        else:
+            self.show_menu(which)
 
     def on_escape(self):
         if self.dropdown:

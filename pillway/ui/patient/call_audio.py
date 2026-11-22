@@ -16,13 +16,13 @@ from config import get_settings
 
 from ...storage.paths import data_folder
 from ...voice.speech_input import LocalSpeechInput, resolve_input_device
-from ...voice.tts import speak
+from ...voice.tts import speak, stop as stop_speaking
 
 
 def microphone_status():
     try:
         resolve_input_device(get_settings().call.microphone_device)
-    except (RuntimeError, ValueError) as error:
+    except (RuntimeError, ValueError, OSError) as error:
         return False, str(error)
     return True, ""
 
@@ -146,7 +146,22 @@ class CallAudioMixin:
             if message["role"] == "sarah" and message["id"] not in self.call_state["spoken"]:
                 self.call_state["spoken"].add(message["id"])
                 if self.call_state.get("speaker_enabled"):
-                    speak(message["text"], self.lang)
+                    self._speak_on_call(message["text"])
+
+    def _speak_on_call(self, text):
+        """Speak Sarah's reply, with the microphone paused so it doesn't 'hear' her own voice."""
+        listener = getattr(self, "call_listener", None)
+        if listener:
+            listener.set_muted(True)
+        state = self.call_state
+
+        def done():
+            # back on (unless the patient pressed mute themselves meanwhile)
+            if listener and not state.get("muted"):
+                listener.set_muted(False)
+
+        speak(text, self.lang, on_done=done,
+              on_error=lambda message: self._background_errors.append(message))
 
     def _send_call_text(self, text):
         patient_id = self.patient_id
@@ -174,6 +189,8 @@ class CallAudioMixin:
 
     def toggle_call_speaker(self):
         self.call_state["speaker_enabled"] = not self.call_state.get("speaker_enabled", False)
+        if not self.call_state["speaker_enabled"]:
+            stop_speaking()
         self.render()
 
     def switch_call_to_chat(self):
@@ -191,6 +208,7 @@ class CallAudioMixin:
 
     def _stop_call_input(self):
         if getattr(self, "call_listener", None):
+            stop_speaking()
             self.call_listener.stop()
         if getattr(self, "_call_poll_job", None):
             self.after_cancel(self._call_poll_job)

@@ -1,0 +1,74 @@
+{
+  "_comment": "Content for the simple pages that used to say 'Coming soon'. All details are MADE UP for the demo. Edit freely: each page is a list of cards; a card has a title, optional text, optional rows [label, value], and optional buttons. A button does ONE of: toast (show a short message), go (open a page), action (talk_to_pharmacist, open_chat, open_call, sign_out, copy_referral).",
+  "See a doctor": [
+    {"title": "Virtual visit with a doctor or nurse practitioner",
+     "text": "Book a video or phone visit for new symptoms, prescription renewals or questions your pharmacist can't answer. Demo only: no real booking is made.",
+     "rows": [["Next available", "Tomorrow, 10:30 AM"], ["How", "Video or phone"], ["Length", "About 15 minutes"]],
+     "buttons": [{"label": "Request a visit", "toast": "Visit requested (demo). The clinic will contact you to confirm."},
+                 {"label": "Talk to a pharmacist instead", "action": "talk_to_pharmacist", "kind": "outline"}]},
+    {"title": "Is it urgent?",
+     "text": "For chest pain, trouble breathing, signs of a stroke, or very low or very high blood sugar with confusion, call 911 or go to the nearest emergency department now."}
+  ],
+  "Contact us": [
+    {"title": "Talk to the care team",
+     "rows": [["Pharmacy hours", "Mon to Fri 9 AM to 9 PM, Sat and Sun 10 AM to 6 PM"], ["Phone (demo)", "1-800-555-0199"], ["Email (demo)", "care@pillway-demo.example"]],
+     "buttons": [{"label": "Talk to a pharmacist", "action": "talk_to_pharmacist"},
+                 {"label": "Chat with the assistant", "action": "open_chat", "kind": "outline"}]},
+    {"title": "In an emergency",
+     "text": "Call 911. The assistant and the pharmacy team can't respond to emergencies in real time."}
+  ],
+  "Account tour": [
+    {"title": "1. Check up",
+     "text": "Your blood sugar and blood pressure at a glance. Start a short check-in by chat or by phone call.",
+     "buttons": [{"label": "Open Check up", "go": "Dashboard"}]},
+    {"title": "2. Chat or call",
+     "text": "The assistant asks one question at a time. Anything worrying is flagged straight to your pharmacist, who stays in charge of your care.",
+     "buttons": [{"label": "Start a chat", "action": "open_chat", "kind": "outline"}]},
+    {"title": "3. Care plan",
+     "text": "After your check-in, your pharmacist reviews and approves a care plan in English and French."},
+    {"title": "4. Tasks",
+     "text": "Simple daily goals like walking or checking your feet. Tick them off as you go.",
+     "buttons": [{"label": "Open Tasks", "go": "Tasks", "kind": "outline"}]},
+    {"title": "5. Medications, prescriptions and orders",
+     "text": "See what you take, upload a prescription, and track deliveries."}
+  ],
+  "Payments": [
+    {"title": "Payment method",
+     "rows": [["Card (demo)", "Visa ending in 4242"], ["Expires", "08/28"], ["Billing address", "Brampton, ON"]],
+     "buttons": [{"label": "Add a card", "toast": "Adding cards is turned off in the demo."}]},
+    {"title": "Insurance (demo)",
+     "rows": [["Plan", "Demo Health Benefits"], ["Member ID", "DEMO-00012345"]],
+     "buttons": [{"label": "Update insurance", "toast": "Updating insurance is turned off in the demo.", "kind": "outline"}]}
+  ],
+  "Profile settings": [
+    {"title": "Personal details",
+     "rows": [["Name", "{name}"], ["Date of birth (demo)", "March 14, 1964"], ["Phone (demo)", "905-555-0142"], ["City", "Brampton, ON"], ["Preferred language", "{language}"]],
+     "buttons": [{"label": "Edit details", "toast": "Editing is turned off in the demo."}]}
+  ],
+  "Account settings": [
+    {"title": "Sign-in and security",
+     "rows": [["Email (demo)", "{email}"], ["Password", "Last changed 3 months ago"], ["Two-step verification", "On"]],
+     "buttons": [{"label": "Change password", "toast": "Changing the password is turned off in the demo."},
+                 {"label": "Sign out", "action": "sign_out", "kind": "outline"}]}
+  ],
+  "Payment method": "Payments",
+  "Promotions": [
+    {"title": "No promotions right now",
+     "text": "Offers and discounts will appear here. You can share your referral code with friends in the meantime.",
+     "buttons": [{"label": "See my referral code", "go": "Referral code"}]}
+  ],
+  "Referral code": [
+    {"title": "Share Pillway with a friend",
+     "text": "Give this code to a friend when they sign up (demo).",
+     "rows": [["Your code", "{referral}"]],
+     "buttons": [{"label": "Copy code", "action": "copy_referral"}]}
+  ],
+  "Info and legal": [
+    {"title": "About this demo",
+     "text": "Hackathon prototype for the Brampton AI Innovator Challenge. Every patient, order and number is made up."},
+    {"title": "Privacy",
+     "text": "Names and contact details are removed before anything is sent to the AI. The AI sees 'Patient A', not your name."},
+    {"title": "Important",
+     "text": "The assistant is not a doctor or pharmacist and doesn't diagnose. Your pharmacist reviews flags and approves your care plan."}
+  ]
+}

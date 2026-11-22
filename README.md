@@ -152,8 +152,10 @@ Everything lives in **`pillway_config.toml`** (heavily commented). Save, then re
 | Problem | Fix |
 |---|---|
 | **"API key not found"** / always demo mode | Check `pillway_config.local.toml` exists (no `.example` in the name) and `python Pillway.py --check-config`. Also `pip install -r requirements.txt` (the `anthropic` package). |
-| **Microphone not working** | Mac: **System Settings → Privacy & Security → Microphone** → allow Terminal (or Python / VS Code), then restart. The first call downloads a ~40 MB offline speech model (needs internet once). You can always tap **Switch to chat**, or use demo lines. |
-| **Read-aloud is silent** | Install `pyttsx3` (in requirements). Otherwise the app uses `say` (Mac) or Windows speech; if nothing works it says "Read-aloud isn't available on this computer". |
+| **Voice not working (read-aloud or microphone)** | First run **`python Pillway.py --check-voice`**. It speaks a test sentence, listens for 4 seconds, and prints **PROBLEM** lines with the fix for each one. |
+| **Microphone hears nothing** | Windows: **Settings → Privacy & security → Microphone** → turn on *Microphone access* **and** *Let desktop apps access your microphone*, then restart VS Code. Mac: **System Settings → Privacy & Security → Microphone** → allow Terminal / VS Code. |
+| **Speech-to-text never types anything** | The first use downloads a ~40 MB offline model (needs internet once; do it before the venue). On Windows, if that can't work, the app switches to Windows' built-in speech recognition automatically (`speech_to_text_engine = "auto"` in `pillway_config.toml`; set `"windows"` to force it). You can always tap **Switch to chat**. |
+| **Read-aloud is silent** | The app uses the computer's own voice (PowerShell speech on Windows, `say` on Mac). Check the volume and the output device. `--check-voice` shows the exact error. |
 | **App looks too big or small** | Resize the window; everything is drawn as vectors and scales. Windows: Settings → Display → Scale at 100–150%. |
 | **Fonts look wrong on Mac** | Normal: Macs don't have Segoe UI, so the app picks SF Pro / Helvetica Neue automatically (`pillway/ui/theme.py`). |
 | **Something freezes on stage** | Don't panic: close the window, run `python Pillway.py --demo --role patient`. Data is saved after every message, so nothing is lost. |
