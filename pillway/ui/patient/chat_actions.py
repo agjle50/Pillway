@@ -6,14 +6,22 @@ window never freezes; "Sarah is typing…" shows until the reply is saved.
 """
 
 import queue
+import time
 import tkinter as tk
 
 from config import get_settings
 
+from ... import debug_log
 from ...storage.paths import data_folder
 from ...voice.speech_input import LocalSpeechInput, resolve_input_device
 from ...voice.tts import speak
 from ..theme import TEXT_DARK, TEXT_MUTED
+
+
+def voice_typing_may_listen(app):
+    """Voice typing hears the patient only while nothing is being read aloud (plus an echo tail)."""
+    return (not getattr(app, "_read_aloud_busy", False)
+            and time.monotonic() >= getattr(app, "_read_aloud_deaf_until", 0.0))
 
 
 class ChatActionsMixin:
@@ -24,6 +32,9 @@ class ChatActionsMixin:
     def open_profile_chat(self):
         if self.role != "patient":
             raise RuntimeError("Only the patient side has the chat.")
+        gate = getattr(self, "intake_gate", None)
+        if gate and gate():      # a brand-new patient answers the questionnaire first
+            return
         self._cancel_checkup_animation()
         self.call_open = False
         self.chat_open = True
@@ -88,6 +99,7 @@ class ChatActionsMixin:
         self.chat_draft = ""
         self.chat_focus_requested = True
         self.service.busy.add(self.patient_id)  # show "typing" straight away
+        debug_log.log("chat", "sent to Sarah", text=debug_log.snippet(message))
         patient_id = self.patient_id
         self.run_in_background(lambda: self.service.handle_message(patient_id, message, "chat"),
                                "Sarah couldn't reply just now. Your message is saved; please try again.")
@@ -101,8 +113,26 @@ class ChatActionsMixin:
         self.render()
 
     def read_aloud(self, text):
+        """Read a message aloud. If voice typing is on, its mic is closed meanwhile (and for a
+        short echo tail after), so Sarah's voice is never typed into the patient's message."""
+        from .call_audio import ECHO_TAIL_SECONDS
         self.flash_light(self.t("chat.read_aloud") + "…")
-        speak(text, self.lang, on_error=lambda message: self._background_errors.append(message))
+        token = getattr(self, "_read_aloud_token", 0) + 1
+        self._read_aloud_token = token
+        self._read_aloud_busy = True
+        if self.voice_listener:
+            self.voice_listener.set_muted(True)
+            debug_log.log("chat", "voice typing mic OFF (read-aloud playing)")
+        debug_log.log("voice", "read aloud", words=len(text.split()))
+
+        def done():
+            if getattr(self, "_read_aloud_token", 0) != token:
+                return
+            self._read_aloud_busy = False
+            self._read_aloud_deaf_until = time.monotonic() + ECHO_TAIL_SECONDS
+
+        speak(text, self.lang, on_done=done,
+              on_error=lambda message: self._background_errors.append(message))
 
     def voice_typing(self):
         if self.voice_listener:
@@ -129,6 +159,8 @@ class ChatActionsMixin:
             transcribe=True,
         )
         self.voice_listener.language = self.lang
+        if not voice_typing_may_listen(self):
+            self.voice_listener.set_muted(True)
         self.voice_typing_active = True
         self.voice_typing_had_text = False
         self.voice_typing_error = False
@@ -146,12 +178,22 @@ class ChatActionsMixin:
             return
 
         should_render = False
+        may_listen = voice_typing_may_listen(self)
+        muted_event = getattr(listener, "muted_event", None)
+        if muted_event is not None and muted_event.is_set() == may_listen:
+            listener.set_muted(not may_listen)
+            debug_log.log("chat", f"voice typing mic {'ON' if may_listen else 'OFF'}")
         while True:
             try:
                 event, value = events.get_nowait()
             except queue.Empty:
                 break
+            if event in ("final", "partial", "level") and not may_listen:
+                if event == "final" and value:
+                    debug_log.log("chat", "voice typing heard (DROPPED: read-aloud)", text=debug_log.snippet(value))
+                continue
             if event == "final" and value:
+                debug_log.log("chat", "voice typing heard", text=debug_log.snippet(value))
                 self._insert_voice_text(value)
                 self.voice_typing_had_text = True
             elif event == "state" and value == "listening":

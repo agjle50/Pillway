@@ -47,6 +47,9 @@ class CheckUpMixin:
             return
         if kind == "Call":
             self._cancel_checkup_animation()
+            gate = getattr(self, "intake_gate", None)
+            if gate and gate():  # a brand-new patient answers the questionnaire first
+                return
             if self.patient_id in self.service.busy:
                 self.status = "Sarah is finishing a chat reply. Please wait before starting a call."
                 self.render()

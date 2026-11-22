@@ -28,6 +28,9 @@ SCHEMAS = {
         "summary_updates": (list, False, ("type", "value")),
         "medication_question": (bool, False, None),
     },
+    "health_profile": {
+        "areas": (list, True, ("area", "why", "ask_about")),
+    },
     "memory": {
         "memory": (str, True, None),
     },

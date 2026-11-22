@@ -3,8 +3,8 @@
   "intro": {
     "summary_en": "From your questionnaire, it looks like you're managing {conditions}. Your last blood pressure reading was {last_bp}, {smoking_text}, and you're taking {medications}.",
     "summary_fr": "D'après votre questionnaire, vous gérez {conditions}. Votre dernière mesure de tension artérielle était de {last_bp}, {smoking_text}, et vous prenez {medications}.",
-    "changes_en": "Are there any changes since you filled this in?",
-    "changes_fr": "Y a-t-il eu des changements depuis que vous l'avez rempli?",
+    "changes_en": "Has anything changed with your health lately, like new symptoms, medicines or readings?",
+    "changes_fr": "Y a-t-il eu des changements récents dans votre santé, comme de nouveaux symptômes, médicaments ou mesures?",
     "changes_quick_en": [
       "No changes",
       "Yes, something changed"

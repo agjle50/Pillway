@@ -50,6 +50,8 @@ class LoginMixin:
         self.role = role
         self.section, self.tab, self.dropdown = "Dashboard", "Check up", None
         self.chat_open = self.call_open = False
+        self.intake_open = self.intake_later = False
+        self.intake_form = None
         if role == "patient":
             profile = self.profiles.get(self.active_profile_id, {})
             if profile.get("role") != "Patient":

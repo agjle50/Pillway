@@ -27,6 +27,8 @@ import threading
 
 from config import get_settings
 
+from .. import debug_log
+
 UNAVAILABLE = "Read-aloud isn't available on this computer."
 
 _lock = threading.Lock()
@@ -226,10 +228,13 @@ def speak(text, lang="en", on_error=None, on_done=None, on_playing=None):
             for engine in ENGINES:
                 try:
                     engine(text, lang, generation)
+                    debug_log.log("voice", f"spoke with {engine.__name__.replace('_speak_', '')}")
                     return
                 except Exception as error:  # try the next engine
                     last_error = str(error) or UNAVAILABLE
                     print(f"[read-aloud] {engine.__name__} failed: {type(error).__name__}: {error}")
+                    debug_log.log("voice", f"{engine.__name__} failed, trying the next voice",
+                                  error=f"{type(error).__name__}: {error}")
                 finally:
                     _playing(generation, False)
             if on_error:

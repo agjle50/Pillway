@@ -68,6 +68,8 @@ class AIClient:
         self.last_payload = request
         model = request["model"]
         if time.monotonic() < self._cool_until.get(model, 0):
+            from .. import debug_log
+            debug_log.log("ai", f"{job} skipped: rate-limit pause, using backup lines", model=model)
             return None, UNAVAILABLE   # still inside Google's rate-limit pause: use the backup at once
         for attempt in range(self.settings.ai.retries + 1):
             started = time.monotonic()
@@ -125,6 +127,8 @@ class AIClient:
         self.timings.append({"job": job, "seconds": seconds, "outcome": outcome})
         if self.settings.dev.dev_mode:
             print(f"[AI] {job}: {seconds}s ({outcome})")
+        from .. import debug_log
+        debug_log.log("ai", f"{job} reply", seconds=seconds, outcome=outcome)
 
 
 def _retry_seconds(text):

@@ -37,6 +37,7 @@ from .ui.patient.check_up import CheckUpMixin
 from .ui.patient.consent import ConsentMixin
 from .ui.patient.dashboard import PatientDashboardMixin
 from .ui.patient.info_pages import InfoPagesMixin, has_info_page
+from .ui.patient.intake import IntakeMixin
 from .ui.patient.ai_connection import AIConnectionMixin
 from .ui.patient.manage_profiles import ManageProfilesMixin
 from .ui.patient.medications import MedicationsMixin
@@ -82,7 +83,7 @@ class PillwayApp(
     # sign-in and live updates
     LoginMixin, LiveSyncMixin,
     # patient screens
-    PatientDashboardMixin, CheckUpMixin, CallMixin, CallAudioMixin, ChatMixin, ChatActionsMixin, ConsentMixin,
+    PatientDashboardMixin, IntakeMixin, CheckUpMixin, CallMixin, CallAudioMixin, ChatMixin, ChatActionsMixin, ConsentMixin,
     MedicationsMixin, PrescriptionMixin, OrdersMixin, TasksMixin, PatientCarePlanMixin, SettingsMixin, InfoPagesMixin, AIConnectionMixin,
     ManageProfilesMixin, ProfileActionsMixin,
     # pharmacist screens
@@ -196,6 +197,10 @@ class PillwayApp(
         self.prescription_entry = None
         self.chat_open = False
         self.call_open = False
+        self.intake_open = False          # the first-visit health questionnaire is showing
+        self.intake_later = False         # the patient pressed "Do this later" (this sign-in only)
+        self.intake_form = None
+        self.intake_errors = {}
         self.call_state = {}
         self.call_listener = None
         self.call_events = None

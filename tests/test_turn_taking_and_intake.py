@@ -1,0 +1,173 @@
+"""Turn-taking on calls (Sarah never hears herself) and the first-visit questionnaire / health profile."""
+
+import time
+import unittest
+from queue import Queue
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
+
+from tests.helpers import use_temp_settings
+
+use_temp_settings()
+
+from pillway.ai.brain import MEMORY_PROMPT, patient_context  # noqa: E402
+from pillway.app import PillwayApp  # noqa: E402
+from pillway.core import intake  # noqa: E402
+from pillway.core.conversation_service import ConversationService  # noqa: E402
+from pillway.core.patient_summary import intake_summary  # noqa: E402
+from pillway.ui.patient import call_audio  # noqa: E402
+
+GOOD_FORM = {"weight": "92", "weight_unit": "kg", "height": "165", "height_unit": "cm", "checks_bp": "yes",
+             "systolic": "148", "diastolic": "94", "tobacco": "yes", "readiness": "thinking"}
+
+
+class FakeListener:
+    def __init__(self):
+        self.muted = False
+        self.active_engine = "whisper"
+
+    def set_muted(self, value):
+        self.muted = value
+
+
+def call_app(**state):
+    base = {"started": 0, "heard": [], "muted": False, "spoken": set(), "speaker_enabled": True}
+    base.update(state)
+    return SimpleNamespace(call_open=True, call_state=base, call_events=Queue(), call_listener=FakeListener(),
+                           lang="en", _background_errors=[], _send_call_text=Mock(), _speak_new_replies=Mock(),
+                           _update_call_widgets=Mock(), _tick_call=Mock(), after=Mock(return_value="job"))
+
+
+class MicGateTests(unittest.TestCase):
+    def test_the_mic_only_listens_on_the_patients_turn(self):
+        self.assertEqual(call_audio.mic_should_listen({}), (True, "patient's turn"))
+        self.assertFalse(call_audio.mic_should_listen({"muted": True})[0])
+        self.assertFalse(call_audio.mic_should_listen({"sarah_speaking": True})[0])
+        now = time.monotonic()
+        self.assertFalse(call_audio.mic_should_listen({"deaf_until": now + 1}, now)[0])
+        self.assertTrue(call_audio.mic_should_listen({"deaf_until": now - 0.1}, now)[0])
+
+    def test_words_heard_while_sarah_talks_are_never_sent(self):
+        app = call_app(sarah_speaking=True)
+        app.call_events.put(("final", "how are you feeling today"))   # her own voice through the speakers
+        PillwayApp._tick_call(app)
+        app._send_call_text.assert_not_called()
+        self.assertTrue(app.call_listener.muted)
+
+    def test_words_heard_during_the_echo_tail_are_dropped_then_the_mic_reopens(self):
+        app = call_app(deaf_until=time.monotonic() + 5)
+        app.call_events.put(("final", "today"))
+        PillwayApp._tick_call(app)
+        app._send_call_text.assert_not_called()
+        app.call_state["deaf_until"] = time.monotonic() - 0.01
+        app.call_events.put(("final", "I feel fine"))
+        PillwayApp._tick_call(app)
+        app._send_call_text.assert_called_once_with("I feel fine")
+        self.assertFalse(app.call_listener.muted)
+
+    def test_the_mic_closes_before_sarah_starts_and_reopens_only_after_the_tail(self):
+        app = call_app(heard=["half a sentence"])
+        with patch("pillway.ui.patient.call_audio.speak") as speak:
+            PillwayApp._speak_on_call(app, "Hello there.")
+        self.assertTrue(app.call_listener.muted)                 # closed before any sound
+        self.assertEqual(app.call_state["heard"], [])            # nothing half-heard leaks through
+        speak.call_args.kwargs["on_done"]()
+        self.assertFalse(app.call_state["sarah_speaking"])
+        self.assertGreater(app.call_state["deaf_until"], time.monotonic())   # echo tail
+        self.assertFalse(call_audio.apply_mic_gate(app))          # still closed during the tail
+
+    def test_an_old_reply_finishing_cannot_reopen_the_mic_while_a_new_one_plays(self):
+        app = call_app()
+        with patch("pillway.ui.patient.call_audio.speak") as speak:
+            PillwayApp._speak_on_call(app, "First reply.")
+            first_done = speak.call_args.kwargs["on_done"]
+            PillwayApp._speak_on_call(app, "Second reply.")
+        first_done()   # the first one was stopped by the second: its callback is stale
+        self.assertTrue(app.call_state["sarah_speaking"])
+        self.assertFalse(call_audio.apply_mic_gate(app))
+        self.assertTrue(app.call_listener.muted)
+
+    def test_windows_recognizer_gets_a_longer_echo_tail(self):
+        app = call_app()
+        app.call_listener.active_engine = "windows"
+        self.assertEqual(call_audio.echo_tail(app), call_audio.ECHO_TAIL_SECONDS_WINDOWS)
+
+
+class IntakeValidationTests(unittest.TestCase):
+    def test_a_complete_form_is_clean(self):
+        clean, errors = intake.validate(GOOD_FORM)
+        self.assertEqual(errors, {})
+        self.assertEqual((clean["bp_systolic"], clean["bp_diastolic"]), (148, 94))
+        self.assertEqual(clean["quit_readiness"], "thinking")
+
+    def test_weight_and_height_are_optional_and_pounds_are_converted(self):
+        clean, errors = intake.validate({**GOOD_FORM, "weight": "", "height": ""})
+        self.assertEqual(errors, {})
+        self.assertFalse(clean["shared_weight"])
+        clean, _ = intake.validate({**GOOD_FORM, "weight": "200", "weight_unit": "lb"})
+        self.assertAlmostEqual(clean["weight_kg"], 90.7, places=1)
+
+    def test_the_yes_no_questions_are_required(self):
+        _, errors = intake.validate({"checks_bp": None, "tobacco": "yes"})
+        self.assertIn("checks_bp", errors)
+        self.assertIn("readiness", errors)
+
+    def test_impossible_blood_pressure_is_caught(self):
+        _, errors = intake.validate({**GOOD_FORM, "systolic": "80", "diastolic": "120"})
+        self.assertIn("bp", errors)
+        _, errors = intake.validate({**GOOD_FORM, "systolic": "130", "diastolic": ""})
+        self.assertIn("bp", errors)
+
+
+class NeverPresumeTests(unittest.TestCase):
+    def setUp(self):
+        use_temp_settings()
+        self.service = ConversationService()
+
+    def test_a_new_account_is_asked_the_questionnaire_first(self):
+        record = self.service.store.load("maria")
+        self.assertTrue(intake.needed_at_boot(record))
+        record, errors = self.service.submit_intake("maria", GOOD_FORM)
+        self.assertEqual(errors, {})
+        self.assertFalse(intake.needed_at_boot(record))
+
+    def test_demo_numbers_are_not_read_back_before_the_patient_gives_them(self):
+        record = self.service.store.load("maria")   # the seed file has 142/90, 78 kg, non-smoker
+        summary = intake_summary(record, "en")
+        self.assertNotIn("142/90", summary)
+        self.assertNotIn("smoke", summary)
+        checklist = self.service._checklist(record)
+        self.assertFalse(checklist["questionnaire_done"])
+        self.assertEqual(checklist["already_in_questionnaire"], {})
+        self.assertEqual(self.service._facts(record), {})
+
+    def test_skipping_weight_removes_the_old_value_and_is_marked_private(self):
+        record, _ = self.service.submit_intake("maria", {**GOOD_FORM, "weight": "", "height": ""})
+        self.assertNotIn("weight_kg", record["profile"])
+        self.assertTrue(record["health_profile"]["not_shared"])
+        self.assertNotIn("weight_kg", self.service._checklist(record)["already_in_questionnaire"])
+
+    def test_the_profile_lists_hunches_with_reasons_and_reaches_the_ai(self):
+        record, _ = self.service.submit_intake("maria", GOOD_FORM)
+        areas = {a["area"]: a["why"] for a in record["health_profile"]["areas_to_explore"]}
+        self.assertIn("high blood pressure", areas)
+        self.assertIn("148/94", areas["high blood pressure"])
+        self.assertIn("smoking", areas)
+        self.assertIn("weight, eating habits and activity", areas)
+        sent = patient_context(record)["health_profile"]
+        self.assertEqual(sent["areas_to_explore"], record["health_profile"]["areas_to_explore"])
+        self.assertIn("148/94", intake_summary(record, "en"))
+
+    def test_ai_suggestions_are_added_without_replacing_the_rules(self):
+        record, _ = self.service.submit_intake("maria", GOOD_FORM)
+        intake.merge_ai_suggestions(record, [{"area": "sleep", "why": "smokers often sleep poorly", "ask_about": "sleep"},
+                                             {"area": "", "why": "empty is ignored"}])
+        self.assertEqual([a["area"] for a in record["health_profile"]["ai_suggestions"]], ["sleep"])
+        self.assertTrue(record["health_profile"]["areas_to_explore"])
+
+    def test_memory_keeps_medical_details_only(self):
+        self.assertIn("Do NOT keep small talk", MEMORY_PROMPT)
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -24,7 +24,7 @@ from ..storage import audit_log
 from ..storage.patient_store import PatientStore, new_id, now_iso
 from . import answer_parsing as parse
 from . import care_plan as care_plan_logic
-from . import flagging, reply_builder, tasks
+from . import flagging, intake, reply_builder, tasks
 from .content import advice
 from .conversation_flow import (ANSWER_HANDLERS, _generic_answer, empty_plan, go_back, plan_turn,
                                 protein_targets, question_list, question_payload)
@@ -57,6 +57,34 @@ class ConversationService:
                 record["conversation"]["stage"] = "greeting"
         record = self.store.update(patient_id, change)
         audit_log.record("consent", patient_id, accepted=accepted)
+        return record
+
+    def submit_intake(self, patient_id, form, lang="en"):
+        """Save the first-visit questionnaire and build the health profile.
+
+        Returns (record, errors). If errors is not empty nothing was saved (show them on the form).
+        """
+        from .. import debug_log
+        clean, errors = intake.validate(form, lang)
+        if errors:
+            debug_log.log("intake", "questionnaire has problems", fields=",".join(sorted(errors)))
+            return self.store.load(patient_id), errors
+        record = self.store.update(patient_id, lambda r: intake.apply(r, clean))
+        audit_log.record("intake_questionnaire", patient_id, shared_weight=clean.get("shared_weight"))
+        profile = record["health_profile"]
+        debug_log.log("intake", "questionnaire saved", patient=patient_id,
+                      answered=",".join(k for k in clean if k != "shared_weight"))
+        debug_log.log("profile", "health profile built (rules)",
+                      areas=[a["area"] for a in profile["areas_to_explore"]] or "none",
+                      not_shared=len(profile["not_shared"]))
+        return record, {}
+
+    def refine_health_profile(self, patient_id):
+        """Ask the AI for extra areas to explore (live AI only). Safe to run in the background."""
+        record = self.store.load(patient_id)
+        suggestions = self.brain.suggest_health_areas(record)
+        if suggestions:
+            record = self.store.update(patient_id, lambda r: intake.merge_ai_suggestions(r, suggestions))
         return record
 
     def set_language(self, patient_id, lang):
@@ -310,9 +338,12 @@ class ConversationService:
         """
         convo, lang = record["conversation"], record["language"]
         profile = record["profile"]
-        questionnaire = {key: profile[key] for key in ("weight_kg", "height_cm", "checks_bp_regularly", "last_bp",
-                                                       "smoker", "quit_readiness") if key in profile}
+        # Only answers the patient actually gave in the questionnaire count (never demo/seed values).
+        done = intake.is_done(record)
+        questionnaire = {key: profile[key] for key in intake.QUESTIONNAIRE_KEYS
+                         if done and profile.get(key) not in (None, "")}
         base = {"off_topic_turns": convo.get("off_topic_turns", 0),
+                "questionnaire_done": done,
                 "already_in_questionnaire": questionnaire}
         if convo["stage"] == "done":
             topic = self._follow_up_topic(record)
@@ -365,6 +396,8 @@ class ConversationService:
     def _facts(record):
         """Numbers the app computed; the AI must use them exactly."""
         facts = {}
+        if not intake.is_done(record):     # demo/seed numbers are never presented as the patient's
+            return facts
         weight = record["profile"].get("weight_kg")
         if weight:
             low, high = protein_targets(weight)

@@ -56,6 +56,7 @@ Useful options (add them after `python Pillway.py`):
 | `--rehearse` | Runs the stage script in the terminal and prints how long each reply took. |
 | `--check-config` | Shows your settings and warns about anything unsafe. |
 | `--show-ai-payload` | Shows **exactly** what the AI company would receive (for the judges' privacy question). |
+| `--debug` | Prints **admin debug lines** in the terminal: when the microphone turns on/off and why, what was heard (used or ignored), Sarah's voice starting/stopping, AI reply times, the questionnaire. On by default (`debug_logs` under `[dev]` in `pillway_config.toml`). |
 
 ## Add your API key
 
@@ -92,8 +93,9 @@ the environment variable `GEMINI_API_KEY`, or copy `.env.example` to `.env`.)
 | Header | Always shows **EN/FR**, **Talk to a pharmacist**, notifications, and an animated account menu with profile progress | Progress reflects the full profile sheet; **Manage profiles** opens the categorized account list |
 | Manage profiles | Separate patient and pharmacist profile categories, each with a **Switch profile** button and an options menu | Choose **Edit profile** or **Delete profile** from the menu; add patient profiles or delete saved data |
 | Edit profile | Personal, health-card, insurance, insurance-photo, and delivery-address pages | Swipe horizontally, use the page dots or section selector, then **Save changes** |
+| Health questionnaire | Shown first for a **brand-new account (no chats yet)**, and kept in **Tasks** until done. Pillway's intake sheet: weight/height (optional), blood pressure, tobacco. Says up front that Sarah only keeps key medical details and shares them only with the pharmacist / care team. Sarah then builds a **health profile**: what's known, what was kept private, and "areas to explore" (guesses she checks by *asking*, never states as fact) | Fill in and **Save and continue**, or **Do this later**. Edit any time from **Tasks → Edit answers** |
 | Check up | Choose how to check in | **Call** or **Chat** |
-| Consent | Shown once before the first chat or call | **I agree** |
+| Consent | Shown once before the first chat or call (includes the privacy note) | **I agree** |
 | Chat | Sarah: summary → "any changes?" → one question at a time → wrap-up → care plan | Returning patients can ask for a recap, continue, or raise a new concern; Sarah won't expect them to remember the last chat. Type or tap quick replies. |
 | Call | iPhone-style voice check-in: name, timer, green voice ring, mute, end | **Hold** the green button and talk. With no microphone (or in demo mode) tap it to "say" the next scripted line. |
 | Medications | Medicines on file (entered by the pharmacist) + prescriptions the patient adds | **Add prescription** |
@@ -163,6 +165,7 @@ Everything lives in **`pillway_config.toml`** (heavily commented). Save, then re
 | **Voice not working (read-aloud or microphone)** | First run **`python Pillway.py --check-voice`**. It speaks a test sentence, listens for 4 seconds, and prints **PROBLEM** lines with the fix for each one. |
 | **Microphone hears nothing** | Windows: **Settings → Privacy & security → Microphone** → turn on *Microphone access* **and** *Let desktop apps access your microphone*, then restart VS Code. Mac: **System Settings → Privacy & Security → Microphone** → allow Terminal / VS Code. |
 | **Speech-to-text never types anything** | The first use downloads a ~40 MB offline model (needs internet once; do it before the venue). On Windows, if that can't work, the app switches to Windows' built-in speech recognition automatically (`speech_to_text_engine = "auto"` in `pillway_config.toml`; set `"windows"` to force it). You can always tap **Switch to chat**. |
+| **Sarah answers herself on a call** (hears her own voice through the speakers) | Fixed: the mic is closed while she talks and for ~1 s after. Run with the terminal visible: lines like `mic OFF (reason=Sarah is talking)` and `heard (DROPPED)` show it working. If it still happens, use headphones or raise the tail (`ECHO_TAIL_SECONDS` in `pillway/ui/patient/call_audio.py`). |
 | **Read-aloud is silent** | The app uses the computer's own voice (PowerShell speech on Windows, `say` on Mac). Check the volume and the output device. `--check-voice` shows the exact error. |
 | **App looks too big or small** | Resize the window; everything is drawn as vectors and scales. Windows: Settings → Display → Scale at 100–150%. |
 | **Fonts look wrong on Mac** | Normal: Macs don't have Segoe UI, so the app picks SF Pro / Helvetica Neue automatically (`pillway/ui/theme.py`). |

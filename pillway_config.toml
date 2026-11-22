@@ -222,3 +222,8 @@ data_folder = ""
 [dev]
 # true = print AI reply timings and extra details in the terminal.
 dev_mode = false
+# true = print admin debug lines in the terminal: when the microphone turns on/off and why,
+# what speech recognition heard (and whether it was used or ignored), Sarah's voice starting and
+# stopping, AI reply times, and the intake questionnaire. Short snippets of text are printed so you
+# can debug; nothing is saved. `python Pillway.py --debug` forces it on for one run.
+debug_logs = true

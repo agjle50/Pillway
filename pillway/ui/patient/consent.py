@@ -12,16 +12,17 @@ class ConsentMixin:
         width = min(self.S(640), x2 - x1 - self.S(60))
         cx = (x1 + x2) / 2
         top = y1 + self.S(30)
-        bottom = min(y2 - self.S(30), top + self.S(470))
+        bottom = min(y2 - self.S(30), top + self.S(560))
         self.rrect(cx - width / 2, top, cx + width / 2, bottom, self.S(22), fill=WHITE, outline=BORDER, width=self.S(1.4))
         self.text(cx, top + self.S(46), self.t("consent.title"), 26, INK, "bold", anchor="center")
         y = top + self.S(96)
-        for key in ("consent.1", "consent.2", "consent.3", "consent.4"):
+        for key in ("consent.1", "consent.privacy", "consent.2", "consent.3", "consent.4"):
             self.c.create_oval(cx - width / 2 + self.S(40), y - self.S(6), cx - width / 2 + self.S(52), y + self.S(6),
                                fill=RED, outline="")
-            item = self.c.create_text(cx - width / 2 + self.S(70), y, text=self.t(key), fill=TEXT_DARK, anchor="w",
-                                      font=self.font(17), width=width - self.S(110))
-            y = self.c.bbox(item)[3] + self.S(26)
+            # top-aligned so a bullet that wraps onto two lines never overlaps the one above
+            item = self.c.create_text(cx - width / 2 + self.S(70), y - self.S(12), text=self.t(key), fill=TEXT_DARK,
+                                      anchor="nw", font=self.font(17), width=width - self.S(110))
+            y = self.c.bbox(item)[3] + self.S(22)
         if getattr(self, "consent_declined", False):
             self.c.create_text(cx, y, text=self.t("consent.declined"), fill=TEXT_MUTED, font=self.font(13),
                                width=width - self.S(80))

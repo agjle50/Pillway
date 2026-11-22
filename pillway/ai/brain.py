@@ -12,6 +12,8 @@ from pathlib import Path
 
 from config import get_settings
 
+from .. import debug_log
+from ..core import intake
 from ..core.deidentify import redact_text, restore_name, safe_profile
 from ..core.medical_guidance import CARE_PLAN_REFERENCE, MEDICAL_KEYWORDS
 from .client import OK, AIClient
@@ -44,16 +46,31 @@ def conversation_system_prompt(lang="en"):
     return head + job + "\n\n# Existing Sarah guidance" + tail
 
 
-MEMORY_PROMPT = """You keep a compact memory for a pharmacy care assistant, so she remembers each patient
-like a person would. You get the current memory and the latest exchange. Return an updated memory.
+MEMORY_PROMPT = """You keep a compact memory for a pharmacy care assistant. The patient was told that she
+does NOT save everything they say: only the important medical details, shared only with their
+pharmacist and care team. Keep that promise. You get the current memory and the latest exchange.
+Return an updated memory.
 
-Keep (most important first): health facts and readings with dates, new symptoms and how they
-changed, medicines mentioned, worries, what they found hard, goals, what was already covered in the
-check-in, open questions for the pharmacist, and personal details they shared in small talk (family,
-hobbies, plans, mood) that a caring person would remember. Drop greetings and filler. Merge, don't
-repeat. Never invent anything. Use "Patient A" for the patient. At most 200 words, short lines.
+Keep ONLY what matters for their care (most important first): health facts and readings with
+dates, new symptoms and how they changed, medicines mentioned, health worries, barriers to their
+care (for example "finds it hard to walk because of knee pain"), health goals, what was already
+covered in the check-in, and open questions for the pharmacist. Do NOT keep small talk or personal
+details that don't affect their care (family news, hobbies, plans, opinions); drop greetings and
+filler. Merge, don't repeat. Never invent anything, and never turn a guess into a fact. Use
+"Patient A" for the patient. At most 200 words, short lines.
 
 Answer ONLY with JSON: {"memory": "the updated memory"}"""
+
+
+PROFILE_PROMPT = """You help a pharmacy care assistant plan her first conversation with a patient.
+You get the patient's intake questionnaire answers, what the pharmacy has on file, and a rule-based
+health profile. Suggest up to 4 EXTRA areas worth gently asking about that the rules missed, each
+with the reason drawn ONLY from the data given. These are hypotheses to check by asking, never
+facts and never a diagnosis. Do not repeat areas already in `areas_to_explore`. Never suggest
+medication changes. If nothing else is worth asking about, return an empty list.
+
+Answer ONLY with JSON: {"areas": [{"area": "short name", "why": "reason from the data",
+"ask_about": "what to gently ask"}]}"""
 
 
 def patient_context(record, limit=8):
@@ -103,6 +120,7 @@ def patient_context(record, limit=8):
         "session_opening": len(patient_turns) == 1,
         "memory": (record.get("memory") or {}).get("text", ""),
         "previous_interaction": previous_interaction,
+        "health_profile": intake.for_ai(record),
     }
 
 
@@ -151,6 +169,24 @@ class Brain:
         user = f"<current_memory>\n{current}\n</current_memory>\n\n<latest_exchange>\n{lines}\n</latest_exchange>"
         data, status = self.client.complete("memory", MEMORY_PROMPT, user, "memory", profile=record["profile"])
         return data["memory"] if status == OK else None
+
+    def suggest_health_areas(self, record):
+        """After the questionnaire: the AI's extra guesses about what to ask. Returns a list or None."""
+        if not self.live:
+            debug_log.log("profile", "AI suggestions skipped (demo mode / no key): using the rules only")
+            return None
+        context = {"questionnaire": (record.get("intake") or {}).get("answers", {}),
+                   "pharmacy_record": {"conditions": record["profile"].get("conditions", []),
+                                       "medications": [m.get("name") for m in record.get("medications", [])]},
+                   "health_profile": intake.for_ai(record)}
+        user = f"<patient_data>\n{json.dumps(context, ensure_ascii=False, indent=1)}\n</patient_data>"
+        data, status = self.client.complete("memory", PROFILE_PROMPT, user, "health_profile",
+                                            profile=record["profile"])
+        if status != OK:
+            debug_log.log("profile", "AI suggestions unavailable: using the rules only")
+            return None
+        debug_log.log("profile", "AI suggested areas", areas=[a["area"] for a in data["areas"]])
+        return data["areas"]
 
     def flag_check(self, record, text, layer1):
         if not get_settings().ai.ai_safety_layer_enabled:
