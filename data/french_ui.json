@@ -314,6 +314,12 @@
     "Order #1057": "Commande no 1057",
     "Order #1063": "Commande no 1063",
     "Read-aloud isn't available on this computer.": "La lecture à voix haute n’est pas disponible sur cet ordinateur.",
-    "A pharmacist will contact you.": "Un pharmacien communiquera avec vous."
+    "A pharmacist will contact you.": "Un pharmacien communiquera avec vous.",
+    "AI connection": "Connexion à l’IA",
+    "Save and connect": "Enregistrer et connecter",
+    "Test connection": "Tester la connexion",
+    "Not connected: Sarah is in demo mode (scripted replies)": "Non connectée : Sarah est en mode démo (réponses préécrites)",
+    "Gemini API key": "Clé d’API Gemini",
+    "Create one at aistudio.google.com/apikey (Get API key). It starts with AIza.": "Créez-en une sur aistudio.google.com/apikey (Get API key). Elle commence par AIza."
   }
 }

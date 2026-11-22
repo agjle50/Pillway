@@ -21,7 +21,7 @@ from .patient_summary import detect_changes, intake_summary, side_effect_matches
 def question_list(record):
     """The questions for this patient, after skip rules, pharmacist choices and the max setting."""
     settings = get_settings()
-    questions = load("questions")["questions"]
+    questions = [q for q in load("questions")["questions"] if not q.get("optional")]  # extras: AI only
     chosen = record["bot_settings"].get("question_ids")
     if chosen:
         by_id = {q["id"]: q for q in questions}

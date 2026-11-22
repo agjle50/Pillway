@@ -7,7 +7,7 @@ from pathlib import Path
 from config import ConfigError, load_settings
 from config.loader import ROOT
 
-FAKE_KEY = "sk-ant-" + "x" * 30 + "ABCD"
+FAKE_KEY = "AIza" + "x" * 31 + "ABCD"
 
 
 class ConfigTests(unittest.TestCase):
@@ -23,12 +23,12 @@ class ConfigTests(unittest.TestCase):
 
     def test_real_repo_config_loads(self):
         settings = load_settings(ROOT, env={})
-        self.assertEqual(settings.ai.flag_model, "claude-haiku-5-5")
+        self.assertEqual(settings.ai.flag_model, "gemini-3.5-flash-lite")
         self.assertTrue(settings.ai.deidentify_before_ai)
 
     def test_defaults_when_file_is_empty(self):
         settings = load_settings(self.make_root(), env={})
-        self.assertEqual(settings.ai.chat_model, "claude-opus-5-5")
+        self.assertEqual(settings.ai.chat_model, "gemini-3.8-flash")
         self.assertEqual(settings.branding.assistant_name, "Sarah")
 
     def test_typo_gives_plain_english_error_naming_the_setting(self):
@@ -38,14 +38,14 @@ class ConfigTests(unittest.TestCase):
         self.assertIn("`blood_sugar_high` must be a number", str(caught.exception))
 
     def test_local_file_overrides_shared_file(self):
-        root = self.make_root('[ai]\nchat_model = "claude-opus-5-5"\n',
-                              local='[ai]\nchat_model = "claude-haiku-5-5"\n')
-        self.assertEqual(load_settings(root, env={}).ai.chat_model, "claude-haiku-5-5")
+        root = self.make_root('[ai]\nchat_model = "gemini-3.8-flash"\n',
+                              local='[ai]\nchat_model = "gemini-3.5-flash-lite"\n')
+        self.assertEqual(load_settings(root, env={}).ai.chat_model, "gemini-3.5-flash-lite")
 
     def test_key_lookup_order(self):
         root = self.make_root(local=f'[ai]\napi_key = "{FAKE_KEY}"\n',
-                              dotenv="ANTHROPIC_API_KEY=from-dotenv\n")
-        self.assertEqual(load_settings(root, env={"ANTHROPIC_API_KEY": "from-env"}).api_key, "from-env")
+                              dotenv="GEMINI_API_KEY=from-dotenv\n")
+        self.assertEqual(load_settings(root, env={"GEMINI_API_KEY": "from-env"}).api_key, "from-env")
         self.assertEqual(load_settings(root, env={}).api_key, FAKE_KEY)
         (root / "pillway_config.local.toml").write_text("", encoding="utf-8")
         self.assertEqual(load_settings(root, env={}).api_key, "from-dotenv")

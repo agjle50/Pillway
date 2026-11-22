@@ -8,6 +8,7 @@ API key order: environment variable -> local file `api_key` -> .env -> none (dem
 """
 
 import os
+import re
 import subprocess
 import tomllib
 from pathlib import Path
@@ -19,7 +20,7 @@ from .validation import ConfigError, cross_checks, validate
 ROOT = Path(__file__).resolve().parent.parent
 SHARED_FILE = "pillway_config.toml"
 LOCAL_FILE = "pillway_config.local.toml"
-KEY_PREFIX = "sk-ant-"
+KEY_PATTERN = re.compile(r"AIza[0-9A-Za-z_\-]{30,}")   # what a Google (Gemini) API key looks like
 
 
 class Settings(SimpleNamespace):
@@ -78,7 +79,7 @@ def _is_tracked_by_git(root, path):
 
 
 def _file_contains_key(path):
-    return path.exists() and KEY_PREFIX in path.read_text(encoding="utf-8", errors="ignore")
+    return path.exists() and bool(KEY_PATTERN.search(path.read_text(encoding="utf-8", errors="ignore")))
 
 
 def _safety_net(root):

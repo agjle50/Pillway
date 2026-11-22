@@ -165,6 +165,63 @@
       ]
     },
     {
+      "id": "low_sugar",
+      "topic": "low blood sugar",
+      "care_plan_section": "a1c",
+      "source": "https://www.diabetes.ca/living-with-diabetes/blood-sugar-management/hypoglycemia",
+      "en": "Have you had any lows lately, like feeling shaky, sweaty or confused, or a reading under 4?",
+      "fr": "Avez-vous eu des baisses de sucre récemment, comme des tremblements, des sueurs, de la confusion, ou une lecture sous 4?",
+      "quick_en": [
+        "No lows",
+        "Once or twice",
+        "Often"
+      ],
+      "quick_fr": [
+        "Aucune",
+        "Une ou deux fois",
+        "Souvent"
+      ],
+      "optional": true
+    },
+    {
+      "id": "eyes",
+      "topic": "eye health",
+      "care_plan_section": "pharmacist_identified_goals",
+      "source": "https://www.diabetes.ca/living-with-diabetes/managing-complications/eye-damage-diabetic-retinopathy",
+      "en": "When was your last eye exam where they put drops in to check the back of your eyes?",
+      "fr": "À quand remonte votre dernier examen des yeux avec des gouttes pour vérifier le fond de l'œil?",
+      "quick_en": [
+        "In the last year",
+        "More than a year ago",
+        "Never / not sure"
+      ],
+      "quick_fr": [
+        "Dans la dernière année",
+        "Il y a plus d'un an",
+        "Jamais / je ne sais pas"
+      ],
+      "optional": true
+    },
+    {
+      "id": "mood",
+      "topic": "stress and mood",
+      "care_plan_section": "barriers",
+      "source": "https://www.diabetes.ca/living-with-diabetes/life-with-diabetes/mental-health-and-diabetes/taking-care-of-your-mental-health",
+      "en": "Living with diabetes can be a lot. How have you been feeling about it lately?",
+      "fr": "Vivre avec le diabète, ce n'est pas toujours facile. Comment vous sentez-vous face à ça ces temps-ci?",
+      "quick_en": [
+        "Doing okay",
+        "A bit stressed",
+        "Pretty overwhelmed"
+      ],
+      "quick_fr": [
+        "Ça va",
+        "Un peu stressé(e)",
+        "Plutôt dépassé(e)"
+      ],
+      "optional": true
+    },
+    {
       "id": "barriers",
       "topic": "barriers",
       "care_plan_section": "barriers",

@@ -73,16 +73,28 @@ def speech_text(text, lang="en"):
     return re.sub(r"\s{2,}", " ", text).strip(" ,")
 
 
+ONE_PIECE = 420      # replies up to this many characters are voiced in one go (no gaps at all)
+
+
 def sentences(text):
-    """Split into short spoken chunks (first chunk small, so playback starts fast)."""
+    """Split into spoken chunks, as FEW as possible: every join can be heard as a small pause.
+
+    A normal reply is one chunk. A long one becomes two: the first sentence (so she starts
+    talking quickly) and everything else (prepared while the first is playing).
+    """
+    text = text.strip()
+    if not text:
+        return []
+    if len(text) <= ONE_PIECE:
+        return [text]
     parts = [p.strip() for p in re.split(r"(?<=[.!?])\s+", text) if p.strip()]
-    chunks = []
-    for part in parts:
-        if chunks and len(chunks[-1]) < 40 and len(chunks) > 1:
-            chunks[-1] += " " + part                            # glue very short bits together
-        else:
-            chunks.append(part)
-    return chunks
+    first = parts[0]
+    for part in parts[1:]:
+        if len(first) >= 60:
+            break
+        first += " " + part
+    rest = text[len(first):].strip()
+    return [first, rest] if rest else [first]
 
 
 # ---- 2. voice it ---------------------------------------------------------------------------
@@ -119,7 +131,7 @@ def synthesize(text, lang):
 _counter = [0]
 
 
-def _play_windows(path, should_stop):
+def _play_windows(path, should_stop, on_playing=None):
     import ctypes
     winmm = ctypes.windll.winmm
     buffer = ctypes.create_unicode_buffer(64)
@@ -134,19 +146,23 @@ def _play_windows(path, should_stop):
     mci(f'open "{path}" type mpegvideo alias {alias}')
     try:
         mci(f"play {alias}")
+        if on_playing:
+            on_playing(True)              # sound is starting now: her mouth may move
         time.sleep(0.05)
         while not should_stop():
             if mci(f"status {alias} mode") != "playing":
                 break
             time.sleep(0.04)
     finally:
+        if on_playing:
+            on_playing(False)
         try:
             mci(f"close {alias}")
         except RuntimeError:
             pass
 
 
-def _play_process(path, should_stop):
+def _play_process(path, should_stop, on_playing=None):
     if sys.platform == "darwin" and shutil.which("afplay"):
         args = ["afplay", str(path)]
     elif shutil.which("ffplay"):
@@ -157,18 +173,24 @@ def _play_process(path, should_stop):
         raise RuntimeError("No audio player found for the natural voice.")
     process = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                                stderr=subprocess.DEVNULL)
-    while process.poll() is None:
-        if should_stop():
-            process.kill()
-            break
-        time.sleep(0.04)
+    if on_playing:
+        on_playing(True)
+    try:
+        while process.poll() is None:
+            if should_stop():
+                process.kill()
+                break
+            time.sleep(0.04)
+    finally:
+        if on_playing:
+            on_playing(False)
 
 
-def play(path, should_stop):
-    (_play_windows if sys.platform == "win32" else _play_process)(Path(path), should_stop)
+def play(path, should_stop, on_playing=None):
+    (_play_windows if sys.platform == "win32" else _play_process)(Path(path), should_stop, on_playing)
 
 
-def speak(text, lang, should_stop):
+def speak(text, lang, should_stop, on_playing=None):
     """Voice and play `text`, sentence by sentence. Raises if the natural voice can't be used."""
     chunks = sentences(speech_text(text, lang))
     if not chunks:
@@ -198,4 +220,4 @@ def speak(text, lang, should_stop):
         if isinstance(item, Exception):  # part of it was already spoken: stop quietly, don't repeat
             print(f"[natural voice] {type(item).__name__}: {item}")
             return
-        play(item, should_stop)
+        play(item, should_stop, on_playing)

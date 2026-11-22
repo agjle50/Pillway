@@ -37,6 +37,7 @@ from .ui.patient.check_up import CheckUpMixin
 from .ui.patient.consent import ConsentMixin
 from .ui.patient.dashboard import PatientDashboardMixin
 from .ui.patient.info_pages import InfoPagesMixin, has_info_page
+from .ui.patient.ai_connection import AIConnectionMixin
 from .ui.patient.manage_profiles import ManageProfilesMixin
 from .ui.patient.medications import MedicationsMixin
 from .ui.patient.orders import OrdersMixin
@@ -82,7 +83,7 @@ class PillwayApp(
     LoginMixin, LiveSyncMixin,
     # patient screens
     PatientDashboardMixin, CheckUpMixin, CallMixin, CallAudioMixin, ChatMixin, ChatActionsMixin, ConsentMixin,
-    MedicationsMixin, PrescriptionMixin, OrdersMixin, TasksMixin, PatientCarePlanMixin, SettingsMixin, InfoPagesMixin,
+    MedicationsMixin, PrescriptionMixin, OrdersMixin, TasksMixin, PatientCarePlanMixin, SettingsMixin, InfoPagesMixin, AIConnectionMixin,
     ManageProfilesMixin, ProfileActionsMixin,
     # pharmacist screens
     PharmacistDashboardMixin, PatientDetailMixin, FlagsMixin, HighlightsMixin, LogMixin,
@@ -138,6 +139,8 @@ class PillwayApp(
         self._popover_opened_now = False
         self._popover_bindings = False
         self.profile_edit_vars = {}         # unsaved edits in the profile editor
+        self.ai_connection_status = ""      # Settings > AI connection
+        self.ai_key_entry = None
         self.profile_page_index = 0
         self._profile_page_frame = self._profile_viewport = None
         self._profile_slide_in = 0
@@ -311,6 +314,8 @@ class PillwayApp(
             self.draw_manage_profiles()
         elif self.section == "Edit profile":
             self.draw_profile_editor()
+        elif self.section == "AI connection":
+            self.draw_ai_connection()
         elif self.section == "Microphone":
             self.draw_microphone_settings()
         elif self.section != "FAQ" and has_info_page(self.section):

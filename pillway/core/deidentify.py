@@ -41,7 +41,7 @@ def redact_text(text, profile=None):
 
 def safe_profile(profile):
     """Only the facts the AI needs. No name, contact details, health card or birth date."""
-    keep = ("age", "sex", "weight_kg", "height_cm", "conditions", "diabetes_type", "diagnosis_date",
+    keep = ("age", "sex", "weight_kg", "height_cm", "checks_bp_regularly", "conditions", "diabetes_type", "diagnosis_date",
             "monitoring", "last_bp", "last_a1c", "smoker", "quit_readiness", "allergies", "alcohol", "activity")
     facts = {key: profile[key] for key in keep if key in profile and profile[key] not in ("", None, [])}
     if "diagnosis_date" in facts:

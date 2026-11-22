@@ -55,14 +55,14 @@ def check_config():
 def estimate_cost():
     """Very rough: about 15 chat turns, 15 flag checks, 1 care plan, 2 recaps per stage run."""
     ai = get_settings().ai
-    price = {"opus": (5.0, 25.0), "sonnet": (3.0, 15.0), "haiku": (1.0, 5.0)}  # USD per million tokens (estimate)
+    price = {"lite": (0.10, 0.40), "flash": (0.50, 3.00), "pro": (2.00, 12.00)}  # USD per million tokens (estimate)
 
     def cost(model, calls, tokens_in, tokens_out):
-        tier = next((name for name in price if name in model), "opus")
+        tier = next((name for name in price if name in model), "flash")
         return calls * (tokens_in * price[tier][0] + tokens_out * price[tier][1]) / 1_000_000
     total = (cost(ai.chat_model, 15, 4000, 250) + cost(ai.flag_model, 15, 1500, 80)
              + cost(ai.care_plan_model, 1, 3000, 1200) + cost(ai.summary_model, 2, 2500, 120))
-    return f"about US${total:.2f} (estimate; check current prices on anthropic.com)"
+    return f"about US${total:.2f} (rough estimate; check current prices at ai.google.dev/pricing)"
 
 
 def show_ai_payload():

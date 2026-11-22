@@ -59,16 +59,20 @@ Useful options (add them after `python Pillway.py`):
 
 ## Add your API key
 
-"Connect it to our Claude account" means an **Anthropic API key** from <https://console.anthropic.com>.
-API usage is **billed separately** from a claude.ai chat subscription.
+Sarah's brain is **Google Gemini**. You need a free Gemini API key from <https://aistudio.google.com/apikey>
+(it starts with `AIza`). The free tier has limits; beyond them Google bills usage.
 
+**Easiest:** start the app (`python Pillway.py`, without `--demo`), go to **Settings → AI connection**,
+paste the key and press **Save and connect**. It tests the connection for you.
+
+**Or by hand:**
 1. Copy `pillway_config.local.example.toml` and name the copy `pillway_config.local.toml`.
-2. Open it and paste your key between the quotes: `api_key = "sk-ant-..."`
-3. Run `python Pillway.py --check-config`. It should say *"API key: found (ends …abcd)"*.
+2. Open it and paste your key between the quotes: `api_key = "AIza..."`
+3. Run `python Pillway.py --check-config` to confirm.
 
-`pillway_config.local.toml` is in `.gitignore`, so it is **never committed**. (Other options: set
-the environment variable `ANTHROPIC_API_KEY`, or copy `.env.example` to `.env`.)
-If a key is ever found in the shared `pillway_config.toml`, the app refuses to start and tells you to move it.
+`pillway_config.local.toml` is in `.gitignore`, so the key never goes to GitHub. (You can also set
+the environment variable `GEMINI_API_KEY`, or copy `.env.example` to `.env`.)
+**Never** start the app with `--demo` if you want the real AI: that forces scripted replies.
 
 ## Demo mode and Reset demo
 
@@ -139,8 +143,10 @@ Everything lives in **`pillway_config.toml`** (heavily commented). Save, then re
 
 | I want to… | Edit this line |
 |---|---|
-| Use a cheaper model for development | `chat_model = "claude-haiku-5-5"` (also `care_plan_model`, `summary_model`) |
-| Change the safety-check model | `flag_model = "claude-haiku-5-5"` |
+| Use a cheaper model for development | `chat_model = "gemini-3.5-flash-lite"` (also `care_plan_model`, `summary_model`) |
+| Change the safety-check model | `flag_model = "gemini-3.5-flash-lite"` |
+| Faster or deeper replies | `thinking_level = "low"` (fastest) / `"medium"` / `"high"` |
+| Change the monthly follow-up topics | edit `data/follow_up_topics.json` (one topic per follow-up call) |
 | Run with no AI | `demo_mode = true` |
 | Change a danger threshold | `[safety]` → `blood_sugar_low = 3.9` (all placeholders: confirm with Pillway) |
 | Start in French | `[patient]` → `default_language = "fr"` |
@@ -153,7 +159,7 @@ Everything lives in **`pillway_config.toml`** (heavily commented). Save, then re
 
 | Problem | Fix |
 |---|---|
-| **"API key not found"** / always demo mode | Check `pillway_config.local.toml` exists (no `.example` in the name) and `python Pillway.py --check-config`. Also `pip install -r requirements.txt` (the `anthropic` package). |
+| **"API key not found"** / always demo mode | Check `pillway_config.local.toml` exists (no `.example` in the name) and `python Pillway.py --check-config`. Also `pip install -r requirements.txt` (the `google-genai` package). |
 | **Voice not working (read-aloud or microphone)** | First run **`python Pillway.py --check-voice`**. It speaks a test sentence, listens for 4 seconds, and prints **PROBLEM** lines with the fix for each one. |
 | **Microphone hears nothing** | Windows: **Settings → Privacy & security → Microphone** → turn on *Microphone access* **and** *Let desktop apps access your microphone*, then restart VS Code. Mac: **System Settings → Privacy & Security → Microphone** → allow Terminal / VS Code. |
 | **Speech-to-text never types anything** | The first use downloads a ~40 MB offline model (needs internet once; do it before the venue). On Windows, if that can't work, the app switches to Windows' built-in speech recognition automatically (`speech_to_text_engine = "auto"` in `pillway_config.toml`; set `"windows"` to force it). You can always tap **Switch to chat**. |
@@ -242,7 +248,7 @@ tools/generate_french_review.py  rebuilds docs/french_review.md
                                                      │ 2. LAYER 1 core/safety_rules.py  (instant, offline)
                                                      │      urgent? ──► red bubble + flag on dashboard NOW
                                                      │ 3. core/conversation_flow.py decides the next step
-                                                     │ 4. ai/brain.py ──► ai/client.py ──► Anthropic API
+                                                     │ 4. ai/brain.py ──► ai/client.py ──► Gemini API  
                                                      │      (de-identified; falls back to ai/demo_mode.py)
                                                      │      • LAYER 2 flag check (Haiku)  • Sarah's paragraph (Opus)
                                                      │ 5. core/flagging.py: AI may add/raise, never clear Tier 1

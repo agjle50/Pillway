@@ -1,0 +1,113 @@
+{
+  "_about": "Monthly follow-up calls (about 10 to 15 minutes each, one topic per call, for about 6 months), the way Pillway's pharmacists run them. Sarah covers ONE topic per follow-up, in this order, skipping topics marked skip_if. Facts come from Diabetes Canada (see each source). Edit freely: questions are guides, not a script.",
+  "topics": [
+    {
+      "id": "fibre",
+      "title_en": "Fibre", "title_fr": "Les fibres",
+      "goal": "Help them add fibre gradually: whole grains, legumes, vegetables, fruit with skins.",
+      "questions": [
+        {"id": "fibre_now", "en": "What does a usual breakfast and lunch look like for you?"},
+        {"id": "fibre_foods", "en": "Which of these do you eat most weeks: beans or lentils, oats or barley, whole grain bread, nuts and seeds?"},
+        {"id": "fibre_step", "en": "What is one small fibre swap you'd like to try this month?"}
+      ],
+      "facts": ["Include both soluble fibre (oats, barley, legumes, apples, carrots) and insoluble fibre (whole grains, nuts and seeds, fruit and vegetable skins, leafy greens).",
+                "Add fibre in small amounts over time and drink more water, to avoid an upset stomach.",
+                "Fill half the plate with non-starchy vegetables; choose whole grains more often; check labels for fibre."],
+      "source": "https://www.diabetes.ca/nutrition-and-recipes/nutrition/get-the-facts-on-fibre"
+    },
+    {
+      "id": "foot_care",
+      "title_en": "Foot care", "title_fr": "Soins des pieds",
+      "goal": "Build a daily foot check habit and know when to call for help.",
+      "questions": [
+        {"id": "foot_check", "en": "How often do you look at your feet, including between the toes and the soles?"},
+        {"id": "foot_changes", "en": "Have you noticed any cuts, blisters, colour changes, numbness or tingling lately?"},
+        {"id": "foot_shoes", "en": "What kind of shoes and socks do you usually wear around the house and outside?"}
+      ],
+      "facts": ["Check feet every day (a mirror helps for the soles); wash and dry well, especially between the toes.",
+                "Wear well-fitting shoes and clean socks; don't walk barefoot.",
+                "Any sore that isn't healing, new colour change or numbness should be seen by a health-care provider."],
+      "source": "https://www.diabetes.ca/living-with-diabetes/managing-complications/nerve-damage-and-amputation"
+    },
+    {
+      "id": "activity",
+      "title_en": "Physical activity", "title_fr": "Activité physique",
+      "goal": "Work toward 150 minutes a week of activity they enjoy, plus some strength work.",
+      "questions": [
+        {"id": "activity_week", "en": "How active were you this past week, and what did you do?"},
+        {"id": "activity_enjoy", "en": "What kind of movement do you actually enjoy, or used to?"},
+        {"id": "activity_plan", "en": "What's a realistic goal for the next month?"}
+      ],
+      "facts": ["Aim for at least 150 minutes a week of moderate activity (for example 30 minutes, 5 days a week); 10-minute bouts count.",
+                "Try not to go more than 2 days in a row without activity; add strength exercises 2 to 3 times a week.",
+                "Start low and go slow; anyone who has been inactive should check with their doctor before anything harder than a brisk walk."],
+      "source": "https://www.diabetes.ca/living-with-diabetes/exercise-fitness/exercise-activity"
+    },
+    {
+      "id": "low_sugar",
+      "title_en": "Low blood sugar", "title_fr": "Hypoglycémie",
+      "goal": "Make sure they can recognise and are ready for a low.",
+      "questions": [
+        {"id": "lows_recent", "en": "Have you had any lows since we last talked?"},
+        {"id": "lows_signs", "en": "What does a low feel like for you, if you've had one?"},
+        {"id": "lows_ready", "en": "Do you keep something fast-acting with you, like juice or glucose tablets?"}
+      ],
+      "facts": ["Below 4 mmol/L is considered low blood sugar.",
+                "If they feel low, check right away; if they can't check, treat it anyway.",
+                "Wait until blood sugar is above 5 mmol/L before driving. Repeated lows should be discussed with the pharmacist."],
+      "source": "https://www.diabetes.ca/living-with-diabetes/blood-sugar-management/hypoglycemia"
+    },
+    {
+      "id": "eye_health",
+      "title_en": "Eye health", "title_fr": "Santé des yeux",
+      "goal": "Get a yearly dilated eye exam booked and know the warning signs.",
+      "questions": [
+        {"id": "eyes_last", "en": "Have you had an eye exam with drops in the past year?"},
+        {"id": "eyes_symptoms", "en": "Any blurry vision, flashes, or spots lately?"},
+        {"id": "eyes_plan", "en": "Would it help if your pharmacist reminded you to book one?"}
+      ],
+      "facts": ["People with diabetes should have an eye exam about once a year, or as their eye doctor advises.",
+                "Blurred vision, flashes of light, spots or sudden vision loss need an eye doctor right away.",
+                "Keeping A1C, blood pressure and cholesterol on target, not smoking and staying active protect the eyes."],
+      "source": "https://www.diabetes.ca/living-with-diabetes/managing-complications/eye-damage-diabetic-retinopathy"
+    },
+    {
+      "id": "blood_pressure",
+      "title_en": "Blood pressure", "title_fr": "Tension artérielle",
+      "goal": "Regular home readings and steady progress toward their target.",
+      "questions": [
+        {"id": "bp_readings", "en": "Have you been able to check your blood pressure at home? What numbers are you seeing?"},
+        {"id": "bp_salt", "en": "How much salty or processed food is in a usual week for you?"},
+        {"id": "bp_routine", "en": "What would make checking it regularly easier?"}
+      ],
+      "facts": ["A common target for people with diabetes is below 130/80 mmHg; the pharmacist confirms each person's target.",
+                "Less salt and processed food, regular activity and limiting alcohol help lower blood pressure."],
+      "source": "https://www.diabetes.ca/living-with-diabetes/managing-complications/high-blood-pressure"
+    },
+    {
+      "id": "mood",
+      "title_en": "Stress and mood", "title_fr": "Stress et humeur",
+      "goal": "Check in on how they're coping and point to support.",
+      "questions": [
+        {"id": "mood_now", "en": "How have you been feeling lately, honestly?"},
+        {"id": "mood_support", "en": "Who do you lean on when things get hard?"}
+      ],
+      "facts": ["Feeling stressed or down about diabetes is common; it's okay to ask for help.",
+                "The pharmacist can connect them with support if stress is affecting daily life."],
+      "source": "https://www.diabetes.ca/living-with-diabetes/life-with-diabetes/mental-health-and-diabetes/taking-care-of-your-mental-health"
+    },
+    {
+      "id": "smoking",
+      "title_en": "Quitting smoking", "title_fr": "Arrêter de fumer",
+      "skip_if": {"smoker": false},
+      "goal": "Meet them where they are (not ready / thinking / ready) and offer the pharmacist's help.",
+      "questions": [
+        {"id": "smoking_stage", "en": "Where are you with smoking these days?"},
+        {"id": "smoking_help", "en": "Would you like your pharmacist to help you make a plan?"}
+      ],
+      "facts": ["Quitting smoking lowers the risk of heart, eye, kidney and foot problems.",
+                "Pharmacists can help with a quit plan and quit aids."],
+      "source": "https://www.diabetes.ca/living-with-diabetes/managing-complications/heart-disease-and-stroke"
+    }
+  ]
+}

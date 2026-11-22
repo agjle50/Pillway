@@ -134,15 +134,21 @@ class CallAudioMixin:
         if listener:
             listener.set_muted(True)
         state = self.call_state
-        state["sarah_speaking"] = True   # her avatar's mouth moves; the silence card waits
+        # "speaking" = a reply is on its way or playing (mic paused, silence card waits);
+        # "audio" = sound is ACTUALLY coming out (only then does her mouth move).
+        state["sarah_speaking"] = True
+
+        def playing(value):
+            state["sarah_audio"] = value
 
         def done():
             state["sarah_speaking"] = False
+            state["sarah_audio"] = False
             # back on (unless the patient pressed mute themselves meanwhile)
             if listener and not state.get("muted"):
                 listener.set_muted(False)
 
-        speak(text, self.lang, on_done=done,
+        speak(text, self.lang, on_done=done, on_playing=playing,
               on_error=lambda message: self._background_errors.append(message))
 
     def _send_call_text(self, text):

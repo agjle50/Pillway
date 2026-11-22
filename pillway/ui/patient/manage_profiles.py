@@ -1,6 +1,8 @@
 """Profile editor and account switching page."""
 
 import tkinter as tk
+
+from ..components.slim_scrollbar import SlimScrollbar
 from tkinter import filedialog, messagebox
 
 from ..theme import (
@@ -132,10 +134,10 @@ class ManageProfilesMixin:
         outer = tk.Frame(self, bg=PAGE_BG, bd=0, highlightthickness=0)
         self.profiles_view_frame = outer
         canvas = tk.Canvas(outer, bg=PAGE_BG, bd=0, highlightthickness=0)
-        scrollbar = tk.Scrollbar(outer, orient="vertical", command=canvas.yview)
+        scrollbar = SlimScrollbar(outer, command=canvas.yview, width=max(8, int(self.S(12))), bg=PAGE_BG)
         canvas.configure(yscrollcommand=scrollbar.set)
-        canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
         body = tk.Frame(canvas, bg=PAGE_BG, padx=max(10, int(self.S(4))))
         body_window = canvas.create_window((0, 0), window=body, anchor="nw")
         body.bind("<Configure>", lambda *_: canvas.configure(scrollregion=canvas.bbox("all")))

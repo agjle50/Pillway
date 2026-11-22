@@ -16,6 +16,7 @@ FILES = {
     "care_plan_template": lambda s: "data/care_plan_template.json",
     "check_in_messages": lambda s: s.check_ins.check_in_messages_file,
     "french_strings": lambda s: s.french.french_strings_file,
+    "follow_up_topics": lambda s: "data/follow_up_topics.json",
 }
 
 
