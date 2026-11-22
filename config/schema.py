@@ -9,32 +9,30 @@ Each entry: "key": (default, type, rule)
 """
 
 MODEL_NAMES = [
-    "claude-opus-5-5",    # smartest, slower, most expensive
-    "claude-sonnet-5-5",  # balanced
-    "claude-haiku-5-5",   # fastest and cheapest
-    "claude-fable-5-2",
+    "gemini-3.8-flash",       # Google's most capable Flash model: Sarah's conversation
+    "gemini-3.5-flash-lite",  # fastest and cheapest: background safety checks and memory
+    "gemini-3.1-pro-preview", # deepest reasoning (preview), slower
+    "gemini-4-argon",         # flagship
 ]
 
 SCHEMA = {
     "ai": {
-        "provider": ("anthropic", str, ["anthropic"]),
-        "chat_model": ("claude-opus-5-5", str, None),
-        "flag_model": ("claude-haiku-5-5", str, None),
-        "care_plan_model": ("claude-opus-5-5", str, None),
-        "summary_model": ("claude-sonnet-5-5", str, None),
-        "call_model": ("claude-opus-5-5", str, None),
-        "memory_model": ("claude-haiku-5-5", str, None),
+        "provider": ("gemini", str, ["gemini"]),
+        "chat_model": ("gemini-3.8-flash", str, None),
+        "flag_model": ("gemini-3.5-flash-lite", str, None),
+        "care_plan_model": ("gemini-3.8-flash", str, None),
+        "summary_model": ("gemini-3.8-flash", str, None),
+        "call_model": ("gemini-3.8-flash", str, None),
+        "memory_model": ("gemini-3.5-flash-lite", str, None),
         "conversation_style": ("natural", str, ["natural", "scripted"]),
-        "conversation_temperature": (0.7, float, (0.0, 1.0)),
-        "temperature": (0.3, float, (0.0, 1.0)),
-        "max_tokens": (900, int, (100, 8000)),
+        "thinking_level": ("low", str, ["low", "medium", "high"]),
+        "max_tokens": (2048, int, (100, 8000)),
         "timeout_seconds": (20, int, (3, 120)),
         "retries": (1, int, (0, 3)),
         "demo_mode": (False, bool, None),
         "ai_safety_layer_enabled": (True, bool, None),
         "deidentify_before_ai": (True, bool, None),
-        "prompt_caching": (True, bool, None),
-        "api_key_env_var": ("ANTHROPIC_API_KEY", str, None),
+        "api_key_env_var": ("GEMINI_API_KEY", str, None),
         "api_key": ("", str, None),  # only allowed in pillway_config.local.toml
     },
     "safety": {

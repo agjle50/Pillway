@@ -13,7 +13,7 @@ try:
 except ImportError:  # no tkinter on this computer
     raise unittest.SkipTest("tkinter is not installed")
 
-KEY = "sk-ant-api03-" + "a" * 40
+KEY = "AIzaSy" + "a" * 33
 
 
 class SaveKeyTests(unittest.TestCase):
@@ -26,16 +26,16 @@ class SaveKeyTests(unittest.TestCase):
     def test_replaces_an_old_key_and_keeps_other_settings(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / "pillway_config.local.toml"
-            path.write_text('[ai]\napi_key = "old"\nchat_model = "claude-haiku-5-5"\n')
+            path.write_text('[ai]\napi_key = "old"\nchat_model = "gemini-3.5-flash-lite"\n')
             save_key_to_local_file(Path(folder), KEY)
             text = path.read_text()
             self.assertIn(KEY, text)
             self.assertNotIn('"old"', text)
-            self.assertIn('chat_model = "claude-haiku-5-5"', text)
+            self.assertIn('chat_model = "gemini-3.5-flash-lite"', text)
 
     def test_only_real_looking_keys_are_accepted(self):
         self.assertTrue(KEY_PATTERN.match(KEY))
-        for bad in ("", "hello", "sk-ant-short", "sk-proj-" + "a" * 40):
+        for bad in ("", "hello", "AIzashort", "sk-ant-" + "a" * 40):
             self.assertFalse(KEY_PATTERN.match(bad))
 
     def test_the_local_file_is_gitignored(self):

@@ -1,6 +1,6 @@
 """Natural conversation mode: the AI writes Sarah's whole reply, with code-side safety kept.
 
-Uses a fake Anthropic SDK (no internet, no key, no cost).
+Uses a fake Gemini SDK (no internet, no key, no cost).
 """
 
 import json
@@ -28,11 +28,12 @@ def talk(reply, **extra):
 class FakeSDK:
     def __init__(self, conversation, memory="Patient A: likes hockey."):
         self.calls, self.conversation, self.memory = [], list(conversation), memory
-        self.messages = SimpleNamespace(create=self.create)
+        self.models = SimpleNamespace(generate_content=self.generate_content)
 
-    def create(self, **request):
+    def generate_content(self, model, contents, config):
+        request = {"model": model, "system": config["system_instruction"], "contents": contents}
         self.calls.append(request)
-        system = request["system"][0]["text"]
+        system = request["system"]
         if "second safety check" in system:
             text = NO_FLAG
         elif "compact memory" in system:
@@ -42,12 +43,12 @@ class FakeSDK:
         else:  # scripted fallback paragraph
             text = json.dumps({"advice": "Thanks for telling me that, Patient A.", "possible_issues": [],
                                "summary_updates": []})
-        return SimpleNamespace(content=[SimpleNamespace(type="text", text=text)])
+        return SimpleNamespace(text=text)
 
 
 def natural_service(sdk):
     settings = use_temp_settings(demo_mode=False)
-    settings.api_key = "sk-ant-test-key-1234"
+    settings.api_key = "AIza-test-key-1234"
     settings.ai.conversation_style = "natural"
     brain = Brain()
     brain.client._sdk = sdk
@@ -106,7 +107,7 @@ class NaturalConversationTests(unittest.TestCase):
         while time.monotonic() < deadline and not service.store.load("maria").get("memory"):
             time.sleep(0.05)
         self.assertEqual(service.store.load("maria")["memory"]["text"], "Patient A: big hockey fan.")
-        prompt = next(c for c in sdk.calls if "compact memory" in c["system"][0]["text"])
+        prompt = next(c for c in sdk.calls if "compact memory" in c["system"])
         self.assertNotIn("Rossi", json.dumps(prompt))                          # de-identified
 
     def test_memory_is_sent_before_the_reply(self):
@@ -117,8 +118,50 @@ class NaturalConversationTests(unittest.TestCase):
         while time.monotonic() < deadline and not service.store.load("maria").get("memory"):
             time.sleep(0.05)
         service.handle_message("maria", "ok")
-        convo_calls = [c for c in sdk.calls if "How this conversation works" in c["system"][0]["text"]]
-        self.assertIn("granddaughter Lily", convo_calls[-1]["messages"][0]["content"])
+        convo_calls = [c for c in sdk.calls if "How this conversation works" in c["system"]]
+        self.assertIn("granddaughter Lily", convo_calls[-1]["contents"])
+
+
+class WorkflowTests(unittest.TestCase):
+    def test_questionnaire_answers_and_session_type_reach_the_ai(self):
+        sdk = FakeSDK([talk("Hi!")])
+        service = natural_service(sdk)
+        service.handle_message("maria", "hello")
+        sent = next(c for c in sdk.calls if "How this conversation works" in c["system"])["contents"]
+        self.assertIn("already_in_questionnaire", sent)
+        self.assertIn("weight_kg", sent)
+        self.assertIn("first consultation", sent)
+
+    def test_off_topic_turns_are_counted_and_reset(self):
+        sdk = FakeSDK([talk("Ha!", small_talk=True), talk("Sure!", small_talk=True),
+                       talk("Back to you: how are meals going?", asking="diet")])
+        service = natural_service(sdk)
+        service.handle_message("maria", "the leafs won")
+        record = service.handle_message("maria", "and the raptors too")
+        self.assertEqual(record["conversation"]["off_topic_turns"], 2)
+        record = service.handle_message("maria", "ok ok")
+        self.assertEqual(record["conversation"]["off_topic_turns"], 0)
+
+    def test_monthly_follow_up_covers_one_topic_and_logs_it_for_the_pharmacist(self):
+        sdk = FakeSDK([
+            talk("This month let's chat about fibre. What's a usual breakfast for you?", asking="fibre_now"),
+            talk("Oats are great. Do you eat beans or lentils most weeks?",
+                 answered=[{"id": "fibre_now", "value": "toast and coffee"}], asking="fibre_foods"),
+            talk("Love that plan. Talk soon!", answered=[{"id": "fibre_foods", "value": "rarely"},
+                                                          {"id": "fibre_step", "value": "oats 3 mornings a week"}],
+                 finished=True),
+        ])
+        service = natural_service(sdk)
+        service.store.update("maria", lambda r: r["conversation"].update(stage="done"))
+        service.handle_message("maria", "hi sarah")
+        sent = [c for c in sdk.calls if "How this conversation works" in c["system"]][-1]["contents"]
+        self.assertIn("monthly follow-up", sent)
+        self.assertIn("Fibre", sent)
+        service.handle_message("maria", "toast and coffee usually")
+        record = service.handle_message("maria", "not really, but I could try oats")
+        self.assertEqual(record["follow_up"]["done"][0]["id"], "fibre")
+        self.assertTrue(any("Follow-up (Fibre)" in u["text"] for u in record["summary_updates"]))
+        self.assertIsNone(record["follow_up"]["current"])
 
 
 if __name__ == "__main__":

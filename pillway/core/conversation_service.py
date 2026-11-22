@@ -294,8 +294,30 @@ class ConversationService:
                 and record["conversation"]["stage"] not in ("consent", "greeting"))
 
     def _checklist(self, record):
-        """What the check-in still needs, as gentle guidance for the AI (not a script)."""
+        """What this conversation should achieve, as gentle guidance for the AI (not a script).
+
+        First consultation (replaces the pharmacist's ~30-minute call): the remaining check-in
+        questions, adapting to each answer. After the care plan: a monthly follow-up on ONE
+        topic (data/follow_up_topics.json), like the pharmacist's 10-15 minute calls.
+        """
         convo, lang = record["conversation"], record["language"]
+        profile = record["profile"]
+        questionnaire = {key: profile[key] for key in ("weight_kg", "height_cm", "checks_bp_regularly", "last_bp",
+                                                       "smoker", "quit_readiness") if key in profile}
+        base = {"off_topic_turns": convo.get("off_topic_turns", 0),
+                "already_in_questionnaire": questionnaire}
+        if convo["stage"] == "done":
+            topic = self._follow_up_topic(record)
+            if topic:
+                answers = record.get("follow_up", {}).get("answers", {})
+                remaining = [{"id": q["id"], "about": topic["title_en"], "example_question": q["en"]}
+                             for q in topic["questions"] if q["id"] not in answers]
+                return {**base, "session_type": "monthly follow-up call (10-15 minutes, ONE topic only)",
+                        "topic": {k: topic[k] for k in ("id", "title_en", "goal", "facts", "source")},
+                        "remaining": remaining, "suggested_next": remaining[0]["id"] if remaining else "anything_else",
+                        "already_answered": answers}
+            return {**base, "session_type": "check-in (all monthly topics done)", "remaining": [],
+                    "suggested_next": "anything_else", "already_answered": {}}
         intro = load_questions_intro()
         remaining = []
         if convo["stage"] in ("changes", "changes_detail"):
@@ -305,9 +327,31 @@ class ConversationService:
             if question["id"] not in convo["answers"]:
                 remaining.append({"id": question["id"], "about": question["topic"],
                                   "example_question": question.get(lang) or question["en"]})
-        return {"stage": convo["stage"], "remaining": remaining,
+        from .content import load
+        extras = [{"id": q["id"], "about": q["topic"], "example_question": q.get(lang) or q["en"]}
+                  for q in load("questions")["questions"] if q.get("optional") and q["id"] not in convo["answers"]]
+        return {**base, "session_type": "first consultation (in place of the pharmacist's 30-minute call)",
+                "stage": convo["stage"], "remaining": remaining,
+                "optional_if_time_allows": extras,
                 "suggested_next": remaining[0]["id"] if remaining else "anything_else",
                 "already_answered": {qid: a.get("value") for qid, a in convo["answers"].items()}}
+
+    @staticmethod
+    def _follow_up_topic(record):
+        """This month's follow-up topic: the current one, or the next one not done yet."""
+        from .content import load
+        state = record.setdefault("follow_up", {"done": [], "current": None, "answers": {}})
+        topics = load("follow_up_topics")["topics"]
+        by_id = {topic["id"]: topic for topic in topics}
+        if state.get("current") in by_id:
+            return by_id[state["current"]]
+        done = {item["id"] for item in state.get("done", [])}
+        for topic in topics:
+            skip = any(record["profile"].get(key) == value for key, value in topic.get("skip_if", {}).items())
+            if topic["id"] not in done and not skip:
+                state["current"], state["answers"] = topic["id"], {}
+                return topic
+        return None
 
     @staticmethod
     def _facts(record):
@@ -378,7 +422,12 @@ class ConversationService:
                 self._add_sarah(record, reply, tier=1, source="code", channel=channel)
                 return
 
-            known = {q["id"] for q in question_list(record)}
+            convo["off_topic_turns"] = convo.get("off_topic_turns", 0) + 1 if talk.get("small_talk") else 0
+            if convo["stage"] == "done":
+                self._record_follow_up(record, talk, heard)
+            from .content import load as load_content
+            optional = {q["id"] for q in load_content("questions")["questions"] if q.get("optional")}
+            known = ({q["id"] for q in question_list(record)} | optional) if convo["stage"] != "done" else set()
             for item in talk.get("answered", []):
                 qid, value = item["id"].strip(), (item.get("value") or heard).strip()
                 if qid == "changes" and convo["stage"] in ("changes", "changes_detail"):
@@ -439,6 +488,23 @@ class ConversationService:
             self.make_care_plan(patient_id, channel)
             on_update()
         return self.store.load(patient_id)
+
+    def _record_follow_up(self, record, talk, heard):
+        """Save this month's follow-up answers; when the topic is covered, log it for the pharmacist."""
+        topic = self._follow_up_topic(record)
+        if not topic:
+            return
+        state = record["follow_up"]
+        ids = {q["id"] for q in topic["questions"]}
+        for item in talk.get("answered", []):
+            if item["id"] in ids:
+                state["answers"][item["id"]] = (item.get("value") or heard).strip()
+        if talk.get("finished") or ids <= set(state["answers"]):
+            summary = "; ".join(f"{qid.replace('_', ' ')}: {value}" for qid, value in state["answers"].items())
+            record["summary_updates"].append({"time": now_iso(), "type": "lifestyle",
+                                              "text": f"Follow-up ({topic['title_en']}): {summary or 'discussed'}"})
+            state["done"].append({"id": topic["id"], "time": now_iso(), "answers": dict(state["answers"])})
+            state["current"], state["answers"] = None, {}
 
     # ---- memory: a compact note Sarah reads before every reply --------------------
 

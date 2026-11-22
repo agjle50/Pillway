@@ -1,4 +1,4 @@
-"""Tests the LIVE AI path with a fake Anthropic SDK (no internet, no key, no cost).
+"""Tests the LIVE AI path with a fake Gemini SDK (no internet, no key, no cost).
 
 Checks: a good AI reply is used; broken JSON is retried; a failed call falls back to demo
 mode ("offline") without crashing; an unsafe AI reply is replaced by the safe fallback; the
@@ -18,28 +18,29 @@ from pillway.core.conversation_service import ConversationService  # noqa: E402
 
 
 class FakeSDK:
-    """Answers like the Anthropic SDK. `script` is a list of replies or exceptions, by job keyword."""
+    """Answers like the Gemini SDK (client.models.generate_content). Replies are chosen by job."""
 
     def __init__(self, chat=None, flag=None, care_plan=None, fail=False):
         self.calls = []
         self.replies = {"chat": chat, "flag": flag, "care_plan": care_plan}
         self.fail = fail
-        self.messages = SimpleNamespace(create=self.create)
+        self.models = SimpleNamespace(generate_content=self.generate_content)
 
-    def create(self, **request):
+    def generate_content(self, model, contents, config):
+        request = {"model": model, "system": config["system_instruction"], "contents": contents}
         self.calls.append(request)
         if self.fail:
             raise TimeoutError("network down")
-        system = request["system"][0]["text"]
+        system = request["system"]
         job = "flag" if "second safety check" in system else "care_plan" if "lifestyle parts" in system else "chat"
         reply = self.replies[job]
         text = reply.pop(0) if isinstance(reply, list) else reply
-        return SimpleNamespace(content=[SimpleNamespace(type="text", text=text)])
+        return SimpleNamespace(text=text)
 
 
 def live_service(sdk):
     settings = use_temp_settings(demo_mode=False)
-    settings.api_key = "sk-ant-test-key-1234"
+    settings.api_key = "AIza-test-key-1234"
     settings.ai.conversation_style = "scripted"   # these tests cover the original scripted pipeline
     brain = Brain()
     brain.client._sdk = sdk
@@ -69,7 +70,7 @@ class LiveAIPathTests(unittest.TestCase):
             self.assertNotIn(identifier, sent)
 
     def test_broken_json_is_retried(self):
-        sdk = FakeSDK(chat=["not json at all", GOOD_CHAT[1:]], flag=NO_FLAG)
+        sdk = FakeSDK(chat=["not json at all", GOOD_CHAT], flag=NO_FLAG)
         service = live_service(sdk)
         for text in ["hi", "no changes", "I eat pretty well"]:
             record = service.handle_message("maria", text)

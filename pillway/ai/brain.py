@@ -136,8 +136,7 @@ class Brain:
                 f"<patient_message>\n{redact_text(text, record['profile'])}\n</patient_message>")
         job = "call" if channel == "call" else "chat"
         data, status = self.client.complete(job, conversation_system_prompt(record["language"]), user, "converse",
-                                            profile=record["profile"],
-                                            temperature=get_settings().ai.conversation_temperature)
+                                            profile=record["profile"])
         if status == OK:
             data["reply"] = restore_name(data["reply"], record["profile"])
             data["heard_as"] = restore_name(data.get("heard_as", ""), record["profile"])
@@ -150,8 +149,7 @@ class Brain:
         current = (record.get("memory") or {}).get("text", "") or "(empty: first conversation)"
         lines = "\n".join(f"{who}: {redact_text(said, record['profile'])}" for who, said in exchange)
         user = f"<current_memory>\n{current}\n</current_memory>\n\n<latest_exchange>\n{lines}\n</latest_exchange>"
-        data, status = self.client.complete("memory", MEMORY_PROMPT, user, "memory", profile=record["profile"],
-                                            temperature=0.2)
+        data, status = self.client.complete("memory", MEMORY_PROMPT, user, "memory", profile=record["profile"])
         return data["memory"] if status == OK else None
 
     def flag_check(self, record, text, layer1):

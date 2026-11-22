@@ -1,10 +1,10 @@
-"""The ONLY file that talks to the AI company's API (Anthropic).
+"""The ONLY file that talks to the AI company's API (Google Gemini, via the google-genai package).
 
 Called by: ai/brain.py. Everything else goes through the brain, so demo mode and the real
 API are interchangeable.
-- The model for each job (chat, flag, care_plan, summary) comes from pillway_config.toml.
+- The model for each job (chat, call, flag, memory, care_plan, summary) comes from pillway_config.toml.
 - Every outgoing message is de-identified here as a last safety net (core/deidentify.py).
-- Timeouts, retries and plain-English errors; never prints or logs the API key.
+- Replies are requested as JSON; timeouts, a retry, plain-English errors; never prints or logs the key.
 - Runs in a background thread (the UI never calls this directly).
 """
 
@@ -16,6 +16,7 @@ from ..core.deidentify import redact_text
 from .parsers import InvalidAIOutput, parse
 
 OK, UNAVAILABLE = "ok", "unavailable"
+FAST_JOBS = ("flag", "memory")   # background jobs: think as little as possible
 
 
 class AIClient:
@@ -28,49 +29,46 @@ class AIClient:
         if self.settings.ai.demo_mode:
             self.unavailable_reason = "Demo mode is on (scripted replies, no AI)."
         elif not self.settings.api_key:
-            self.unavailable_reason = "No API key found, so the app is using demo mode."
+            self.unavailable_reason = "No Gemini API key found, so the app is using demo mode."
         else:
             try:
-                import anthropic
-                self._sdk = anthropic.Anthropic(api_key=self.settings.api_key,
-                                                timeout=self.settings.ai.timeout_seconds, max_retries=0)
+                from google import genai
+                timeout_ms = self.settings.ai.timeout_seconds * 1000
+                self._sdk = genai.Client(api_key=self.settings.api_key, http_options={"timeout": timeout_ms})
             except ImportError:
-                self.unavailable_reason = "The 'anthropic' package isn't installed (pip install -r requirements.txt)."
+                self.unavailable_reason = "The 'google-genai' package isn't installed (pip install -r requirements.txt)."
 
     @property
     def available(self):
         return self._sdk is not None
 
-    def build_request(self, job, system_text, user_text, profile=None, temperature=None):
+    def build_request(self, job, system_text, user_text, profile=None):
         """The exact request that would be sent (used by --show-ai-payload too)."""
         ai = self.settings.ai
         if ai.deidentify_before_ai:
             user_text = redact_text(user_text, profile or {})
-        system = [{"type": "text", "text": system_text}]
-        if ai.prompt_caching:
-            system[0]["cache_control"] = {"type": "ephemeral"}
-        return {"model": getattr(ai, f"{job}_model"), "max_tokens": ai.max_tokens,
-                "temperature": ai.temperature if temperature is None else temperature, "system": system,
-                "messages": [{"role": "user", "content": user_text}]}
+        model = getattr(ai, f"{job}_model")
+        # "minimal" thinking is only offered on Flash-Lite; everything else uses the configured level.
+        thinking = "minimal" if job in FAST_JOBS and "lite" in model else ai.thinking_level
+        return {"model": model, "system": system_text, "contents": user_text,
+                "max_output_tokens": ai.max_tokens, "thinking_level": thinking}
 
-    def complete(self, job, system_text, user_text, schema, profile=None, temperature=None):
+    def complete(self, job, system_text, user_text, schema, profile=None):
         """Ask the AI and return (clean_json, status). status is "ok" or "unavailable"."""
         if not self.available:
             return None, UNAVAILABLE
-        request = self.build_request(job, system_text, user_text, profile, temperature)
+        request = self.build_request(job, system_text, user_text, profile)
         self.last_payload = request
         for attempt in range(self.settings.ai.retries + 1):
             started = time.monotonic()
             try:
-                text = self._send(request)
-                data = parse(text, schema)
+                data = parse(self._send(request), schema)
                 self._log_timing(job, started, "ok")
                 return data, OK
-            except InvalidAIOutput as problem:
+            except InvalidAIOutput as problem:  # retry once with a firm reminder
                 self._log_timing(job, started, f"invalid JSON ({problem})")
-                request = dict(request, messages=request["messages"] + [
-                    {"role": "assistant", "content": "{"},
-                ]) if attempt == 0 else request
+                request = dict(request, contents=request["contents"] +
+                               "\n\nReply with ONE valid JSON object only, exactly in the shape described.")
             except Exception as error:  # network, timeout, rate limit, server error
                 self._log_timing(job, started, f"error: {type(error).__name__}")
                 if attempt >= self.settings.ai.retries:
@@ -79,18 +77,19 @@ class AIClient:
         return None, UNAVAILABLE
 
     def _send(self, request):
+        config = {"system_instruction": request["system"], "max_output_tokens": request["max_output_tokens"],
+                  "response_mime_type": "application/json",
+                  "thinking_config": {"thinking_level": request["thinking_level"]}}
         try:
-            response = self._sdk.messages.create(**request)
+            response = self._sdk.models.generate_content(model=request["model"], contents=request["contents"],
+                                                         config=config)
         except Exception as error:
-            if "temperature" in str(error).lower():
-                request = {k: v for k, v in request.items() if k != "temperature"}
-                response = self._sdk.messages.create(**request)
-            else:
+            if "thinking" not in str(error).lower():
                 raise
-        text = "".join(block.text for block in response.content if getattr(block, "type", "") == "text")
-        if request["messages"][-1]["role"] == "assistant":
-            text = request["messages"][-1]["content"] + text
-        return text
+            config.pop("thinking_config")   # an older model without thinking levels: ask again without
+            response = self._sdk.models.generate_content(model=request["model"], contents=request["contents"],
+                                                         config=config)
+        return response.text or ""
 
     def _log_timing(self, job, started, outcome):
         seconds = round(time.monotonic() - started, 2)

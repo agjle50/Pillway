@@ -1,4 +1,4 @@
-"""Settings > AI connection: connect Sarah to Claude Opus 5.5 by pasting an Anthropic API key.
+"""Settings > AI connection: connect Sarah to Google Gemini by pasting a Gemini API key.
 
 Called by: PillwayApp.render() for the "AI connection" section (patient and pharmacist).
 - Shows whether Sarah is LIVE (real AI conversation) or in DEMO MODE (scripted backup).
@@ -15,7 +15,7 @@ from config.loader import LOCAL_FILE
 
 from ..theme import BORDER, GREEN, GREEN_SOFT, INK, RED, RED_SOFT, TEXT_DARK, TEXT_MUTED, WHITE
 
-KEY_PATTERN = re.compile(r"^sk-ant-[A-Za-z0-9_\-]{20,}$")
+KEY_PATTERN = re.compile(r"^AIza[0-9A-Za-z_\-]{30,}$")   # Google API keys start with "AIza"
 
 
 def save_key_to_local_file(root, key):
@@ -52,13 +52,13 @@ class AIConnectionMixin:
         self.text(x1 + self.S(20), top + self.S(28), title, 16, ink, "bold")
         detail = (f"Natural conversation is {'on' if settings.ai.conversation_style == 'natural' else 'off'}. "
                   f"Key …{settings.api_key[-4:]} from {settings.api_key_source}." if live else
-                  self.service.brain.status_note() or "Paste an Anthropic API key below to connect.")
+                  self.service.brain.status_note() or "Paste a Gemini API key below to connect.")
         self.text(x1 + self.S(20), top + self.S(58), detail, 13, TEXT_DARK)
 
         # key field
         y = top + self.S(116)
-        self.text(x1, y, "Anthropic API key", 15, INK, "bold")
-        self.text(x1, y + self.S(26), "Create one at console.anthropic.com > API keys. It starts with sk-ant-.",
+        self.text(x1, y, "Gemini API key", 15, INK, "bold")
+        self.text(x1, y + self.S(26), "Create one at aistudio.google.com/apikey (Get API key). It starts with AIza.",
                   13, TEXT_MUTED)
         field_y = y + self.S(50)
         entry = tk.Entry(self, show="•", font=self.font(15), relief="flat", bd=0, bg=WHITE, fg=INK,
@@ -81,12 +81,12 @@ class AIConnectionMixin:
             x1, by + self.S(112), anchor="nw", width=int(x2 - x1), fill=TEXT_MUTED, font=self.font(12),
             text=("The key is saved only in pillway_config.local.toml on this computer. That file is never "
                   "uploaded to GitHub. Never paste your key into chat, email or the shared config file. "
-                  "API use is billed by Anthropic separately from a claude.ai subscription."))
+                  "Gemini API use is free up to Google's limits, then billed by Google."))
 
     def save_ai_key(self):
         key = (self.ai_key_entry.get() if getattr(self, "ai_key_entry", None) else "").strip()
         if not KEY_PATTERN.match(key):
-            self.ai_connection_status = "✕ That doesn't look like an Anthropic API key (it should start with sk-ant-)."
+            self.ai_connection_status = "✕ That doesn't look like a Gemini API key (it should start with AIza)."
             self.render()
             return
         settings = get_settings()
@@ -119,16 +119,19 @@ class AIConnectionMixin:
 
         def work():
             try:
-                client._sdk.messages.create(model=model, max_tokens=8,
-                                            messages=[{"role": "user", "content": "Reply with OK."}])
-                result = f"✓ Connected. Claude ({model}) answered. Sarah will now have real conversations."
-            except Exception as error:  # wrong key, no internet, no credit, model not enabled...
-                name = type(error).__name__
-                hint = {"AuthenticationError": "the key was rejected; check you copied all of it",
-                        "PermissionDeniedError": "this key can't use that model",
-                        "NotFoundError": f"the model '{model}' wasn't found for this key",
-                        "RateLimitError": "too many requests or no credit left on the account",
-                        "APIConnectionError": "no internet connection"}.get(name, str(error)[:120])
+                client._sdk.models.generate_content(model=model, contents="Reply with OK.",
+                                                    config={"max_output_tokens": 16})
+                result = f"✓ Connected. Gemini ({model}) answered. Sarah will now have real conversations."
+            except Exception as error:  # wrong key, no internet, quota, model not available...
+                text = str(error)
+                hint = ("the key was rejected; check you copied all of it" if "API_KEY_INVALID" in text
+                        or "API key not valid" in text else
+                        f"the model '{model}' isn't available for this key" if "404" in text or "NOT_FOUND" in text
+                        else "this key isn't allowed to use Gemini" if "403" in text or "PERMISSION" in text
+                        else "the free limit was reached; wait a minute or add billing" if "429" in text
+                        or "RESOURCE_EXHAUSTED" in text
+                        else "no internet connection" if "connect" in text.lower() or "timed out" in text.lower()
+                        else text[:120])
                 result = f"✕ Not connected: {hint}."
             self.ai_connection_status = result   # the app redraws when background work finishes
         self.run_in_background(work)
