@@ -26,7 +26,7 @@ class CheckUpMixin:
         for i, (title, icon, sub, label) in enumerate(bars):
             off = (1 - self.anim) * self.S(70) * (i + 1)
             by = y + i * (bh + self.S(22)) + off
-            tag = f"bar::{title}"
+            tag = "bar::" + "_".join(title.split())
             self.rrect(x1, by + self.S(4), x2, by + bh + self.S(4), self.S(20),
                        fill=SHADOW, outline="", tags=tag)
             self.rrect(x1, by, x2, by + bh, self.S(20), fill=WHITE,
@@ -83,7 +83,7 @@ class CheckUpMixin:
         self.anim = 1 - (1 - progress) ** 3
         delta = self.anim - previous
         for index, title in enumerate(("Call", "Chat")):
-            self.c.move(f"bar::{title}", 0, -delta * self.S(70) * (index + 1))
+            self.c.move("bar::" + "_".join(title.split()), 0, -delta * self.S(70) * (index + 1))
         if progress < 1.0:
             self._checkup_animation_job = self.after(16, self._animate)
         else:

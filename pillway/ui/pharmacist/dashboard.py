@@ -107,7 +107,7 @@ class PharmacistDashboardMixin:
                                    "compact" if self.dash_view == "comfortable" else "comfortable"),
                                   ("Sort: " + self.dash_sort, "sort",
                                    "Name" if self.dash_sort == "Needs attention" else "Needs attention")):
-            tag = f"dashbtn::{label}"
+            tag = "dashbtn::" + "_".join(label.split())
             item = self.c.create_text(0, -500, text=label, font=self.font(12, "bold"))
             width = self.c.bbox(item)[2] - self.c.bbox(item)[0] + self.S(30)
             self.c.delete(item)
