@@ -129,9 +129,12 @@ french_strings_file = "data/french_strings.json"
 # -----------------------------------------------------------------------------
 [call]
 call_enabled = true
-# "vosk" = offline speech-to-text on this computer (downloads a ~40 MB model once).
-# "none" = no microphone; the call uses the scripted demo lines.
-speech_to_text_engine = "vosk"
+# "auto"    = try the offline Vosk model first (downloads ~40 MB once); if that can't work,
+#             use Windows' built-in speech recognition instead (Windows only). Recommended.
+# "vosk"    = only the offline Vosk model.
+# "windows" = only Windows' built-in speech recognition (no download needed).
+# "none"    = no microphone; the call uses the scripted demo lines.
+speech_to_text_engine = "auto"
 # Leave blank to use the system default, or select a device under Settings > Microphone.
 microphone_device = ""
 # "continuous" listens while the microphone is unmuted; mute to pause listening.

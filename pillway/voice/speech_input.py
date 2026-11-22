@@ -15,6 +15,11 @@ MODEL_NAME = "vosk-model-small-en-us-0.15"
 MODEL_URL = f"https://alphacephei.com/vosk/models/{MODEL_NAME}.zip"
 MAX_MODEL_BYTES = 100_000_000
 MAX_EXTRACTED_BYTES = 500_000_000
+MIC_BLOCKED_HINT = (
+    "The microphone is sending silence. On Windows: Settings > Privacy & security > Microphone > "
+    "turn on 'Let desktop apps access your microphone'. On Mac: System Settings > Privacy & "
+    "Security > Microphone > allow your terminal or VS Code."
+)
 
 
 def ensure_model(model_root, stop_event, events):
@@ -97,7 +102,7 @@ def audio_level(raw_bytes):
 def input_devices():
     try:
         import sounddevice
-    except ImportError as error:
+    except (ImportError, OSError) as error:
         raise RuntimeError(f"Audio input is unavailable: {error}") from error
 
     try:
@@ -122,7 +127,7 @@ def input_devices():
 def resolve_input_device(selection=None):
     try:
         import sounddevice
-    except ImportError as error:
+    except (ImportError, OSError) as error:
         raise RuntimeError(f"Audio input is unavailable: {error}") from error
 
     try:
@@ -184,12 +189,33 @@ class LocalSpeechInput:
     def is_alive(self):
         return self.thread.is_alive()
 
+    def _engine(self):
+        from config import get_settings
+        try:
+            return get_settings().call.speech_to_text_engine
+        except Exception:
+            return "auto"
+
+    def _use_windows_backup(self, reason):
+        """Vosk couldn't start: on Windows, switch to Windows' own recognizer instead."""
+        from . import windows_speech
+        if self._engine() in ("auto", "windows") and windows_speech.available():
+            print(f"[speech] offline model unavailable ({reason}); using Windows speech recognition")
+            windows_speech.run(self)
+            return True
+        return False
+
     def _run(self):
+        if self._engine() == "windows" and self.transcribe:
+            if self._use_windows_backup("engine set to windows"):
+                return
         try:
             import sounddevice
             if self.transcribe:
                 from vosk import KaldiRecognizer, Model
-        except ImportError as error:
+        except (ImportError, OSError) as error:
+            if self.transcribe and self._use_windows_backup(error):
+                return
             self.events.put((
                 "error",
                 f"{error}. Install the local speech dependencies with "
@@ -203,19 +229,37 @@ class LocalSpeechInput:
             audio_chunks = queue.Queue(maxsize=20)
             recognition_failed = threading.Event()
             if self.transcribe:
-                model_path = ensure_model(self.model_root, self.stop_event, self.events)
-                if self.stop_event.is_set():
-                    self.events.put(("state", "stopped"))
-                    return
-                model = Model(str(model_path))
-                recognizer = KaldiRecognizer(model, 16000)
+                try:
+                    model_path = ensure_model(self.model_root, self.stop_event, self.events)
+                    if self.stop_event.is_set():
+                        self.events.put(("state", "stopped"))
+                        return
+                    model = Model(str(model_path))
+                    recognizer = KaldiRecognizer(model, 16000)
+                except InterruptedError:
+                    raise
+                except Exception as error:  # no internet, blocked download, broken model...
+                    if self._use_windows_backup(error):
+                        return
+                    raise RuntimeError(
+                        f"Couldn't get the offline speech model ({type(error).__name__}: {error}). "
+                        "Connect to the internet once so it can download (about 40 MB)."
+                    ) from error
+            silence = {"blocks": 0, "warned": False}
 
             def on_audio(indata, _frames, _time_info, status):
                 if self.stop_event.is_set() or self.muted_event.is_set():
                     return
                 try:
                     raw_audio = bytes(indata)
-                    self.events.put(("level", audio_level(raw_audio)))
+                    level = audio_level(raw_audio)
+                    self.events.put(("level", level))
+                    # Perfect silence (every sample is 0) for ~4 s usually means the computer
+                    # is blocking the microphone, not that the room is quiet.
+                    silence["blocks"] = silence["blocks"] + 1 if not any(raw_audio) else 0
+                    if silence["blocks"] == 40 and not silence["warned"]:
+                        silence["warned"] = True
+                        self.events.put(("status", MIC_BLOCKED_HINT))
                     if status:
                         self.events.put(("status", f"Microphone status: {status}"))
                     if recognizer is not None:

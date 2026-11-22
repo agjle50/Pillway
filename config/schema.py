@@ -72,7 +72,7 @@ SCHEMA = {
     },
     "call": {
         "call_enabled": (True, bool, None),
-        "speech_to_text_engine": ("vosk", str, ["vosk", "none"]),
+        "speech_to_text_engine": ("auto", str, ["auto", "vosk", "windows", "none"]),
         "microphone_device": ("", str, None),
         "listening_mode": ("continuous", str, ["hold_to_talk", "continuous"]),
         "voice_meter_sensitivity": (1.0, float, (0.1, 5.0)),

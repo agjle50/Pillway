@@ -90,7 +90,7 @@ class ChatActionsMixin:
 
         try:
             input_device = resolve_input_device(get_settings().call.microphone_device)
-        except (RuntimeError, ValueError) as error:
+        except (RuntimeError, ValueError, OSError) as error:
             self.voice_typing_status = self.t("chat.voice_error").format(error=str(error))
             self.c.itemconfigure("chat_voice_status", text=self.voice_typing_status)
             return

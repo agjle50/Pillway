@@ -1,11 +1,8 @@
 """The notifications and profile dropdown menus under the header.
 
 Called by: PillwayApp.render() when self.dropdown is set.
-BUG FIX (Manage profiles dropdown): Tk always draws embedded widgets (the profile list,
-the chat, scroll areas) ON TOP of canvas drawings, so the old dropdown was hidden behind
-them on the Manage profiles page. The dropdown is now its own small canvas placed above
-everything with place() + lift(). It closes on Escape, on a second click, or on any
-click elsewhere on the page.
+BUG FIX: both menus are now native pop-up menus (tk.Menu). They always appear above
+the chat and lists, always show their text, and close on Esc or a click elsewhere.
 """
 
 import tkinter as tk
@@ -43,35 +40,40 @@ class DropdownMixin:
         items.append(("Sign out", "", self.sign_out))
         return ("Pharmacist" if self.role == "pharmacist" else display_name(self.record or {"id": "Patient"})), items
 
-    def draw_dropdown(self):
-        title, items = self.dropdown_items()
-        width, row = self.S(340), self.S(66)
-        height = self.S(56) + row * len(items) + self.S(8)
-        x2 = (self.bell_box[0] + self.S(330)) if self.dropdown == "notifications" else self.w - self.S(18)
-        x1, top = min(x2, self.w - self.S(10)) - width, self.S(86)
-        menu = tk.Canvas(self, width=int(width), height=int(height), bg=WHITE, highlightthickness=1,
-                         highlightbackground=BORDER, bd=0)
-        menu.place(x=int(x1), y=int(top))
-        menu.tk.call("raise", menu._w)
-        self.dropdown_frame = menu
-        self.tx(menu, self.S(20), self.S(18), title, 16, INK, "bold")
-        y = self.S(56)
-        for index, (head, sub, action) in enumerate(items):
-            tag = f"dd::{index}"
-            menu.create_line(self.S(16), y, width - self.S(16), y, fill=BORDER)
-            menu.create_rectangle(2, y + 1, width - 2, y + row - 1, fill=WHITE, outline=WHITE, tags=tag)
-            if sub:
-                self.tx(menu, self.S(20), y + self.S(10), head, 14, INK, "bold", tag=tag)
-                self.tx(menu, self.S(20), y + self.S(36), sub, 12, TEXT_MUTED, tag=tag, width=width - self.S(40))
-            else:
-                self.tx(menu, self.S(20), y + row / 2, head, 14, RED, "bold", anchor="w", tag=tag)
-            self.bind_click(menu, tag, lambda a=action: self._dropdown_choose(a))
-            y += row
-        self._dropdown_opened_by_click = True
-        self.after_idle(self._arm_dropdown_close)
+    def show_menu(self, which):
+        """Open the profile or notifications menu as a native pop-up menu.
 
-    def _arm_dropdown_close(self):
-        self._dropdown_opened_by_click = False
+        BUG FIX (white empty box you couldn't close): the old menu was a small drawing
+        canvas placed over the page. On some Windows setups it showed up blank and
+        swallowed clicks, so it couldn't be closed. A native Tk menu is drawn by Windows
+        or macOS itself: it always shows its text, sits above everything (including the
+        chat and lists), and closes when you click anywhere else or press Esc.
+        """
+        self.dropdown = which
+        title, items = self.dropdown_items()
+        self.dropdown = None
+        menu = tk.Menu(self, tearoff=0, font=self.font(13), bg=WHITE, fg=INK,
+                       activebackground="#eef1f6", activeforeground=INK,
+                       disabledforeground=TEXT_MUTED, relief="flat", bd=1)
+        menu.add_command(label=title, state="disabled")
+        menu.add_separator()
+        for head, sub, action in items:
+            label = f"{head}  \u00b7  {sub}" if sub and which == "notifications" else head
+            menu.add_command(label=label, command=lambda a=action: self._dropdown_choose(a))
+            if head == "Sign out":
+                menu.entryconfigure("end", foreground=RED, activeforeground=RED)
+        self.dropdown_menu = menu
+        anchor_x, anchor_y = self.bell_box if which == "notifications" else self.profile_box
+        x = self.winfo_rootx() + int(anchor_x)
+        y = self.winfo_rooty() + int(anchor_y) + int(self.S(8))
+        try:
+            menu.tk_popup(x, y)
+        finally:
+            menu.grab_release()
+
+    def draw_dropdown(self):
+        """Kept for old callers: menus are now native pop-ups (see show_menu)."""
+        self.dropdown = None
 
     def _dropdown_choose(self, action):
         self.dropdown = None
@@ -81,8 +83,7 @@ class DropdownMixin:
             self.render()
 
     def close_dropdown_on_outside_click(self, _event=None):
-        if self.dropdown and not getattr(self, "_dropdown_opened_by_click", False):
-            self.after_idle(lambda: self.dropdown and self.toggle_dropdown(None))
+        """Native menus close themselves; nothing to do (kept so old bindings still work)."""
 
     def reset_demo(self):
         self.store.reset_demo()
