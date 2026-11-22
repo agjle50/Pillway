@@ -44,12 +44,12 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(load_settings(root, env={}).ai.chat_model, "gemini-3.5-flash-lite")
 
     def test_key_lookup_order(self):
-        root = self.make_root(local=f'[ai]\napi_key = "{FAKE_KEY}"\n',
-                              dotenv="DEEPSEEK_API_KEY=from-dotenv\n")
-        self.assertEqual(load_settings(root, env={"DEEPSEEK_API_KEY": "from-env"}).api_key, "from-env")
-        self.assertEqual(load_settings(root, env={}).api_key, FAKE_KEY)
+        # the key saved in the app comes first, then the computer's settings, then .env
+        root = self.make_root(local='[ai]\napi_key = "sk-from-app"\n', dotenv="DEEPSEEK_API_KEY=sk-from-dotenv\n")
+        self.assertEqual(load_settings(root, env={"DEEPSEEK_API_KEY": "sk-from-env"}).api_key, "sk-from-app")
         (root / "pillway_config.local.toml").write_text("", encoding="utf-8")
-        self.assertEqual(load_settings(root, env={}).api_key, "from-dotenv")
+        self.assertEqual(load_settings(root, env={"DEEPSEEK_API_KEY": "sk-from-env"}).api_key, "sk-from-env")
+        self.assertEqual(load_settings(root, env={}).api_key, "sk-from-dotenv")
 
     def test_switching_provider_is_one_line(self):
         from pillway.ai.client import model_for

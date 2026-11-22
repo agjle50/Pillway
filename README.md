@@ -56,6 +56,7 @@ Useful options (add them after `python Pillway.py`):
 | `--rehearse` | Runs the stage script in the terminal and prints how long each reply took. |
 | `--check-config` | Shows your settings and warns about anything unsafe. |
 | `--show-ai-payload` | Shows **exactly** what the AI company would receive (for the judges' privacy question). |
+| `--check-ai` | **AI not working on your computer?** Lists every API key found (last 4 characters only), which one is used, runs a live test and says how to fix it. |
 | `--debug` | Prints **admin debug lines** in the terminal: when the microphone turns on/off and why, what was heard (used or ignored), Sarah's voice starting/stopping, AI reply times, the questionnaire. On by default (`debug_logs` under `[dev]` in `pillway_config.toml`). |
 
 ## Add your API key
@@ -172,6 +173,7 @@ Everything lives in **`pillway_config.toml`** (heavily commented). Save, then re
 | Problem | Fix |
 |---|---|
 | **"API key not found"** / always demo mode | Check `pillway_config.local.toml` exists (no `.example` in the name) and `python Pillway.py --check-config`. A DeepSeek key starts with `sk-`; a Gemini key (`AIza...`) won't work while `provider = "deepseek"` (the app says so). |
+| **AI works for teammates but not for me / "wrong API key"** | Run `python Pillway.py --check-ai`. It shows every key on your computer and which one is used. The key saved in **Settings → AI connection** always wins; old keys in your computer's settings (`DEEPSEEK_API_KEY`) or `.env` are ignored and listed so you can delete them. |
 | **"402 ... no balance left"** | Your DeepSeek account is empty: top up at platform.deepseek.com. The app keeps working with the scripted backup replies meanwhile. |
 | **Voice not working (read-aloud or microphone)** | First run **`python Pillway.py --check-voice`**. It speaks a test sentence, listens for 4 seconds, and prints **PROBLEM** lines with the fix for each one. |
 | **Microphone hears nothing** | Windows: **Settings → Privacy & security → Microphone** → turn on *Microphone access* **and** *Let desktop apps access your microphone*, then restart VS Code. Mac: **System Settings → Privacy & Security → Microphone** → allow Terminal / VS Code. |

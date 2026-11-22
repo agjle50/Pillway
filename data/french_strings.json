@@ -25,7 +25,7 @@
     "consent.declined": {"en": "No problem. You can still talk to a pharmacist any time with the button at the top.", "fr": "Aucun problème. Vous pouvez toujours parler à un pharmacien avec le bouton en haut."},
     "chat.title": {"en": "Chat with Sarah", "fr": "Clavardage avec Sarah"},
     "chat.placeholder": {"en": "Type your message...", "fr": "Écrivez votre message..."},
-    "chat.typing": {"en": "Sarah is typing…", "fr": "Sarah écrit…"},
+    "chat.typing": {"en": "Sarah is thinking…", "fr": "Sarah réfléchit…"},
     "chat.saved": {"en": "Saved", "fr": "Enregistré"},
     "chat.sending": {"en": "Sending…", "fr": "Envoi…"},
     "chat.shared_urgent": {"en": "Shared with your pharmacist", "fr": "Transmis à votre pharmacien"},

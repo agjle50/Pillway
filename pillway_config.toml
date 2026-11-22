@@ -145,8 +145,9 @@ call_enabled = true
 # "windows" = only Windows' built-in speech recognition (no download needed).
 # "none"    = no microphone; the call uses the scripted demo lines.
 speech_to_text_engine = "auto"
-# Whisper model size: "small" (accurate; ~460 MB download once) or "base" (faster on old laptops).
-whisper_model = "small"
+# Whisper model size: "base" (fast: Sarah answers sooner after you stop talking; ~140 MB download once)
+# or "small" (a little more accurate but noticeably slower on most laptops; ~460 MB).
+whisper_model = "base"
 # Leave blank to use the system default, or select a device under Settings > Microphone.
 microphone_device = ""
 # "continuous" listens while the microphone is unmuted; mute to pause listening.

@@ -102,22 +102,48 @@ def _safety_net(root):
 
 
 PROVIDER_ENV_VARS = {"deepseek": "DEEPSEEK_API_KEY", "gemini": "GEMINI_API_KEY"}
+KEY_PREFIX = {"deepseek": "sk-", "gemini": "AIza"}
+
+
+def clean_key(value):
+    """Tidy a pasted key: spaces, line breaks, quotes and a stray "Bearer " are removed."""
+    value = (value or "").strip().strip('"').strip("'").strip()
+    if value.lower().startswith("bearer "):
+        value = value[7:].strip()
+    return "".join(value.split())
+
+
+def find_api_keys(root, values, env):
+    """Every key the app can find, in priority order: [(key, source), ...].
+
+    BUG FIX ("it pulls the wrong API key"): a key in the computer's settings (environment
+    variable) or .env used to beat the key you saved in the app, so an old key silently won.
+    Now the key saved in the app (pillway_config.local.toml) comes first.
+    """
+    names = list(dict.fromkeys(filter(None, [values["ai"]["api_key_env_var"],
+                                             PROVIDER_ENV_VARS.get(values["ai"]["provider"], ""),
+                                             *PROVIDER_ENV_VARS.values()])))
+    found = []
+    if values["ai"]["api_key"]:
+        found.append((clean_key(values["ai"]["api_key"]), LOCAL_FILE))
+    for env_name in names:
+        if env.get(env_name):
+            found.append((clean_key(env[env_name]), f"environment variable {env_name}"))
+    dotenv = _read_dotenv(root / ".env")
+    for env_name in names:
+        if dotenv.get(env_name):
+            found.append((clean_key(dotenv[env_name]), f".env file ({env_name})"))
+    return [(key, source) for key, source in found if key]
 
 
 def _find_api_key(root, values, env):
-    # the configured variable first, then the usual one for the chosen provider
-    names = list(dict.fromkeys([values["ai"]["api_key_env_var"],
-                                PROVIDER_ENV_VARS.get(values["ai"]["provider"], "")]))
-    for env_name in filter(None, names):
-        if env.get(env_name):
-            return env[env_name].strip(), f"environment variable {env_name}"
-    if values["ai"]["api_key"]:
-        return values["ai"]["api_key"].strip(), LOCAL_FILE
-    dotenv = _read_dotenv(root / ".env")
-    for env_name in filter(None, names):
-        if dotenv.get(env_name):
-            return dotenv[env_name], ".env file"
-    return "", "none"
+    """The first key that fits the chosen provider (a Gemini key is skipped when using DeepSeek)."""
+    found = find_api_keys(root, values, env)
+    prefix = KEY_PREFIX.get(values["ai"]["provider"], "")
+    for key, source in found:
+        if key.startswith(prefix):
+            return key, source
+    return found[0] if found else ("", "none")
 
 
 def load_settings(root=None, env=None):
@@ -145,10 +171,21 @@ def load_settings(root=None, env=None):
         raise ConfigError("Your settings need fixing:\n  - " + "\n  - ".join(all_errors))
 
     api_key, key_source = _find_api_key(root, values, env)
+    # every key found, masked, for --check-ai and Settings > AI connection (never the full key)
+    found = [{"source": source, "ends": key[-4:], "kind": _kind(key), "used": source == key_source}
+             for key, source in find_api_keys(root, values, env)]
+    for item in found:
+        if not item["used"] and item["ends"] != api_key[-4:]:
+            all_warnings.append(f"A different API key (ending …{item['ends']}) in {item['source']} is NOT used; "
+                                f"the app uses the one from {key_source}.")
     sections = {name: SimpleNamespace(**section) for name, section in values.items()}
     sections["ai"].api_key = ""  # the key lives only on settings.api_key
-    return Settings(root=root, api_key=api_key, api_key_source=key_source,
+    return Settings(root=root, api_key=api_key, api_key_source=key_source, api_keys_found=found,
                     warnings=all_warnings, **sections)
+
+
+def _kind(key):
+    return "DeepSeek" if key.startswith("sk-") else "Gemini" if key.startswith("AIza") else "unknown"
 
 
 _cached = None

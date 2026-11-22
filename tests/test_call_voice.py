@@ -25,12 +25,9 @@ class SpokenTextTests(unittest.TestCase):
         reply = "That sounds uncomfortable. When did you first notice it? Was it after a long walk?"
         self.assertEqual(natural_voice.sentences(reply), [reply])
 
-    def test_long_replies_split_once_so_she_starts_talking_quickly(self):
+    def test_even_long_replies_are_voiced_in_one_piece_with_no_pauses(self):
         reply = "Okay, thanks for telling me all of that. " + "Here is a longer explanation sentence. " * 15
-        chunks = natural_voice.sentences(reply)
-        self.assertEqual(len(chunks), 2)
-        self.assertTrue(chunks[0].startswith("Okay, thanks"))
-        self.assertEqual(" ".join(chunks), reply.strip())
+        self.assertEqual(natural_voice.sentences(reply), [reply.strip()])
 
     def test_ranges_and_symbols(self):
         said = natural_voice.speech_text("Aim for 0.8–1.0 g/kg, e.g. eggs & beans.")

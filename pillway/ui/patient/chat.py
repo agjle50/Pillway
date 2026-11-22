@@ -78,7 +78,7 @@ class ChatMixin:
             previous = message
         if self.patient_id in self.service.busy:
             self._draw_avatar(canvas, self.S(30), y + self.S(24))
-            self.rr(canvas, self.S(58), y, self.S(58) + self.S(190), y + self.S(48), self.S(24),
+            self.rr(canvas, self.S(58), y, self.S(58) + self.S(250), y + self.S(48), self.S(24),
                     fill=SURFACE_HIGH, outline=SURFACE_HIGH)
             self.tx(canvas, self.S(80), y + self.S(24), self.t("chat.typing"), 15, TEXT_MUTED, anchor="w")
             y += self.S(64)

@@ -7,6 +7,7 @@ Called by: Pillway.py.
   --role patient|pharmacist   open straight into one side (run two windows side by side)
   --demo              force demo mode for this run (no AI, no internet needed)
   --rehearse          run the 5-minute stage script without the window and time each reply
+  --check-ai          find out why the AI isn't working: every key found, which one is used, a live test
   --debug             print admin debug lines (mic on/off, what was heard, AI timings) in the terminal
 """
 
@@ -27,6 +28,7 @@ def parse_args(argv=None):
     parser.add_argument("--check-voice", action="store_true", help="test read-aloud and the microphone, then exit")
     parser.add_argument("--rehearse", action="store_true", help="run the stage script in the terminal and time it")
     parser.add_argument("--debug", action="store_true", help="print admin debug lines in the terminal")
+    parser.add_argument("--check-ai", action="store_true", help="test the AI connection and explain any problem")
     return parser.parse_args(argv)
 
 
@@ -95,6 +97,53 @@ def show_ai_payload():
     print("\nNever sent: name, phone, email, address, health card number, date of birth.")
 
 
+def check_ai():
+    """Plain-English answer to "why doesn't the AI work on MY computer?" (keys, code, certificates)."""
+    import sys
+    import time
+    from pillway.ai.client import AIClient, PROVIDER_NAMES, model_for
+    from pillway.ui.patient.ai_connection import connection_hint
+    settings = get_settings()
+    ai = settings.ai
+    name = PROVIDER_NAMES[ai.provider]
+    print("Pillway AI check\n" + "=" * 40)
+    print(f"Python          : {sys.version.split()[0]}  ({sys.executable})")
+    print(f"Pillway folder  : {settings.root}")
+    print(f"AI company      : {name}   (provider = \"{ai.provider}\" in pillway_config.toml)")
+    print(f"Chat model      : {model_for('chat', ai)}")
+    found = getattr(settings, "api_keys_found", [])
+    print("\nAPI keys found on this computer (only the last 4 characters are shown):")
+    if not found:
+        print("   none. Fix: open the app > Settings > AI connection, paste your key, Save and connect.")
+    for item in found:
+        mark = "USED   " if item["used"] else "ignored"
+        print(f"   [{mark}] …{item['ends']}  {item['kind']:<8} from {item['source']}")
+    if any(not item["used"] for item in found):
+        print("   Ignored keys can confuse things later: delete them if they're old.\n"
+              "   (Windows: Start > 'Edit environment variables for your account'. Mac: ~/.zshrc. Or the .env file.)")
+    if ai.demo_mode:
+        print("\nPROBLEM: demo_mode = true, so the AI is never used. Set demo_mode = false (and don't start with --demo).")
+        return
+    client = AIClient()
+    if not client.available:
+        print(f"\nPROBLEM: {client.unavailable_reason}")
+        return
+    print(f"\nTesting {name} with the key ending …{settings.api_key[-4:]} …")
+    started = time.monotonic()
+    try:
+        client._sdk.models.generate_content(model=model_for("chat", ai), contents="Reply with OK.",
+                                            config={"max_output_tokens": 16})
+        print(f"OK: {name} answered in {time.monotonic() - started:.1f}s. Sarah's AI works on this computer.")
+    except Exception as error:
+        text = str(error)
+        print(f"PROBLEM: {connection_hint(text, model_for('chat', ai), ai.provider)}.\n   Details: {text[:200]}")
+        if "CERTIFICATE" in text.upper() or "SSL" in text.upper():
+            print("   Fix for certificate errors: python -m pip install -r requirements.txt  (installs certifi).\n"
+                  "   On a Mac also double-click 'Install Certificates.command' in Applications > Python 3.x.")
+        elif "401" in text:
+            print("   Copy the key again from platform.deepseek.com/api_keys and paste it in Settings > AI connection.")
+
+
 def reset_demo():
     from pillway.storage.patient_store import PatientStore
     PatientStore().reset_demo()
@@ -116,6 +165,9 @@ def run(argv=None):
         debug_log.force(True)
     if args.check_config:
         check_config()
+        return None
+    if args.check_ai:
+        check_ai()
         return None
     if args.show_ai_payload:
         show_ai_payload()
