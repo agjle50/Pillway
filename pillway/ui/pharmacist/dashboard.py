@@ -46,7 +46,7 @@ def sort_by_attention(records):
 class PharmacistDashboardMixin:
     def draw_pharmacist_dashboard(self):
         x1, y1, x2, y2 = self.sw + self.S(14), self.S(92), self.w - self.S(14), self.h - self.S(14)
-        self.rrect(x1, y1, x2, y2, self.S(28), fill=WHITE, outline=WHITE)  # white sheet
+        self.draw_sheet(x1, y1, x2, y2)
         records = self.store.all()
         y = self._draw_summary_tiles(records, x1 + self.S(20), y1 + self.S(16), x2 - self.S(20))
         y = self._draw_filter_bar(x1 + self.S(20), y + self.S(14), x2 - self.S(20))
@@ -95,7 +95,7 @@ class PharmacistDashboardMixin:
             width = self.c.bbox(item)[2] - self.c.bbox(item)[0] + self.S(36) + (self.S(14) if name == "ACTIVE" else 0)
             self.c.delete(item)
             # Google-style filter chips: tinted when selected, outlined when not
-            self.rrect(x, y, x + width, y + self.S(44), self.S(22), fill=TONAL if selected else WHITE,
+            self.rrect(x, y, x + width, y + self.S(44), self.S(8), fill=TONAL if selected else WHITE,
                        outline=TONAL if selected else BORDER, width=self.S(1.4), tags=tag)
             self.text(x + width / 2 + (self.S(7) if name == "ACTIVE" else 0), y + self.S(22), label, 13,
                       NAVY if selected else TEXT_DARK, "bold", anchor="center", tag=tag)
@@ -115,7 +115,7 @@ class PharmacistDashboardMixin:
             width = self.c.bbox(item)[2] - self.c.bbox(item)[0] + self.S(40)
             self.c.delete(item)
             primary = key is None
-            self.rrect(right - width, y, right, y + self.S(44), self.S(22), fill=RED if primary else SURFACE_HIGH,
+            self.rrect(right - width, y, right, y + self.S(44), self.S(8), fill=RED if primary else SURFACE_HIGH,
                        outline=RED if primary else SURFACE_HIGH, tags=tag)
             self.text(right - width / 2, y + self.S(22), label, 13, WHITE if primary else NAVY, "bold", anchor="center", tag=tag)
             action = self.add_patient_profile if primary else (lambda k=key, v=value: self.set_dashboard_pref(**{k: v}))

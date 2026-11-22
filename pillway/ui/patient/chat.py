@@ -178,7 +178,7 @@ class ChatMixin:
         for index, option, dy, x, width in layout:
             tag = f"quick::{index}"
             top = y + dy + self.S(4)
-            self.rrect(x, top, x + width, top + self.S(48), self.S(24), fill=WHITE, outline=NAVY,
+            self.rrect(x, top, x + width, top + self.S(48), self.S(8), fill=WHITE, outline=NAVY,
                        width=self.S(1.6), tags=tag)
             self.text(x + width / 2, top + self.S(24), option, 15, NAVY, "bold", anchor="center", tag=tag)
             self.clickable(tag, lambda text=option: self.send_quick_reply(text))
@@ -186,16 +186,16 @@ class ChatMixin:
     def _draw_input(self, x1, x2, input_y, input_h):
         left, right = x1 + self.S(28), x2 - self.S(28)
         # Google-style search-bar message box: tinted pill, navy outline while typing
-        self.rrect(left, input_y, right, input_y + input_h, input_h / 2, fill=SURFACE_HIGH, outline=SURFACE_HIGH,
+        self.rrect(left, input_y, right, input_y + input_h, self.S(8), fill=SURFACE_HIGH, outline=BORDER,
                    width=self.S(2), tags="chat_input_box")
         entry = tk.Entry(self, relief="flat", bd=0, font=self.font(17), fg=TEXT_DARK, insertbackground=INK,
                          highlightthickness=0, bg=SURFACE_HIGH)
         entry.insert(0, self.chat_draft or self.chat_placeholder)
         if not self.chat_draft:
             entry.configure(fg=TEXT_MUTED)
-        entry.bind("<FocusIn>", lambda e: (self.c.itemconfigure("chat_input_box", outline=NAVY),
+        entry.bind("<FocusIn>", lambda e: (self.recolor("chat_input_box", outline=NAVY),
                                            self.chat_focus_in(e)))
-        entry.bind("<FocusOut>", lambda e: (self.c.itemconfigure("chat_input_box", outline=SURFACE_HIGH),
+        entry.bind("<FocusOut>", lambda e: (self.recolor("chat_input_box", outline=BORDER),
                                             self.chat_focus_out(e)))
         entry.bind("<Return>", self.send_chat_message)
         self.chat_entry = entry

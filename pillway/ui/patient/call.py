@@ -81,6 +81,8 @@ class CallMixin:
 
     def _draw_call_wave(self):
         state = self.call_state
+        if "wave_center" not in state:  # the call screen hasn't been laid out yet
+            return
         cx, cy = state["wave_center"]
         radius = state["wave_radius"]
         level = 0.0 if state.get("muted") else state.get("level", 0.0)
@@ -181,16 +183,16 @@ class CallMixin:
         self.c.tag_bind(
             tag, "<Enter>",
             lambda *_: (
-                self.c.itemconfigure(background_tag, fill=HOVER),
-                self.c.itemconfigure(f"{tag}_icon", fill=ORANGE),
+                self.recolor(background_tag, fill=HOVER),
+                self.recolor(f"{tag}_icon", fill=ORANGE),
             ),
             add="+",
         )
         self.c.tag_bind(
             tag, "<Leave>",
             lambda *_: (
-                self.c.itemconfigure(background_tag, fill=fill),
-                self.c.itemconfigure(f"{tag}_icon", fill=icon_color),
+                self.recolor(background_tag, fill=fill),
+                self.recolor(f"{tag}_icon", fill=icon_color),
             ),
             add="+",
         )

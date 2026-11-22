@@ -8,9 +8,12 @@ from ..theme import (
     BORDER_SOFT,
     HOVER,
     INK,
+    NAVY,
     PAGE_BG,
     RED,
     SHADOW,
+    SOFT_BLUE,
+    TEXT_DARK,
     TEXT_MUTED,
     WHITE,
 )
@@ -155,126 +158,62 @@ class ManageProfilesMixin:
         )
 
     def _draw_profile_card(self, parent, profile):
-        height = max(1, int(self.S(156)))
-        card = tk.Canvas(parent, bg=PAGE_BG, bd=0, highlightthickness=0, height=height)
+        """One account card: initials badge, name and description, Switch button, and a ⋮ menu."""
+        current = profile["id"] == self.active_profile_id
+        card = tk.Frame(parent, bg=WHITE, bd=0, highlightthickness=1, highlightbackground=BORDER,
+                        padx=self.S(18), pady=self.S(14))
         card.pack(fill="x", pady=(0, self.S(10)))
-        content = tk.Frame(card, bg=WHITE, padx=self.S(16), pady=self.S(12))
-        window = card.create_window(self.S(14), self.S(10), window=content, anchor="nw")
+        name = profile.get("name", "Account")
+        badge = "".join(part[:1] for part in name.split()[:2]).upper() or "?"
+        tk.Label(card, text=badge, bg=NAVY, fg=WHITE, font=self.font(14, "bold"), width=3,
+                 pady=self.S(6)).pack(side="left", padx=(0, self.S(14)))
+        details = tk.Frame(card, bg=WHITE)
+        details.pack(side="left", fill="x", expand=True)
+        tk.Label(details, text=name, bg=WHITE, fg=INK, font=self.font(16, "bold"), anchor="w").pack(fill="x")
+        tk.Label(details, text=profile.get("description", ""), bg=WHITE, fg=TEXT_MUTED, font=self.font(13),
+                 anchor="w", justify="left", wraplength=max(200, int(self.S(620)))).pack(fill="x", pady=(self.S(2), 0))
 
-        def rounded(width, item_height, offset=0):
-            radius = self.S(16)
-            top = self.S(3) + offset
-            left, right = self.S(4), width - self.S(4)
-            bottom = item_height - self.S(4) + offset
-            return [
-                left + radius, top, right - radius, top, right, top, right, top + radius,
-                right, bottom - radius, right, bottom, right - radius, bottom,
-                left + radius, bottom, left, bottom, left, bottom - radius, left, top + radius,
-                left, top,
-            ]
+        self._dots_button(card, lambda widget, pid=profile["id"]: self._show_profile_actions(pid, widget)).pack(
+            side="right", padx=(self.S(8), 0))
+        if current:
+            tk.Label(card, text="Current profile", bg=SOFT_BLUE, fg=INK, font=self.font(12, "bold"),
+                     padx=self.S(10), pady=self.S(6)).pack(side="right")
+        else:
+            switch = tk.Label(card, text="Switch profile", bg=RED, fg=WHITE, font=self.font(13, "bold"),
+                              padx=self.S(14), pady=self.S(8), cursor="hand2")
+            switch.pack(side="right")
+            switch.bind("<Button-1>", lambda _e, pid=profile["id"]: self.switch_profile(pid))
+            switch.bind("<Enter>", lambda _e: switch.configure(bg="#c7361f"))
+            switch.bind("<Leave>", lambda _e: switch.configure(bg=RED))
 
-        shadow = card.create_polygon(
-            *rounded(800, height, self.S(3)), smooth=True, fill=SHADOW, outline=""
-        )
-        surface = card.create_polygon(
-            *rounded(800, height), smooth=True, fill=WHITE, outline=BORDER_SOFT, width=1
-        )
-        card.tag_lower(shadow)
-        card.tag_lower(surface)
-
-        def resize(event):
-            card.coords(shadow, *rounded(event.width, height, self.S(3)))
-            card.coords(surface, *rounded(event.width, height))
-            card.itemconfigure(window, width=max(1, event.width - self.S(28)))
-
-        card.bind("<Configure>", resize, add="+")
-        details = tk.Frame(content, bg=WHITE)
-        details.pack(fill="x")
-        tk.Label(details, text=profile["name"], bg=WHITE, fg=INK,
-                 font=self.font(16, "bold"), anchor="w").pack(side="left")
-        if profile["id"] == self.active_profile_id:
-            tk.Label(details, text="Current profile", bg="#f5f6f8", fg=TEXT_MUTED,
-                     font=self.font(10, "bold"), padx=self.S(9), pady=self.S(4)).pack(side="right")
-        tk.Label(content, text=profile.get("description", ""), bg=WHITE, fg=TEXT_MUTED,
-                 font=self.font(11), anchor="w", wraplength=max(200, int(self.S(700)))).pack(
-                     fill="x", pady=(self.S(5), self.S(12)))
-        actions = tk.Frame(content, bg=WHITE)
-        actions.pack(fill="x")
-        tk.Button(
-            actions, text="Switch profile",
-            command=lambda selected=profile["id"]: self.switch_profile(selected),
-            state="disabled" if profile["id"] == self.active_profile_id else "normal",
-            bg="#fff0ed", fg=RED, activebackground="#ffe5df",
-            relief="flat", bd=0, font=self.font(11, "bold"), cursor="hand2",
-            padx=self.S(14), pady=self.S(8),
-        ).pack(side="right")
-        menu_button = tk.Button(
-            actions, text="⋯", command=lambda selected=profile["id"]:
-            self._show_profile_actions(selected, menu_button),
-            bg=WHITE, fg=INK, activebackground="#f5f6f8",
-            relief="flat", bd=0, highlightthickness=1,
-            highlightbackground=BORDER_SOFT, font=self.font(18, "bold"), cursor="hand2",
-            padx=self.S(10), pady=self.S(3),
-        )
-        menu_button.pack(side="right", padx=(0, self.S(8)))
-
-        def set_hover(active):
-            color = HOVER if active else WHITE
-            card.itemconfigure(surface, fill=color)
-            self._set_profile_card_color(content, color)
-
-        def switch_from_card(_event=None):
-            if profile["id"] != self.active_profile_id:
-                self.switch_profile(profile["id"])
-            return "break"
-
-        def bind_card(widget):
-            if isinstance(widget, tk.Button):
-                widget.bind("<Enter>", lambda *_: set_hover(True), add="+")
-                widget.bind("<Leave>", lambda *_: set_hover(False), add="+")
-                return
-            widget.bind("<Enter>", lambda *_: set_hover(True), add="+")
-            widget.bind("<Leave>", lambda *_: set_hover(False), add="+")
-            widget.bind("<Button-1>", switch_from_card, add="+")
-            for child in widget.winfo_children():
-                bind_card(child)
-
-        bind_card(card)
-        card.bind("<Enter>", lambda *_: set_hover(True), add="+")
-        card.bind("<Leave>", lambda *_: set_hover(False), add="+")
-
-    def _set_profile_card_color(self, widget, color):
-        try:
-            widget.configure(bg=color)
-        except tk.TclError:
-            return
-        for child in widget.winfo_children():
-            if not isinstance(child, tk.Button):
-                self._set_profile_card_color(child, color)
+    def _dots_button(self, parent, on_click, bg=WHITE):
+        """A ⋮ button (three round dots). A faint grey circle appears behind it on hover."""
+        size = max(28, int(self.S(38)))
+        canvas = tk.Canvas(parent, width=size, height=size, bg=bg, highlightthickness=0, bd=0, cursor="hand2")
+        circle = self.circle(canvas, 1, 1, size - 1, size - 1, fill=bg, tags="halo")
+        r = max(1.6, self.S(2.4))
+        for dy in (-self.S(7), 0, self.S(7)):
+            cy = size / 2 + dy
+            self.circle(canvas, size / 2 - r, cy - r, size / 2 + r, cy + r, fill=INK)
+        canvas.bind("<Enter>", lambda _e: self.recolor("halo", fill="#e8e9ee", canvas=canvas))
+        canvas.bind("<Leave>", lambda _e: self.recolor("halo", fill=bg, canvas=canvas))
+        canvas.bind("<Button-1>", lambda _e: (on_click(canvas), "break")[1])
+        return canvas
 
     def _show_profile_actions(self, profile_id, button):
+        """The ⋮ menu: Edit and Delete only (switching is the card's own button)."""
         profile = self.profiles[profile_id]
         role_count = sum(item["role"] == profile["role"] for item in self.profiles.values())
         items = []
         if profile["role"] == "Patient":
-            items.append(
-                ("Edit profile", lambda: self.edit_profile(profile_id), INK)
-            )
-        items.append(
-            ("Switch profile",
-             lambda: self.switch_profile(profile_id)
-             if profile_id != self.active_profile_id else None,
-             INK if profile_id != self.active_profile_id else TEXT_MUTED)
-        )
-        items.append(
-            ("Delete profile",
-             lambda: self.delete_profile(profile_id) if role_count > 1 else None,
-             RED if role_count > 1 else TEXT_MUTED)
-        )
+            items.append(("Edit profile", lambda: self.edit_profile(profile_id), INK))
+        items.append(("Delete profile",
+                      (lambda: self.delete_profile(profile_id)) if role_count > 1 else None,
+                      RED if role_count > 1 else TEXT_MUTED))
         width = int(self.S(220))
         x = button.winfo_rootx() + button.winfo_width() - width
-        y = button.winfo_rooty() + button.winfo_height()
-        self._show_branded_menu(x, y, items, width=width, row_height=int(self.S(46)))
+        y = button.winfo_rooty() + button.winfo_height() + int(self.S(4))
+        self._show_branded_menu(x, y, items, width=width)
 
     def edit_profile(self, profile_id):
         if profile_id not in self.profiles:
@@ -321,9 +260,17 @@ class ManageProfilesMixin:
         page_index = min(max(getattr(self, "profile_page_index", 0), 0), len(PROFILE_PAGES) - 1)
         self.profile_page_index = page_index
         title, fields = PROFILE_PAGES[page_index]
-        page = tk.Frame(panel_body, bg=WHITE, bd=0, highlightthickness=1,
+        # The page sits in a clipping "viewport" so it can slide sideways (smooth swipe).
+        viewport = tk.Frame(panel_body, bg=WHITE, bd=0, highlightthickness=0)
+        viewport.pack(fill="both", expand=True)
+        page = tk.Frame(viewport, bg=WHITE, bd=0, highlightthickness=1,
                         highlightbackground=BORDER, padx=self.S(22), pady=self.S(18))
-        page.pack(fill="both", expand=True)
+        slide_from = getattr(self, "_profile_slide_in", 0)
+        self._profile_slide_in = 0
+        page.place(x=0, y=0, relwidth=1, relheight=1)
+        self._profile_viewport, self._profile_page_frame = viewport, page
+        if slide_from:  # arriving from a swipe: glide in from that side
+            self.after(10, lambda: self._slide_profile_page(slide_from, 0, None))
         tk.Label(page, text=title, bg=WHITE, fg=INK,
                  font=self.font(17, "bold"), anchor="w").pack(fill="x", pady=(0, self.S(5)))
         tk.Label(page, text=f"Section {page_index + 1} of {len(PROFILE_PAGES)}",
@@ -420,30 +367,90 @@ class ManageProfilesMixin:
         self._profile_record_id = record_id
         return variables
 
-    def _set_profile_page(self, page_index):
-        self.profile_page_index = min(max(page_index, 0), len(PROFILE_PAGES) - 1)
+    def _set_profile_page(self, page_index, animate=True):
+        """Go to another section. With animate, the current page slides out and the new one in."""
+        page_index = min(max(page_index, 0), len(PROFILE_PAGES) - 1)
+        current = getattr(self, "profile_page_index", 0)
+        frame = getattr(self, "_profile_page_frame", None)
+        if animate and page_index != current and frame is not None and frame.winfo_exists():
+            direction = -1 if page_index > current else 1      # next page: slide left
+            width = max(1, self._profile_viewport.winfo_width())
+            start = getattr(self, "_profile_drag_dx", 0)
+
+            def arrive():
+                self.profile_page_index = page_index
+                self._profile_slide_in = -direction * width    # new page enters from the other side
+                self.render()
+            self._slide_profile_page(start, direction * width, arrive)
+            return
+        self.profile_page_index = page_index
         self.render()
 
+    def _slide_profile_page(self, start, end, done, duration=0.18):
+        """Ease the page from x=start to x=end (pixels), then call done()."""
+        import time
+        frame = getattr(self, "_profile_page_frame", None)
+        if frame is None or not frame.winfo_exists():
+            if done:
+                done()
+            return
+        began = time.monotonic()
+
+        def step():
+            if not frame.winfo_exists():
+                return
+            t = min(1.0, (time.monotonic() - began) / duration)
+            eased = 1 - (1 - t) ** 3
+            frame.place_configure(x=int(start + (end - start) * eased))
+            if t < 1:
+                self.after(12, step)
+            else:
+                self._profile_drag_dx = 0
+                if done:
+                    done()
+        step()
+
     def _bind_profile_swipe(self, widget):
+        if isinstance(widget, (tk.Entry, tk.Text)):  # dragging in a text box selects text instead
+            return
         widget.bind("<ButtonPress-1>", self._profile_swipe_start, add="+")
+        widget.bind("<B1-Motion>", self._profile_swipe_move, add="+")
         widget.bind("<ButtonRelease-1>", self._profile_swipe_end, add="+")
         for child in widget.winfo_children():
             self._bind_profile_swipe(child)
 
     def _profile_swipe_start(self, event):
         self._profile_swipe_origin = (event.x_root, event.y_root)
+        self._profile_drag_dx = 0
+
+    def _profile_swipe_move(self, event):
+        """While dragging sideways, the page follows the pointer (reveals the next page gradually)."""
+        origin = getattr(self, "_profile_swipe_origin", None)
+        frame = getattr(self, "_profile_page_frame", None)
+        if not origin or frame is None or not frame.winfo_exists():
+            return
+        dx, dy = event.x_root - origin[0], event.y_root - origin[1]
+        if abs(dx) < self.S(8) or abs(dx) < abs(dy):
+            return
+        at_edge = (dx > 0 and self.profile_page_index == 0) or (
+            dx < 0 and self.profile_page_index == len(PROFILE_PAGES) - 1)
+        if at_edge:
+            dx = dx / 4  # resist past the first/last section
+        self._profile_drag_dx = dx
+        frame.place_configure(x=int(dx))
 
     def _profile_swipe_end(self, event):
         origin = getattr(self, "_profile_swipe_origin", None)
         self._profile_swipe_origin = None
         if not origin:
             return
-        dx, dy = event.x_root - origin[0], event.y_root - origin[1]
-        if abs(dx) < self.S(60) or abs(dx) < abs(dy) * 1.3:
-            return
+        dx = getattr(self, "_profile_drag_dx", 0)
         page = self.profile_page_index + (1 if dx < 0 else -1)
-        if 0 <= page < len(PROFILE_PAGES):
+        if abs(dx) >= self.S(80) and 0 <= page < len(PROFILE_PAGES):
             self._set_profile_page(page)
+            return "break"
+        if dx:  # not far enough: spring back
+            self._slide_profile_page(dx, 0, None, duration=0.15)
             return "break"
 
     def _profile_field(self, parent, label, variable, kind):

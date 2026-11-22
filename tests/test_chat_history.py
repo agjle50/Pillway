@@ -14,13 +14,13 @@ class ChatHistoryStoreTests(unittest.TestCase):
             logs = store.load()
             timestamp = local_timestamp()
             self.assertIsNotNone(datetime.fromisoformat(timestamp).utcoffset())
-            logs["patient"].append(("Juliez", "Patient-only message", timestamp))
+            logs["patient"].append(("Sarah", "Patient-only message", timestamp))
             logs["doctor"].append(("Doctor workspace", "Doctor-only message"))
             store.save(logs)
 
             restored = ChatHistoryStore(("patient", "doctor"), path).load()
 
-        self.assertEqual(restored["patient"], [("Juliez", "Patient-only message", timestamp)])
+        self.assertEqual(restored["patient"], [("Sarah", "Patient-only message", timestamp)])
         self.assertEqual(restored["doctor"], [("Doctor workspace", "Doctor-only message", None)])
 
     def test_legacy_sarah_sender_is_migrated_without_changing_message_text(self):
@@ -34,7 +34,7 @@ class ChatHistoryStoreTests(unittest.TestCase):
 
             restored = ChatHistoryStore(("patient",), path).load()
 
-        self.assertEqual(restored["patient"], [("Juliez", "Sarah said hello", None)])
+        self.assertEqual(restored["patient"], [("Sarah", "Sarah said hello", None)])
 
     def test_chat_time_uses_local_device_date(self):
         now = datetime.now().astimezone().replace(hour=12, minute=0, second=0, microsecond=0)

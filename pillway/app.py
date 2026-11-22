@@ -22,6 +22,7 @@ from .storage.profile_store import ProfileStore
 from .ui.canvas_helpers import CanvasHelpersMixin
 from .ui.components.buttons import ButtonsMixin
 from .ui.components.dropdown import DropdownMixin
+from .ui.components import smooth
 from .ui.components.icons import IconMixin
 from .ui.components.scroll_area import ScrollAreaMixin
 from .ui.i18n import I18nMixin
@@ -62,7 +63,9 @@ from .ui import theme
 
 
 def enable_high_dpi():
-    """Keep every Tk canvas primitive at the screen's physical resolution."""
+    """Keep every Tk canvas primitive at the screen's physical resolution, and load our font."""
+    from .ui.theme import load_bundled_fonts
+    load_bundled_fonts()
     if sys.platform != "win32":
         return
     try:
@@ -124,6 +127,17 @@ class PillwayApp(
         self.dropdown = None              # None | "notifications" | "profile"
         self.dropdown_frame = None
         self.dropdown_menu = None
+        self._branded_menu_window = None   # the open in-window menu, if any
+        self.dropdown_window = None
+        self._popover_kind = None
+        self._popover_opened_now = False
+        self._popover_bindings = False
+        self.profile_edit_vars = {}         # unsaved edits in the profile editor
+        self.profile_page_index = 0
+        self._profile_page_frame = self._profile_viewport = None
+        self._profile_slide_in = 0
+        self._profile_drag_dx = 0
+        self._profile_swipe_origin = None
         self._chat_toast_x = self._chat_toast_y = None
         self._toast_token = 0
         self.notification_prefs = {}      # Settings > Notifications switches (this session only)
@@ -262,6 +276,7 @@ class PillwayApp(
         self.chat_focus_requested = False
         self._clear_embedded_widgets()
         self.c.delete("all")
+        smooth.forget(self.c)
         w, h = max(self.c.winfo_width(), 1), max(self.c.winfo_height(), 1)
         self.w, self.h = w, h
         self.s = min(w / BASE_W, h / BASE_H)
@@ -282,7 +297,7 @@ class PillwayApp(
                 self.draw_dashboard()
         else:
             # every other page sits on the same white sheet as the dashboard
-            self.rrect(*self.panel_box(), self.S(28), fill=WHITE, outline=WHITE)
+            self.draw_sheet(*self.panel_box())
         if self.section == "Dashboard":
             pass
         elif self.section == "Settings":
@@ -299,6 +314,9 @@ class PillwayApp(
             self.draw_placeholder_page(self.section)
         if self.toast:
             self.draw_toast()
+        if self.lang == "fr" and self.role == "patient":
+            self.translate_screen()
+        self.lift_popover()
         if self.dropdown:
             self.draw_dropdown()
         if restore_chat_focus and self.chat_open and self.chat_entry:
@@ -332,6 +350,10 @@ class PillwayApp(
 
     def toggle_dropdown(self, which):
         self.dropdown = None
+        menu_open = getattr(self, "_branded_menu_window", None) is not None
+        if menu_open and getattr(self, "_popover_kind", None) == which:  # second click closes it
+            self._close_branded_menu()
+            return
         if which is None:
             self.render()
         else:

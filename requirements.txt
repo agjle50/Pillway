@@ -6,6 +6,9 @@ anthropic==2.12.0
 # Reads the optional .env file with your API key
 python-dotenv==1.2.1
 
+# Crisp, smooth corners, circles and icons (the app still runs without it, just less sharp)
+Pillow>=10.0
+
 # Read-aloud (optional: falls back to the computer's own speech, then to a friendly message)
 pyttsx3==2.99
 

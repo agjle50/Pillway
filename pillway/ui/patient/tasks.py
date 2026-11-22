@@ -100,7 +100,7 @@ class TasksMixin:
             next_x = starting_x + (target_x - starting_x) * eased
             self.c.move(knob_tag, next_x - current_x[0], 0)
             current_x[0] = next_x
-            self.c.itemconfigure(track_tag, fill=self._blend_color(
+            self.recolor(track_tag, fill=self._blend_color(
                 start_color, target_color, eased,
             ))
             self.c.itemconfigure(f"task_time::{i}", fill=INK if is_on else TEXT_OFF)
@@ -111,6 +111,6 @@ class TasksMixin:
             if progress < 1:
                 self._task_toggle_jobs[i] = self.after(16, animate_toggle)
             else:
-                self.c.itemconfigure(track_tag, fill=target_color)
+                self.recolor(track_tag, fill=target_color)
 
         animate_toggle()

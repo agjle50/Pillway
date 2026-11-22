@@ -168,13 +168,14 @@ check_in_messages_file = "data/check_in_messages.json"
 app_name = "Pillway"
 assistant_name = "Sarah"
 pharmacy_name = "Pillway"
-navy = "#0a0f42"
-navy_dark = "#080c38"
-red = "#ef3f3f"
+# Colours taken from Pillway's own site.
+navy = "#060725"
+navy_dark = "#060725"
+red = "#e3432a"
 # Text colours meet WCAG AA contrast (4.5:1+) on white and on the light page background.
-text_dark = "#1f2a44"
-text_muted = "#4f5a70"
-border = "#c9d0dc"
+text_dark = "#4e4f66"
+text_muted = "#65667b"
+border = "#dedee2"
 logo_path = ""
 
 

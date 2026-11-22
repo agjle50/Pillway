@@ -66,13 +66,16 @@ class ScrollAreaMixin:
     # ---- drawing on any canvas ------------------------------------------------------------
 
     def rr(self, canvas, x1, y1, x2, y2, r, **kw):
+        return self.round_box(canvas, x1, y1, x2, y2, r, **kw)
+
+    def _unused_old_rr(self, canvas, x1, y1, x2, y2, r, **kw):
         r = max(0, min(r, (x2 - x1) / 2, (y2 - y1) / 2))
         pts = [x1 + r, y1, x2 - r, y1, x2, y1, x2, y1 + r, x2, y2 - r, x2, y2,
                x2 - r, y2, x1 + r, y2, x1, y2, x1, y2 - r, x1, y1 + r, x1, y1]
         return canvas.create_polygon(pts, smooth=True, **kw)
 
     def tx(self, canvas, x, y, text, size, color=TEXT_DARK, weight="normal", anchor="nw", width=None, tag=None):
-        options = {"text": text, "fill": color, "anchor": anchor, "font": self.font(size, weight)}
+        options = {"text": self.tr(text), "fill": color, "anchor": anchor, "font": self.font(size, weight)}
         if width:
             options["width"] = max(1, width)
         if tag:
@@ -86,13 +89,14 @@ class ScrollAreaMixin:
     def btn(self, canvas, x1, y1, label, func, kind="ghost", tag=None, size=12, min_w=0, height=None):
         """Draw a button starting at (x1, y1). Returns its right edge x."""
         fill, ink, outline = BUTTON_STYLES[kind]
+        label = self.tr(label)
         tag = safe_tag(tag or f"btn::{id(func)}::{label}::{x1:.0f}::{y1:.0f}")
         height = height or self.S(38)
         probe = canvas.create_text(0, -1000, text=label, font=self.font(size, "bold"))
         box = canvas.bbox(probe)
         canvas.delete(probe)
         width = max(min_w, (box[2] - box[0]) + self.S(28) if box else self.S(100))
-        self.rr(canvas, x1, y1, x1 + width, y1 + height, height / 2, fill=fill, outline=outline,
+        self.rr(canvas, x1, y1, x1 + width, y1 + height, self.S(8), fill=fill, outline=outline,
                 width=max(1, self.S(1.3)), tags=tag)
         canvas.create_text(x1 + width / 2, y1 + height / 2, text=label, fill=ink, font=self.font(size, "bold"), tags=tag)
         self.bind_click(canvas, tag, func)
@@ -124,7 +128,7 @@ class ScrollAreaMixin:
         chat_y = self._chat_toast_y
         if self.chat_open and chat_y is not None:
             cx, y = self._chat_toast_x, chat_y
-        item = self.c.create_text(cx, y, text=self.toast, fill=WHITE, font=self.font(13, "bold"), tags="toast")
+        item = self.c.create_text(cx, y, text=self.tr(self.toast), fill=WHITE, font=self.font(13, "bold"), tags="toast")
         box = self.c.bbox(item)
         pad = self.S(16)
         self.rrect(box[0] - pad, box[1] - self.S(8), box[2] + pad, box[3] + self.S(8), self.S(14),

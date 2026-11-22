@@ -12,7 +12,7 @@ class MedicalRobotTests(unittest.TestCase):
     def test_greeting_is_warm_and_asks_how_patient_feels(self):
         greeting = self.robot.greeting(datetime(2026, 1, 1, 9))
         self.assertIn("Good morning", greeting)
-        self.assertIn("Juliez", greeting)
+        self.assertIn("Sarah", greeting)
         self.assertIn("diabetes and hypertension", greeting)
         self.assertIn("anything changed", greeting)
 

@@ -1,10 +1,10 @@
-"""The notifications and account menus under the header."""
+"""The account and notifications menus, and the shared in-window menu (popover)."""
 
 import tkinter as tk
 
 from ...storage.patient_store import display_name
 from ..patient.manage_profiles import profile_completion
-from ..theme import BORDER, BORDER_SOFT, HOVER, INK, PAGE_BG, RED, SHADOW, TEXT_DARK, TEXT_MUTED, WHITE
+from ..theme import BORDER, BORDER_SOFT, HOVER, INK, NAVY, RED, TEXT_DARK, TEXT_MUTED, WHITE
 
 
 class DropdownMixin:
@@ -41,262 +41,195 @@ class DropdownMixin:
         return ("Pharmacist" if self.role == "pharmacist" else display_name(self.record or {"id": "Patient"})), items
 
     def show_menu(self, which):
-        """Open the account or branded notifications popover."""
+        """Open the account menu or the notifications menu (both inside the app window)."""
         if which == "profile":
             self._show_profile_menu()
+            self._popover_kind = which
             return
         self.dropdown = which
         title, items = self.dropdown_items()
         self.dropdown = None
+        width = int(self.S(360))
         anchor_x, anchor_y = self.bell_box
-        width = int(self.S(340))
-        x = self.winfo_rootx() + int(anchor_x) - width + int(self.S(28))
-        y = self.winfo_rooty() + int(anchor_y) + int(self.S(8))
-        menu_items = [
-            (head, action, TEXT_MUTED if action is None else INK, sub)
-            for head, sub, action in items
-        ]
-        self._show_branded_menu(x, y, menu_items, title=title, width=width)
+        menu_items = [(head, action, TEXT_MUTED if action is None else INK, sub) for head, sub, action in items]
+        self._show_branded_menu(self.winfo_rootx() + int(anchor_x + self.S(44)) - width,
+                                self.winfo_rooty() + int(anchor_y + self.S(8)), menu_items, title=title, width=width)
+        self._popover_kind = which
 
     @staticmethod
     def _notification_time(value):
         value = str(value or "")
         return value[11:16] if len(value) >= 16 else value
 
-    def _show_branded_menu(self, x, y, items, title=None, width=None, row_height=None):
+    # ---- the shared popover ---------------------------------------------------------------
+
+    def _open_popover(self, x, y, width):
+        """Create an empty menu panel at screen point (x, y), kept inside the app window.
+
+        BUG FIX: menus used to be separate windows (Toplevel / tk.Menu), so they could hang
+        outside the app and showed up as extra windows. This is a frame INSIDE the window.
+        """
         self._close_branded_menu()
-        self._close_profile_menu()
-        width = int(width or self.S(280))
-        row_height = int(row_height or self.S(48))
-        title_height = int(self.S(46)) if title else 0
-        content_height = title_height + row_height * len(items) + self.S(12)
-        height = min(int(content_height), self.winfo_screenheight() - int(self.S(28)))
-        x = max(0, min(int(x), self.winfo_screenwidth() - width))
-        y = max(0, min(int(y), self.winfo_screenheight() - height))
+        frame = tk.Frame(self, bg=WHITE, bd=0, highlightthickness=1, highlightbackground=BORDER)
+        frame._pillway_anchor = (x - self.winfo_rootx(), y - self.winfo_rooty(), int(width))
+        self._branded_menu_window = frame
+        self.dropdown_window = frame
+        if not getattr(self, "_popover_bindings", False):
+            self.bind_all("<Button-1>", self._close_branded_menu_on_outside, add="+")
+            self.bind_all("<Escape>", lambda _e: self._close_branded_menu(), add="+")
+            self._popover_bindings = True
+        self._popover_opened_now = True
+        self.after_idle(lambda: setattr(self, "_popover_opened_now", False))
+        return frame
 
-        shadow = tk.Toplevel(self)
-        self._branded_menu_shadow = shadow
-        shadow.overrideredirect(True)
-        shadow.configure(bg=SHADOW)
-        try:
-            shadow.attributes("-alpha", 0.1)
-        except tk.TclError:
-            pass
-        shadow.geometry(f"{width}x{height}+{x + self.S(3):.0f}+{y + self.S(4):.0f}")
+    def _place_popover(self, frame):
+        """Place the finished panel, clamped so it never goes past the window's edges."""
+        lx, ly, width = frame._pillway_anchor
+        frame.update_idletasks()
+        height = frame.winfo_reqheight()
+        win_w, win_h = max(self.winfo_width(), width + 16), max(self.winfo_height(), 200)
+        lx = max(8, min(lx, win_w - width - 8))
+        if ly + height > win_h - 8:
+            ly = max(8, win_h - height - 8)
+        frame.place(x=lx, y=ly, width=width)
+        frame.lift()
 
-        window = tk.Toplevel(self)
-        self._branded_menu_window = window
-        window.overrideredirect(True)
-        window.configure(bg=PAGE_BG)
-        window.geometry(f"{width}x{height}+{x}+{y}")
-        panel = tk.Canvas(window, width=width, height=height, bg=PAGE_BG,
-                          bd=0, highlightthickness=0)
-        panel.pack(fill="both", expand=True)
-        radius, inset = self.S(14), self.S(4)
-        panel.create_polygon(
-            inset + radius, inset, width - inset - radius, inset,
-            width - inset, inset, width - inset, inset + radius,
-            width - inset, height - inset - radius, width - inset, height - inset,
-            width - inset - radius, height - inset, inset + radius, height - inset,
-            inset, height - inset, inset, height - inset - radius,
-            inset, inset + radius, inset, inset,
-            smooth=True, fill=WHITE, outline=BORDER_SOFT, width=1,
-        )
-        body = tk.Frame(panel, bg=WHITE, padx=self.S(6), pady=self.S(6))
-        panel.create_window(inset, inset, window=body, anchor="nw",
-                            width=width - inset * 2, height=height - inset * 2)
+    def lift_popover(self):
+        """Keep an open menu above widgets that were rebuilt by a redraw."""
+        frame = getattr(self, "_branded_menu_window", None)
+        if frame is not None and frame.winfo_exists():
+            frame.lift()
+
+    def _menu_row(self, parent, label, action, color=INK, sub="", badge=None, selected=False):
+        """One menu row: grey on hover, runs `action` when clicked (disabled if action is None)."""
+        row = tk.Frame(parent, bg=WHITE, padx=self.S(16), pady=self.S(11), cursor="hand2" if action else "arrow")
+        row.pack(fill="x")
+        parts = [row]
+        if badge:
+            tile = tk.Label(row, text=badge, bg=NAVY, fg=WHITE, font=self.font(12, "bold"),
+                            width=3, padx=self.S(2), pady=self.S(3))
+            tile.pack(side="left", padx=(0, self.S(12)))
+        text_box = tk.Frame(row, bg=WHITE)
+        text_box.pack(side="left", fill="x", expand=True)
+        parts.append(text_box)
+        main = tk.Label(text_box, text=self.tr(label), bg=WHITE, fg=color, anchor="w", justify="left",
+                        font=self.font(14, "bold" if selected else "normal"))
+        main.pack(fill="x")
+        parts.append(main)
+        if sub:
+            detail = tk.Label(text_box, text=self.tr(sub), bg=WHITE, fg=TEXT_MUTED, anchor="w", justify="left",
+                              font=self.font(12), wraplength=max(120, int(self.S(280))))
+            detail.pack(fill="x")
+            parts.append(detail)
+        if selected:
+            mark = tk.Label(row, text="\u2713", bg=WHITE, fg=RED, font=self.font(14, "bold"))
+            mark.pack(side="right")
+            parts.append(mark)
+        if action is None:
+            return row
+
+        def shade(colour):
+            for part in parts:
+                part.configure(bg=colour)
+        for part in parts:
+            part.bind("<Enter>", lambda _e: shade(HOVER), add="+")
+            part.bind("<Leave>", lambda _e: shade(WHITE), add="+")
+            part.bind("<Button-1>", lambda _e: self._dropdown_choose(action), add="+")
+        return row
+
+    def _menu_separator(self, parent):
+        tk.Frame(parent, bg=BORDER_SOFT, height=max(1, int(self.S(1)))).pack(fill="x")
+
+    def _show_branded_menu(self, x, y, items, title=None, width=None, row_height=None):
+        """A simple list menu at screen point (x, y). items: (label, action, colour[, subtitle])."""
+        frame = self._open_popover(x, y, width or self.S(260))
         if title:
-            tk.Label(body, text=title, bg=WHITE, fg=TEXT_DARK,
-                     font=self.font(12, "bold"), anchor="w",
-                     padx=self.S(12)).pack(fill="x", ipady=self.S(8))
-            tk.Frame(body, bg=BORDER_SOFT, height=1).pack(fill="x")
-        for label, action, color, *subtitles in items:
-            display = label if not subtitles or not subtitles[0] else f"{label}    {subtitles[0]}"
-            button = tk.Button(
-                body, text=display, command=lambda selected=action: self._dropdown_choose(selected),
-                bg=WHITE, fg=color, activebackground=HOVER, activeforeground=color,
-                relief="flat", bd=0, anchor="w", justify="left",
-                font=self.font(11), padx=self.S(12), pady=self.S(10),
-                cursor="hand2" if action else "arrow",
-                state="normal" if action else "disabled",
-            )
-            button.pack(fill="x")
-            button.bind("<Enter>", lambda _event, b=button: b.configure(bg=HOVER), add="+")
-            button.bind("<Leave>", lambda _event, b=button: b.configure(bg=WHITE), add="+")
-        window.bind("<Escape>", lambda _event: self._close_branded_menu())
-        shadow.lift()
-        window.lift()
-        if not getattr(self, "_branded_menu_click_binding", None):
-            self._branded_menu_click_binding = self.bind_all(
-                "<Button-1>", self._close_branded_menu_on_outside, add="+"
-            )
-
-    def _close_branded_menu(self):
-        for name in ("_branded_menu_window", "_branded_menu_shadow"):
-            window = getattr(self, name, None)
-            setattr(self, name, None)
-            if window and window.winfo_exists():
-                window.destroy()
-
-    def _close_branded_menu_on_outside(self, event=None):
-        window = getattr(self, "_branded_menu_window", None)
-        if not window or not window.winfo_exists() or event is None:
-            return
-        path = str(event.widget)
-        if path != str(window) and not path.startswith(str(window) + "."):
-            self._close_branded_menu()
+            tk.Label(frame, text=self.tr(title), bg=WHITE, fg=TEXT_DARK, font=self.font(14, "bold"), anchor="w",
+                     padx=self.S(16), pady=self.S(10)).pack(fill="x")
+            self._menu_separator(frame)
+        for label, action, color, *rest in items:
+            self._menu_row(frame, label, action, color, sub=rest[0] if rest else "")
+        self._place_popover(frame)
 
     def _show_profile_menu(self):
-        self._close_branded_menu()
-        self._close_profile_menu()
-        self.dropdown = None
-        width, height = int(self.S(390)), int(self.S(430))
+        """Account menu: profile progress, Settings, EVERY account (click to switch), Manage, Log out."""
+        width = int(self.S(330))
+        x = self.winfo_rootx() + int(self.w - self.S(14)) - width
+        y = self.winfo_rooty() + int(self.profile_box[1] + self.S(8))
+        frame = self._open_popover(x, y, width)
+
         patient_id = self.patient_id if self.role == "patient" else self.selected_patient_id
-        record = self.store.load(patient_id)
-        progress = profile_completion(record)
-        name = display_name(record)
-
-        x = self.winfo_screenwidth() - width - int(self.S(14))
-        y = self.winfo_rooty() + int(self.profile_box[1]) + int(self.S(8))
-        x = max(0, min(x, self.winfo_screenwidth() - width))
-        y = max(0, min(y, self.winfo_screenheight() - height))
-
-        shadow = tk.Toplevel(self)
-        self.dropdown_shadow = shadow
-        shadow.overrideredirect(True)
-        shadow.configure(bg=SHADOW)
-        try:
-            shadow.attributes("-alpha", 0.1)
-        except tk.TclError:
-            pass
-        shadow.geometry(f"{width}x1+{x + int(self.S(3))}+{y + int(self.S(4))}")
-
-        window = tk.Toplevel(self)
-        self.dropdown_window = window
-        window.overrideredirect(True)
-        window.configure(bg=PAGE_BG, bd=0, highlightthickness=0)
-        window.geometry(f"{width}x1+{x}+{y}")
-        panel = tk.Canvas(window, bg=PAGE_BG, bd=0, highlightthickness=0)
-        panel.pack(fill="both", expand=True)
-        inset, radius = self.S(4), self.S(16)
-        shape = panel.create_polygon(
-            inset + radius, inset, width - inset - radius, inset,
-            width - inset, inset, width - inset, inset + radius,
-            width - inset, height - inset - radius, width - inset, height - inset,
-            width - inset - radius, height - inset, inset + radius, height - inset,
-            inset, height - inset, inset, height - inset - radius,
-            inset, inset + radius, inset, inset,
-            smooth=True, fill=WHITE, outline=BORDER_SOFT, width=1,
-        )
-        body = tk.Frame(panel, bg=WHITE, padx=self.S(6), pady=self.S(6))
-        body_window = panel.create_window(
-            inset, inset, window=body, anchor="nw",
-            width=width - inset * 2, height=height - inset * 2,
-        )
-
-        def resize(event):
-            panel.coords(
-                shape,
-                inset + radius, inset, event.width - inset - radius, inset,
-                event.width - inset, inset, event.width - inset, inset + radius,
-                event.width - inset, height - inset - radius, event.width - inset, height - inset,
-                event.width - inset - radius, height - inset, inset + radius, height - inset,
-                inset, height - inset, inset, height - inset - radius,
-                inset, inset + radius, inset, inset,
-            )
-            panel.itemconfigure(body_window, width=event.width - inset * 2)
-
-        panel.bind("<Configure>", resize, add="+")
-        top = tk.Frame(body, bg=WHITE, padx=self.S(14), pady=self.S(10))
+        progress = profile_completion(self.store.load(patient_id))
+        top = tk.Frame(frame, bg=WHITE, padx=self.S(16), pady=self.S(14))
         top.pack(fill="x")
         title_row = tk.Frame(top, bg=WHITE)
         title_row.pack(fill="x")
-        tk.Label(title_row, text="Profile progress", bg=WHITE, fg=TEXT_DARK,
-                 font=self.font(12, "bold")).pack(side="left")
+        tk.Label(title_row, text=self.tr("Profile progress"), bg=WHITE, fg=TEXT_DARK,
+                 font=self.font(13, "bold")).pack(side="left")
         tk.Label(title_row, text=f"{progress}%", bg=WHITE, fg=TEXT_DARK,
-                 font=self.font(12, "bold")).pack(side="right")
-        bar = tk.Canvas(top, height=max(5, int(self.S(7))), bg="#e1e2e8",
-                        highlightthickness=0, bd=0)
-        bar.pack(fill="x", pady=(self.S(8), self.S(2)))
-        bar.update_idletasks()
-        bar.create_rectangle(0, 0, bar.winfo_width() * progress / 100,
-                             max(5, int(self.S(7))), fill=INK, outline="")
-        self._profile_menu_separator(body)
-        self._profile_menu_button(body, "Settings", lambda: self.go("Settings"))
-        self._profile_menu_separator(body)
+                 font=self.font(13, "bold")).pack(side="right")
+        bar_h = max(6, int(self.S(7)))
+        bar = tk.Canvas(top, height=bar_h, bg="#e1e2e8", highlightthickness=0, bd=0)
+        bar.pack(fill="x", pady=(self.S(8), 0))
 
-        profile_row = tk.Frame(body, bg=WHITE, padx=self.S(16), pady=self.S(12))
-        profile_row.pack(fill="x")
-        initials = "".join(part[:1] for part in name.split()[:2]).upper() or "?"
-        badge = tk.Label(profile_row, text=initials, bg="#26263f", fg=WHITE,
-                         font=self.font(12, "bold"), width=3, height=1)
-        badge.pack(side="left", padx=(0, self.S(14)))
-        tk.Label(profile_row, text=name, bg=WHITE, fg=INK,
-                 font=self.font(13), anchor="w").pack(side="left", fill="x", expand=True)
-        tk.Frame(body, bg=WHITE).pack(fill="both", expand=True)
-        self._profile_menu_separator(body)
-        self._profile_menu_button(body, "Manage profiles", lambda: self.go("Manage profiles"))
+        def draw_bar(event):
+            # BUG FIX: the bar used to be drawn before it had a width (0 px), so it never filled.
+            bar.delete("fill")
+            bar.create_rectangle(0, 0, event.width * progress / 100, bar_h, fill=NAVY, outline="", tags="fill")
+        bar.bind("<Configure>", draw_bar)
+
+        self._menu_separator(frame)
+        self._menu_row(frame, "Settings", lambda: self.go("Settings"))
+        self._menu_separator(frame)
+        for role, heading in (("Patient", "Patient accounts"), ("Pharmacist", "Pharmacist accounts")):
+            profiles = [p for p in self.profiles.values() if p["role"] == role]
+            if not profiles:
+                continue
+            tk.Label(frame, text=self.tr(heading), bg=WHITE, fg=TEXT_MUTED, font=self.font(12, "bold"),
+                     anchor="w", padx=self.S(16), pady=self.S(6)).pack(fill="x")
+            for profile in profiles:
+                name = profile.get("name", "Account")
+                badge = "".join(part[:1] for part in name.split()[:2]).upper() or "?"
+                current = profile["id"] == self.active_profile_id and (
+                    (role == "Patient") == (self.role == "patient"))
+                action = None if current else (lambda pid=profile["id"]: self.switch_profile(pid))
+                self._menu_row(frame, name, action, INK, badge=badge, selected=current)
+        self._menu_separator(frame)
+        self._menu_row(frame, "Manage profiles", lambda: self.go("Manage profiles"))
         if self.role == "pharmacist":
-            self._profile_menu_separator(body)
-            self._profile_menu_button(body, "Reset demo", self.reset_demo)
-        self._profile_menu_separator(body)
-        self._profile_menu_button(body, "Log out", self.sign_out, color=RED)
+            self._menu_row(frame, "Reset demo", self.reset_demo)
+        self._menu_separator(frame)
+        self._menu_row(frame, "Log out", self.sign_out, color=RED)
+        self._place_popover(frame)
 
-        window.bind("<Escape>", lambda _event: self._close_profile_menu())
-        self._dropdown_opened_by_click = True
-        self.after_idle(lambda: setattr(self, "_dropdown_opened_by_click", False))
-        shadow.lift()
-        window.lift()
-        self.after(10, lambda: self._animate_profile_menu(window, shadow, x, y, width, height, 1))
-
-    def _animate_profile_menu(self, window, shadow, x, y, width, height, visible_height):
-        if not window.winfo_exists() or not shadow.winfo_exists():
-            return
-        visible_height = min(height, visible_height + max(20, int(self.S(40))))
-        window.geometry(f"{width}x{visible_height}+{x}+{y}")
-        shadow.geometry(
-            f"{width}x{visible_height}+{x + int(self.S(3))}+{y + int(self.S(4))}"
-        )
-        shadow.lift()
-        window.lift()
-        if visible_height < height:
-            self.after(
-                10,
-                lambda: self._animate_profile_menu(
-                    window, shadow, x, y, width, height, visible_height
-                ),
-            )
-
-    def _profile_menu_separator(self, parent):
-        tk.Frame(parent, bg=BORDER, height=max(1, int(self.S(1)))).pack(fill="x")
-
-    def _profile_menu_button(self, parent, label, action, color=INK):
-        button = tk.Button(
-            parent, text=label, command=lambda: self._dropdown_choose(action),
-            bg=WHITE, fg=color, activebackground=HOVER, activeforeground=color,
-            relief="flat", bd=0, anchor="w", font=self.font(11), padx=self.S(20),
-            pady=self.S(13), cursor="hand2",
-        )
-        button.pack(fill="x")
-        button.bind("<Enter>", lambda _event: button.configure(bg=HOVER), add="+")
-        button.bind("<Leave>", lambda _event: button.configure(bg=WHITE), add="+")
-
-    def _close_profile_menu(self):
-        window = getattr(self, "dropdown_window", None)
-        shadow = getattr(self, "dropdown_shadow", None)
+    def _close_branded_menu(self):
+        frame = getattr(self, "_branded_menu_window", None)
+        self._branded_menu_window = None
         self.dropdown_window = None
-        self.dropdown_shadow = None
-        if window and window.winfo_exists():
-            window.destroy()
-        if shadow and shadow.winfo_exists():
-            shadow.destroy()
+        self._popover_kind = None
+        if frame is not None and frame.winfo_exists():
+            frame.destroy()
+
+    _close_profile_menu = _close_branded_menu
+
+    def _close_branded_menu_on_outside(self, event=None):
+        frame = getattr(self, "_branded_menu_window", None)
+        if frame is None or getattr(self, "_popover_opened_now", False) or event is None:
+            return
+        try:
+            if not frame.winfo_exists():
+                return
+            widget_path, frame_path = str(event.widget), str(frame)
+        except Exception:
+            return
+        if widget_path != frame_path and not widget_path.startswith(frame_path + "."):
+            self.after_idle(self._close_branded_menu)
 
     def draw_dropdown(self):
-        """Kept for old callers: menus are now native pop-ups (see show_menu)."""
+        """Kept for old callers: menus are popovers now (see show_menu)."""
         self.dropdown = None
 
     def _dropdown_choose(self, action):
-        self._close_profile_menu()
         self._close_branded_menu()
         self.dropdown = None
         if action:
@@ -305,17 +238,7 @@ class DropdownMixin:
             self.render()
 
     def close_dropdown_on_outside_click(self, event=None):
-        """Close the account panel when a click lands outside it."""
-        if getattr(self, "_dropdown_opened_by_click", False):
-            self._dropdown_opened_by_click = False
-            return
-        window = getattr(self, "dropdown_window", None)
-        if not window or not window.winfo_exists() or event is None:
-            return
-        widget_path = str(event.widget)
-        window_path = str(window)
-        if widget_path != window_path and not widget_path.startswith(window_path + "."):
-            self._close_profile_menu()
+        """Old canvas binding; the popover handles outside clicks itself."""
 
     def reset_demo(self):
         self.store.reset_demo()
