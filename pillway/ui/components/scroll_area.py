@@ -8,12 +8,14 @@ Buttons are at least 44 px tall at normal size (easy to tap) and show a hand cur
 
 import tkinter as tk
 
-from ..theme import BORDER, FOCUS, INK, RED, RED_DARK, SHADOW, TEXT_DARK, TEXT_MUTED, WHITE
+from ..theme import (BORDER, FOCUS, INK, NAVY, RED, RED_DARK, RED_TEXT, SHADOW, SURFACE_HIGH, TEXT_DARK,
+                     TEXT_MUTED, WHITE)
 
 BUTTON_STYLES = {
     "primary": (RED, WHITE, RED),
-    "outline": (WHITE, RED, RED),
-    "ghost": (WHITE, INK, BORDER),
+    "outline": (WHITE, RED_TEXT, BORDER),
+    "ghost": (SURFACE_HIGH, NAVY, SURFACE_HIGH),   # Google-style "tonal" button
+    "white": (WHITE, NAVY, WHITE),                  # for use on tinted surfaces
     "dark": (INK, WHITE, INK),
     "danger": (WHITE, RED_DARK, RED_DARK),
     "green": ("#1e7a46", WHITE, "#1e7a46"),
@@ -90,7 +92,7 @@ class ScrollAreaMixin:
         box = canvas.bbox(probe)
         canvas.delete(probe)
         width = max(min_w, (box[2] - box[0]) + self.S(28) if box else self.S(100))
-        self.rr(canvas, x1, y1, x1 + width, y1 + height, self.S(9), fill=fill, outline=outline,
+        self.rr(canvas, x1, y1, x1 + width, y1 + height, height / 2, fill=fill, outline=outline,
                 width=max(1, self.S(1.3)), tags=tag)
         canvas.create_text(x1 + width / 2, y1 + height / 2, text=label, fill=ink, font=self.font(size, "bold"), tags=tag)
         self.bind_click(canvas, tag, func)

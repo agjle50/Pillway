@@ -5,7 +5,7 @@ Called by: ui/pharmacist/workspace_router.py.
 
 import tkinter as tk
 
-from ..theme import (
+from ..theme import (RED_TEXT, 
     BORDER,
     INK,
     RED,
@@ -75,7 +75,7 @@ class ConsultPagesMoreMixin:
         card_height = self.S(390)
         self.rrect(x, y, x + width, y + card_height, self.S(12),
                    fill=WHITE, outline=BORDER, width=self.S(1))
-        self.text(x + self.S(24), y + self.S(26), "pillway", 18, RED, "bold")
+        self.text(x + self.S(24), y + self.S(26), "pillway", 18, RED_TEXT, "bold")
         self.text(x + self.S(24), y + self.S(62), "Care-plan reference",
                   20, INK, "bold")
         self.text(x + self.S(24), y + self.S(84),
@@ -84,7 +84,7 @@ class ConsultPagesMoreMixin:
         row_top = y + self.S(112)
         for index, (label, description) in enumerate(CARE_PLAN_REFERENCE):
             line_y = row_top + index * self.S(49)
-            self.text(x + self.S(24), line_y, label, 11, RED, "bold")
+            self.text(x + self.S(24), line_y, label, 11, RED_TEXT, "bold")
             self.c.create_text(
                 x + self.S(220), line_y,
                 text=description,

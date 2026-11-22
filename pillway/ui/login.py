@@ -33,10 +33,8 @@ class LoginMixin:
         for index, (role, title, sub, icon) in enumerate(cards):
             y = self.S(240) + index * (card_h + self.S(26))
             tag = f"login::{role}"
-            self.rrect(cx - card_w / 2, y + self.S(4), cx + card_w / 2, y + card_h + self.S(4), self.S(20),
-                       fill="#e8ebf2", outline="", tags=tag)
-            self.rrect(cx - card_w / 2, y, cx + card_w / 2, y + card_h, self.S(20), fill=WHITE,
-                       outline="#dde2ea", width=self.S(1.5), tags=tag)
+            self.rrect(cx - card_w / 2, y, cx + card_w / 2, y + card_h, self.S(28), fill="#eceef8",
+                       outline="#eceef8", width=self.S(1.5), tags=tag)
             ix = cx - card_w / 2 + self.S(62)
             self.c.create_oval(ix - self.S(34), y + card_h / 2 - self.S(34), ix + self.S(34), y + card_h / 2 + self.S(34),
                                fill=RED if role == "patient" else NAVY, outline="", tags=tag)

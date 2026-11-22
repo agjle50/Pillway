@@ -19,6 +19,14 @@ BORDER = _brand.border
 
 # Supporting colours
 RED_DARK = "#d93636"
+RED_TEXT = "#c42b2b"       # brand red, deepened for small text on white (5.9:1 contrast)
+TEXT_SUBTLE = "#5d6880"    # timestamps and hints (still 5.6:1 on white)
+BORDER_SOFT = "#e3e7ee"    # dividers inside cards
+NAV_SELECTED = "#1d2570"   # selected row in the pharmacist's dark sidebar
+# Google-style (Material) surfaces, tinted from the brand navy
+SURFACE = "#f6f7fc"        # window background behind the white sheets
+SURFACE_HIGH = "#eceef8"   # Sarah's bubbles, message box, quiet buttons
+TONAL = "#dfe3f6"          # selected item in the side menu (navy text on it: 13:1)
 ORANGE = "#f28c28"
 AMBER = "#b26a00"
 AMBER_SOFT = "#fff4e5"
@@ -26,17 +34,17 @@ GREEN = "#1e7a46"
 GREEN_SOFT = "#e8f6ee"
 LIVE_GREEN = "#22c55e"
 RED_SOFT = "#fde8e8"
-TEXT_OFF = "#b4bccb"
+TEXT_OFF = "#8a93a6"
 WHITE = "#ffffff"
 SOFT_BLUE = "#eef2ff"
 INK = "#101a3c"
 NAV_TEXT = "#edf0ff"
-NAV_ICON = "#9da9dc"
-DIVIDER = "#9098b8"
+NAV_ICON = "#c3cbef"
+DIVIDER = "#2a3170"
 SHADOW = "#e8ebf2"
 TOGGLE_OFF = "#d5dae4"
-CHAT_BG = "#f3f3f5"
-PAGE_BG = "#edf1f4"
+CHAT_BG = "#ffffff"
+PAGE_BG = "#f5f6fa"
 BLACK_SIDEBAR = "#0b0b0f"
 BLACK_SIDEBAR_SELECTED = "#26262e"
 BLACK_SIDEBAR_TEXT = "#e9e9ef"
@@ -48,6 +56,8 @@ FONT = FONT_CHOICES[0]
 
 # The design canvas size. Everything is drawn at this size and scaled to the window.
 BASE_W, BASE_H = 1500, 900
+# Smallest text size in base pixels (nothing smaller is drawn: readability).
+MIN_TEXT = 12
 # Smallest tap target in base pixels (accessibility: at least 44 px).
 MIN_TAP = 44
 

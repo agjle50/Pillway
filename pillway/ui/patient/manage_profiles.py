@@ -5,7 +5,7 @@ Called by: PillwayApp.render() for the 'Manage profiles' section.
 
 import tkinter as tk
 
-from ..theme import (
+from ..theme import (RED_TEXT, 
     BORDER,
     INK,
     RED,
@@ -42,7 +42,7 @@ class ManageProfilesMixin:
                   "Chat history is stored locally without encryption and stays separate by profile.",
                   14, TEXT_MUTED)
         if self.profile_status:
-            self.text(x1, y + self.S(130), self.profile_status, 13, RED)
+            self.text(x1, y + self.S(130), self.profile_status, 13, RED_TEXT)
         y += self.S(151)
         list_y = y
         list_w = x2 - x1

@@ -12,10 +12,10 @@ from tkinter import simpledialog
 
 from ...storage import audit_log
 from ...storage.patient_store import now_iso
-from ..theme import AMBER, AMBER_SOFT, BORDER, GREEN, INK, RED, RED_SOFT, TEXT_DARK, TEXT_MUTED, WHITE
+from ..theme import AMBER, AMBER_SOFT, BORDER, GREEN, INK, RED, RED_SOFT, RED_TEXT, TEXT_DARK, TEXT_MUTED, WHITE
 from .patient_detail import PHARMACIST
 
-TIER_STYLE = {1: ("URGENT", RED, RED_SOFT), 2: ("WATCH", AMBER, AMBER_SOFT)}
+TIER_STYLE = {1: ("URGENT", RED_TEXT, RED_SOFT), 2: ("WATCH", AMBER, AMBER_SOFT)}
 
 
 class FlagsMixin:
