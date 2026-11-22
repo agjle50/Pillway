@@ -58,6 +58,9 @@ class ChatActionsMixin:
                 if pending_patient == self.patient_id:
                     self._pending_session_ends.pop((pending_patient, pending_session), None)
             self.service.start_session(self.patient_id, "CHAT")
+            start = getattr(self.service, "start_check_in", None)
+            if start:
+                start(self.patient_id, "chat")   # Sarah speaks first (only before the check-in started)
         self.chat_focus_requested = True
         self.render()
 

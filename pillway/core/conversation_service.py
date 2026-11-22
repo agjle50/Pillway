@@ -59,6 +59,37 @@ class ConversationService:
         audit_log.record("consent", patient_id, accepted=accepted)
         return record
 
+    def start_check_in(self, patient_id, channel="chat"):
+        """Sarah opens the check-in herself (the "Necessary check-in" popup, or opening the chat).
+
+        Only for a patient who agreed to the consent screen and hasn't started the check-in yet:
+        she greets them, says back ONLY what's known (questionnaire + pharmacy file), and asks
+        whether anything has changed. Returns True if she spoke.
+        """
+        from .. import debug_log
+        from .patient_summary import intake_summary
+        spoke = [False]
+
+        def change(record):
+            convo, lang = record["conversation"], record["language"]
+            if not record["consent"]["accepted"] or convo["stage"] not in ("consent", "greeting"):
+                return
+            settings = get_settings().branding
+            intro = load_questions_intro()
+            greeting = advice("greeting", lang, first_name=record["profile"].get("first_name", ""),
+                              assistant=settings.assistant_name, pharmacy=settings.pharmacy_name)
+            check_in = ("C'est votre suivi nécessaire avant votre plan de soins. Ça prend environ 5 minutes."
+                        if lang == "fr" else
+                        "This is your check-in before your care plan. It takes about 5 minutes.")
+            text = "\n\n".join([greeting + " " + check_in, intake_summary(record, lang), intro[f"changes_{lang}"]])
+            convo["stage"] = "changes"
+            self._add_sarah(record, text, quick=intro[f"changes_quick_{lang}"], source="code", channel=channel)
+            spoke[0] = True
+        self.store.update(patient_id, change)
+        if spoke[0]:
+            debug_log.log("checkin", "Sarah opened the check-in", patient=patient_id)
+        return spoke[0]
+
     def submit_intake(self, patient_id, form, lang="en"):
         """Save the first-visit questionnaire and build the health profile.
 
@@ -344,6 +375,7 @@ class ConversationService:
                          if done and profile.get(key) not in (None, "")}
         base = {"off_topic_turns": convo.get("off_topic_turns", 0),
                 "questionnaire_done": done,
+                "priority_from_intake": intake.priority_questions(record),
                 "already_in_questionnaire": questionnaire}
         if convo["stage"] == "done":
             topic = self._follow_up_topic(record)

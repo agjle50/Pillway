@@ -293,6 +293,23 @@ def for_ai(record):
             ("known", "not_shared", "unknown", "areas_to_explore", "ai_suggestions")}
 
 
+AREA_QUESTIONS = (("blood pressure", ("blood_pressure",)), ("weight", ("diet", "activity")),
+                  ("eating", ("diet", "activity")), ("smoking", ("smoking",)), ("low weight", ("diet",)),
+                  ("blood sugar", ("blood_sugar", "feet", "eyes")), ("side effects", ("changes",)))
+
+
+def priority_questions(record):
+    """Check-in question ids made most important by the intake results, most important first."""
+    ids = []
+    profile = record.get("health_profile") or {}
+    for area in profile.get("areas_to_explore", []) + profile.get("ai_suggestions", []):
+        name = area.get("area", "").lower()
+        for word, questions in AREA_QUESTIONS:
+            if word in name:
+                ids += [q for q in questions if q not in ids]
+    return ids
+
+
 def task_entry(record, lang="en"):
     """The Tasks-tab row for the questionnaire."""
     done = is_done(record)

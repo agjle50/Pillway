@@ -30,8 +30,9 @@ class PatientCarePlanMixin:
         self.btn(canvas, width - self.S(170), self.S(6), "Save as text" if self.lang == "en" else "Enregistrer",
                  self.export_care_plan, "ghost", size=11, min_w=self.S(160))
         cy = self.S(74)
-        for lang in ("en", "fr"):
-            cy = self._draw_plan_language(canvas, plan, lang, cy, width) + self.S(30)
+        # simple: only the patient's own language on screen ("Save as text" still has English + French)
+        cy = self._draw_plan_language(canvas, plan, self.lang if self.lang in ("en", "fr") else "en", cy, width)
+        cy += self.S(30)
         self.finish_scroll(canvas, cy)
 
     def _draw_plan_language(self, canvas, plan, lang, y, width):
@@ -52,6 +53,8 @@ class PatientCarePlanMixin:
             y += self.S(32)
             for line in plan_logic.visible_lines(section):
                 text = plan_logic.render_line(line, lang, plan)
+                if line.get("suggested") and not line.get("confirmed"):
+                    text += (" (votre pharmacien va confirmer)" if lang == "fr" else " (your pharmacist will confirm)")
                 missing = plan_logic.BLANK in text
                 if missing:
                     text = text.replace(plan_logic.BLANK, f"[{self.t('careplan.blank')}]")

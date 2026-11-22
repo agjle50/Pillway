@@ -44,5 +44,7 @@ class ConsentMixin:
         self.consent_declined = not accepted
         if accepted:
             self.service.accept_consent(self.patient_id, True)
+            if self.chat_open:
+                self.service.start_check_in(self.patient_id, "chat")   # Sarah speaks first
             self.chat_focus_requested = True
         self.render()

@@ -209,12 +209,23 @@ class Brain:
         return self.demo.reply(record, plan, text, layer1), "demo"
 
     def care_plan_lifestyle(self, record):
+        """The AI's part of the simple care plan: SMART goals, better values, recommendations."""
         if self.live:
+            from ..core import care_plan as plan_logic
+            from ..core.content import load
+            targets, recs, _daily = plan_logic.relevant(record)
+            so_far = {"targets": {k: {"value": v, "reason": r} for k, (v, r) in targets.items()},
+                      "recommended_by_rules": recs,
+                      "allowed_recommendations": {i["id"]: i["when"] for i in load("care_plan_template")["recommendations"]},
+                      "readiness": (record.get("care_plan") or {}).get("readiness", "not set")}
             system = (PROMPTS / "care_plan.md").read_text(encoding="utf-8")
-            task = "Write the lifestyle lines. Readiness: " + str((record.get("care_plan") or {}).get("readiness", "not set"))
+            task = "Fill in the care plan. plan_so_far: " + json.dumps(so_far, ensure_ascii=False)
             data, status = self._ask("care_plan", system, record, task, "(no new message)", "care_plan")
             if status == OK:
+                debug_log.log("careplan", "AI filled the plan", goals=len(data.get("smart_goals", [])),
+                              values=[v["id"] for v in data.get("values", [])], recs=data.get("recommendations"))
                 return data, "ai"
+            debug_log.log("careplan", "AI unavailable: backup rules wrote the plan")
             return self.demo.care_plan_lifestyle(record), "offline"
         return self.demo.care_plan_lifestyle(record), "demo"
 

@@ -102,6 +102,8 @@ class PatientDashboardMixin:
              "Orders": self.draw_orders, "Tasks": self.draw_tasks}[self.tab](x1, x2, y)
         if self.tab != "Check up":
             self.draw_chat_fab()
+        if self.check_in_popup_should_show():
+            self.draw_check_in_popup(px1, py1, px2, py2)
 
     def select_tab(self, name):
         self._cancel_checkup_animation()

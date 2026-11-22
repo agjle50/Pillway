@@ -241,11 +241,30 @@
       ]
     },
     {
+      "id": "concerns",
+      "topic": "main concerns",
+      "care_plan_section": "goals",
+      "en": "What worries you most about your health right now?",
+      "fr": "Qu'est-ce qui vous inquiète le plus au sujet de votre santé en ce moment?",
+      "quick_en": [
+        "What to eat",
+        "My blood sugar",
+        "My weight",
+        "Nothing really"
+      ],
+      "quick_fr": [
+        "Quoi manger",
+        "Ma glycémie",
+        "Mon poids",
+        "Rien de spécial"
+      ]
+    },
+    {
       "id": "goal",
       "topic": "goals",
       "care_plan_section": "goals",
-      "en": "Last one: what is one health goal you'd like to work on in the next month?",
-      "fr": "Dernière question : quel est un objectif de santé sur lequel vous aimeriez travailler le mois prochain?",
+      "en": "Last one: what is one health goal you'd like to work on in the next month? It can be small.",
+      "fr": "Dernière question : quel objectif de santé aimeriez-vous travailler au cours du prochain mois? Il peut être petit.",
       "quick_en": [
         "Walk more",
         "Eat better",

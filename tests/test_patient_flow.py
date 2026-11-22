@@ -21,6 +21,10 @@ STAGE_SCRIPT = ["hi", "I've been feeling dizzy and my doctor started me on a new
                 "No", "I have a sore on my foot that won't heal and my toes feel numb", "right heel, 2 weeks, bigger"]
 
 
+MARIA_INTAKE = {"weight": "78", "weight_unit": "kg", "height": "162", "height_unit": "cm", "checks_bp": "yes",
+                "systolic": "142", "diastolic": "90", "tobacco": "no"}
+
+
 def fresh_service():
     use_temp_settings()
     service = ConversationService()
@@ -35,9 +39,7 @@ def sarah_texts(record):
 class StageScriptTests(unittest.TestCase):
     def test_full_stage_script(self):
         service = fresh_service()
-        service.submit_intake("maria", {"weight": "78", "weight_unit": "kg", "height": "162", "height_unit": "cm",
-                                        "checks_bp": "yes", "systolic": "142", "diastolic": "90",
-                                        "tobacco": "no"})
+        service.submit_intake("maria", MARIA_INTAKE)
         for text in STAGE_SCRIPT:
             record = service.handle_message("maria", text)
         replies = sarah_texts(record)
@@ -81,19 +83,32 @@ class StageScriptTests(unittest.TestCase):
 
     def test_wrap_up_care_plan_and_tasks(self):
         service = fresh_service()
+        service.submit_intake("maria", MARIA_INTAKE)
         get_settings().patient.max_questions_per_check_in = 3
-        for text in ["hi", "no", "I want to eat better", "no", "my feet look fine", "no"]:
+        for text in ["hi", "no", "I'm not sure what to eat", "no", "my feet look fine", "What to eat",
+                     "Eat better", "no"]:
             record = service.handle_message("maria", text)
-        self.assertTrue(any("anything else" in text for text in sarah_texts(record)[-3:]))
         self.assertIn("care plan draft is ready", sarah_texts(record)[-1])
         plan = record["care_plan"]
         self.assertEqual(plan["status"], "draft")
-        titles = [s["en"] for s in plan["sections"]]
-        self.assertEqual(titles, ["Pharmacist identified goals", "A1C", "Blood pressure", "Cholesterol",
-                                  "Medications", "Exercise", "Freestyle Libre"])
-        self.assertEqual(plan["protein_target"], "62-78")
+        ids = [s["id"] for s in plan["sections"]]
+        self.assertEqual(ids, ["smart_goals", "targets", "recommended", "every_day", "medications"])
+        # suggested values are filled in but wait for the pharmacist
         a1c = care_plan.find_line(plan, "a1c_target")
-        self.assertEqual(a1c["value"], "")  # medical target left blank for the pharmacist
+        self.assertEqual(a1c["value"], "7.0")
+        self.assertTrue(a1c["suggested"] and not a1c["confirmed"] and a1c["reason"])
+        self.assertIn(a1c, care_plan.to_check(plan))
+        # protein only because she said no doctor limit, computed from her questionnaire weight
+        self.assertEqual(care_plan.find_line(plan, "protein")["value"], "")
+        self.assertEqual(plan["protein_target"], "62-78")
+        # only what her answers support: she wasn't asked about alcohol, she doesn't smoke
+        with self.assertRaises(KeyError):
+            care_plan.find_line(plan, "alcohol")
+        recs = {line["id"] for line in next(s for s in plan["sections"] if s["id"] == "recommended")["lines"]}
+        self.assertTrue({"rec_coaching", "rec_labs", "rec_dietitian", "rec_lifestylerx"} <= recs)
+        self.assertNotIn("rec_quit_smoking", recs)
+        goals = next(s for s in plan["sections"] if s["id"] == "smart_goals")["lines"]
+        self.assertTrue(goals and any("week" in g["en"] for g in goals))   # SMART: measurable + timed
         meds = next(s for s in plan["sections"] if s["id"] == "medications")
         self.assertFalse(any(line["ai"] for line in meds["lines"]))
         self.assertTrue(record["tasks"])
@@ -105,21 +120,35 @@ class StageScriptTests(unittest.TestCase):
 class CarePlanEditTests(unittest.TestCase):
     def test_edit_history_undo_and_approve(self):
         service = fresh_service()
+        service.submit_intake("maria", MARIA_INTAKE)
         get_settings().patient.max_questions_per_check_in = 1
-        for text in ["hi", "no", "I eat pretty well", "no", "fine", "no"]:
+        for text in ["hi", "no", "I eat pretty well", "no", "nothing", "my sugar", "walk more", "no"]:
             service.handle_message("maria", text)
 
         def edit(record):
-            care_plan.set_value(record, "a1c_target", "7.0", "Pharmacist demo")
+            care_plan.set_value(record, "a1c_target", "6.5", "Pharmacist demo")
             care_plan.edit_text(record, "bp_daily", "en", "Check your blood pressure every morning.", "Pharmacist demo")
             care_plan.undo_last(record, "Pharmacist demo")
             care_plan.approve(record, "Pharmacist demo")
         record = service.store.update("maria", edit)
         plan = record["care_plan"]
-        self.assertEqual(care_plan.find_line(plan, "a1c_target")["value"], "7.0")
+        self.assertEqual(care_plan.find_line(plan, "a1c_target")["value"], "6.5")
+        self.assertTrue(care_plan.find_line(plan, "a1c_target")["confirmed"])
         self.assertNotIn("every morning", care_plan.find_line(plan, "bp_daily")["en"])
         self.assertEqual(plan["status"], "approved")
-        self.assertGreaterEqual(len(record["care_plan_history"]), 4)
+        self.assertEqual(care_plan.to_check(plan), [])      # approving accepted the rest (logged)
+        self.assertTrue(any(e["action"] == "accept_suggestions" for e in record["care_plan_history"]))
+
+    def test_foot_sore_reaches_the_pharmacist_and_shapes_the_plan(self):
+        service = fresh_service()
+        service.submit_intake("maria", MARIA_INTAKE)
+        get_settings().patient.max_questions_per_check_in = 3
+        for text in ["hi", "no", "I eat pretty well", "no", "I have a sore on my foot that won't heal",
+                     "right heel, 2 weeks", "my feet", "heal my foot", "no"]:
+            record = service.handle_message("maria", text)
+        self.assertTrue(any(f["tier"] == 1 for f in record["flags"]))   # reached the pharmacist at once
+        feet = care_plan.find_line(record["care_plan"], "feet_daily")
+        self.assertIn("following up on the sore", feet["en"])
 
 
 class FrenchTests(unittest.TestCase):

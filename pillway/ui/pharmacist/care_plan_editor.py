@@ -1,7 +1,8 @@
-"""Care plan editor for the pharmacist: Pillway's format, AI lines clearly labelled, one-click approve.
+"""Care plan editor for the pharmacist: Pillway's simple format, AI lines clearly labelled, one-click approve.
 
 Called by: ui/pharmacist/patient_detail.py ("Care plan" section).
-- Blank medical targets are highlighted: click "Set" to fill them (the AI never does).
+- Values the AI (or the backup rules) SUGGESTED are highlighted in yellow with the reason:
+  click "Confirm" if it's right, or "Change" to type your own. Approve accepts any left as they are.
 - Every edit is logged (who, when, before/after) and "Undo" reverses the last one.
 - Approve / Request changes, and the "Pharmacist review required" switch Pillway wants to compare.
 """
@@ -25,7 +26,8 @@ class CarePlanEditorMixin:
         canvas = self.make_scroll(x1, y1, x2, y2, "#edf1f4")
         width = x2 - x1 - self.S(30)
         plan = record.get("care_plan")
-        y = self.section_title(canvas, 0, self.S(4), "Care plan", "Pillway's care plan format. English first, then French.")
+        y = self.section_title(canvas, 0, self.S(4), "Care plan", "Simple Pillway care plan, drafted by the AI from the "
+                               "patient's answers. Check the yellow values, then approve.")
         y = self._draw_review_switch(canvas, y, width)
         if not plan:
             self.tx(canvas, 0, y + self.S(10), "No care plan yet. It is drafted when the patient finishes their check-in with Sarah.",
@@ -53,9 +55,11 @@ class CarePlanEditorMixin:
     def _draw_plan_toolbar(self, canvas, record, plan, y, width):
         label, colour = STATUS_TEXT.get(plan["status"], STATUS_TEXT["draft"])
         blanks = plan_logic.blanks_to_fill(plan)
+        check = plan_logic.to_check(plan)
         self.rr(canvas, 0, y, width, y + self.S(66), self.S(12), fill=WHITE, outline=colour, width=self.S(2))
         self.tx(canvas, self.S(18), y + self.S(12), label, 15, colour, "bold")
-        self.tx(canvas, self.S(18), y + self.S(38), f"{len(blanks)} medical targets still to set (highlighted)  ·  "
+        self.tx(canvas, self.S(18), y + self.S(38), f"{len(check)} suggested values to check (yellow)  ·  "
+                f"{len(blanks)} empty  ·  "
                 f"made by {'the AI' if plan['source'] == 'ai' else 'demo mode'}  ·  edits: {len(record['care_plan_history'])}",
                 11, TEXT_MUTED)
         pid = record["id"]
@@ -121,10 +125,13 @@ class CarePlanEditorMixin:
 
     def _draw_editor_line(self, canvas, record, plan, line, y, width):
         pid, lid = record["id"], line["id"]
-        text_w = width - self.S(330)
+        text_w = width - self.S(360)
         faded = not line["included"]
         missing = "{blank}" in line["en"] and not line.get("value") and line["included"]
+        to_check = line["included"] and line.get("suggested") and not line.get("confirmed")
         x = self.S(18)
+        if to_check:
+            x = self.chip(canvas, x, y, "CHECK", WHITE, RED, 9) + self.S(6)
         if line["ai"]:
             x = self.chip(canvas, x, y, "AI", WHITE, AMBER, 9) + self.S(6)
         en = self.tx(canvas, x, y + self.S(2), plan_logic.render_line(line, "en", plan), 13,
@@ -133,11 +140,19 @@ class CarePlanEditorMixin:
         fr = self.tx(canvas, x, self.bottom_of(canvas, en) + self.S(2), plan_logic.render_line(line, "fr", plan) +
                      ("   [FR needs review]" if line.get("needs_review") else ""), 11, "#b4bccb" if faded else TEXT_MUTED,
                      width=text_w - (x - self.S(18)))
-        if missing:
+        bottom = self.bottom_of(canvas, fr)
+        if line.get("reason") and (line.get("suggested") or line["kind"] in ("recommendation", "computed")):
+            why = self.tx(canvas, x, bottom + self.S(4), ("Why: " if not to_check else "Suggested because: ")
+                          + line["reason"], 11, AMBER if to_check else TEXT_MUTED, width=text_w - (x - self.S(18)))
+            bottom = self.bottom_of(canvas, why)
+        if missing or to_check:
             box = canvas.bbox(en)
-            mark = self.rr(canvas, box[0] - 4, box[1] - 2, box[2] + 4, box[3] + 2, 6, fill="#fff7d6", outline="")
+            mark = self.rr(canvas, box[0] - 4, box[1] - 2, box[2] + 4, bottom + 2, 6, fill="#fff7d6", outline="")
             canvas.tag_lower(mark)
-        bx = width - self.S(300)
+        bx = width - self.S(352)
+        if to_check:
+            bx = self.btn(canvas, bx, y, "Confirm", lambda: self.confirm_plan_value(pid, lid), "green", size=11,
+                          height=self.S(32)) + self.S(6)
         if "{blank}" in line["en"]:
             bx = self.btn(canvas, bx, y, "Set" if not line.get("value") else "Change",
                           lambda: self.set_plan_value(pid, lid), "primary" if missing else "ghost", size=11, height=self.S(32))
@@ -149,7 +164,7 @@ class CarePlanEditorMixin:
                       height=self.S(32))
         self.btn(canvas, bx + self.S(6), y, "Edit FR", lambda: self.edit_plan_text(pid, lid, "fr"), "ghost", size=11,
                  height=self.S(32))
-        return max(self.bottom_of(canvas, fr), y + self.S(34)) + self.S(12)
+        return max(bottom, y + self.S(34)) + self.S(12)
 
     # ---- actions -----------------------------------------------------------------------
 
@@ -157,8 +172,13 @@ class CarePlanEditorMixin:
         self.store.update(patient_id, change)
         self.flash(message)
 
+    def confirm_plan_value(self, patient_id, line_id):
+        self._plan_change(patient_id, lambda r: plan_logic.confirm_value(r, line_id, PHARMACIST), "Value confirmed")
+
     def set_plan_value(self, patient_id, line_id):
-        value = simpledialog.askstring("Set target", "Value for this target (for example 7.0):", parent=self)
+        line = plan_logic.find_line(self.store.load(patient_id)["care_plan"], line_id)
+        value = simpledialog.askstring("Set value", "Value for this line (for example 7.0):",
+                                       initialvalue=line.get("value", ""), parent=self)
         if value is not None:
             self._plan_change(patient_id, lambda r: plan_logic.set_value(r, line_id, value.strip(), PHARMACIST), "Target saved")
 
@@ -182,7 +202,9 @@ class CarePlanEditorMixin:
         self.flash("Last edit undone" if undone and undone[0] else "Nothing to undo")
 
     def approve_plan(self, patient_id):
-        self._plan_change(patient_id, lambda r: plan_logic.approve(r, PHARMACIST), "Care plan approved")
+        left = len(plan_logic.to_check(self.store.load(patient_id)["care_plan"]))
+        self._plan_change(patient_id, lambda r: plan_logic.approve(r, PHARMACIST),
+                          "Care plan approved" + (f" ({left} suggested values accepted as they were)" if left else ""))
 
     def request_plan_changes(self, patient_id):
         note = simpledialog.askstring("Request changes", "What should change?", parent=self)
