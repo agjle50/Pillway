@@ -11,6 +11,7 @@ What happens to one message:
   5. layer 2 updates the flag card when it arrives; every decision goes to the audit log
 """
 
+import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -47,6 +48,7 @@ class ConversationService:
         self.busy = set()           # patient ids Sarah is currently "typing" for
         self._turns_since_memory = {}   # patient id -> messages since Sarah's memory was refreshed
         self.timings = []
+        self.prepare_voice = None   # set by the call screen: voice a reply early, while checks finish
 
     # ---- simple actions -------------------------------------------------------
 
@@ -288,8 +290,12 @@ class ConversationService:
 
         if layer1.tier == 1:  # urgent always wins, even inside an injection attempt
             return self._urgent_turn(patient_id, text, layer1, message_id, quick_decision, channel, on_update)
+        # Medication questions: with the live AI, Sarah first gives safe GENERAL information and then
+        # hands off (the pharmacist request is always created, and the output guard still blocks any
+        # personal instruction or dose). Without the AI, the fixed hand-off line is used.
         if parse.is_injection_attempt(text) or (parse.is_medication_question(text)
-                                                and record["conversation"]["stage"] not in ("consent", "greeting")):
+                                                and record["conversation"]["stage"] not in ("consent", "greeting")
+                                                and not self._natural_mode(record)):
             return self._handoff_turn(patient_id, text, message_id, channel, injection=parse.is_injection_attempt(text))
         return self._normal_turn(patient_id, text, layer1, message_id, channel, on_update)
 
@@ -448,8 +454,15 @@ class ConversationService:
             flag_job = pool.submit(self.brain.flag_check, record, text, layer1)
             talk_job = pool.submit(self.brain.converse, record, text, channel, self._checklist(record),
                                    self._facts(record))
-            layer2, flag_status = flag_job.result()
             talk, status = talk_job.result()
+            if status == "ok" and talk and parse.is_medication_question(text):
+                talk["medication_question"] = True   # the pharmacist ALWAYS gets medication questions
+            if channel == "call" and self.prepare_voice and status == "ok" and (talk or {}).get("reply"):
+                try:   # start voicing now; it is only PLAYED after the safety checks below pass
+                    self.prepare_voice(talk["reply"], record["language"])
+                except Exception:
+                    pass
+            layer2, flag_status = flag_job.result()
         lang = record["language"]
         if status != "ok" or not (talk or {}).get("reply") or check_reply(talk["reply"], lang, allow_short=True):
             if talk and talk.get("reply"):
@@ -554,10 +567,18 @@ class ConversationService:
                 record["pharmacist_requests"].append({"id": new_id("req"), "time": now_iso(), "status": "open",
                                                       "reason": "Medication question: " + heard[:140]})
                 line = advice("medication_question", lang)
-                if line.split(",")[0].lower() not in reply.lower():
-                    reply += " " + line
-            if flag and flag["tier"] == 2:  # always tell them the pharmacist will see it
-                reply += "\n\n" + advice("tier2_suffix", lang)
+                if "pharmacist" not in reply.lower() and "pharmacien" not in reply.lower():
+                    reply += "\n\n" + line     # own paragraph: the AI's part was already voiced early
+            if flag and flag["tier"] == 2 and "pharmacist" not in reply.lower() and "pharmacien" not in reply.lower():
+                reply += "\n\n" + advice("tier2_suffix", lang)   # tell them the pharmacist will see it (once)
+            # A promise is a promise: if Sarah told the patient their pharmacist will check, make sure
+            # the pharmacist really gets it (even when the AI didn't flag it or call it a medication question).
+            promised = re.search(r"(?:let|told|tell)\s+your pharmacist|pharmacist (?:know|will (?:check|follow|look|call|contact))"
+                                 r"|(?:sent|shared|passed) (?:it|this|that|your question) (?:on )?(?:to|with) your pharmacist"
+                                 r"|votre pharmacien (?:va|sera)|transmis", reply, re.I)
+            if promised and not flag and not talk.get("medication_question"):
+                record["pharmacist_requests"].append({"id": new_id("req"), "time": now_iso(), "status": "open",
+                                                      "reason": "Sarah told the patient you'd check: " + heard[:140]})
             statements = [{"issue": i["issue"], "reason": i["reason"],
                            "statement": advice("possible_issue", lang, issue=i["issue"], reason=i["reason"])}
                           for i in talk.get("possible_issues", [])[:2]]

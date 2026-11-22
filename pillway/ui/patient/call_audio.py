@@ -32,7 +32,7 @@ from ...voice.tts import speak, stop as stop_speaking
 # If Sarah's reply isn't ready this many seconds after the patient stops talking, she says a short
 # filler ("One moment, let me think.") instead of leaving silence. The fillers are voiced in advance
 # when the call starts, so they play instantly.
-FILLER_AFTER_SECONDS = 1.8
+FILLER_AFTER_SECONDS = 4.0   # only for unusually slow replies (normal ones take ~1.5 s)
 FILLERS = {"en": ("One moment, let me think.", "Okay, give me a second.", "Let me look at that."),
            "fr": ("Un instant, je réfléchis.", "D'accord, une seconde.", "Je regarde ça.")}
 
@@ -43,9 +43,11 @@ def prepare_fillers(lang):
 
     def work():
         try:
-            from ...voice import natural_voice
-            if natural_voice.available():
-                for line in FILLERS.get(lang, FILLERS["en"]):
+            from ...voice import deepseek_voice, natural_voice
+            for line in FILLERS.get(lang, FILLERS["en"]):
+                if deepseek_voice.available(lang):
+                    deepseek_voice.prepare(line)
+                elif natural_voice.available():
                     natural_voice.synthesize(natural_voice.speech_text(line, lang), lang)
         except Exception as error:   # no internet: the computer's voice will say them instead
             debug_log.log("voice", "fillers not pre-voiced", error=f"{type(error).__name__}: {error}")
@@ -128,6 +130,9 @@ class CallAudioMixin:
         if meter_available:
             self._start_listener(transcribe=transcribe)
         prepare_fillers(self.lang)
+        connect = getattr(self, "_connect_prewarm", None)
+        if connect:
+            connect()
         self._tick_call()
 
     def call_elapsed(self):
@@ -199,6 +204,9 @@ class CallAudioMixin:
         if state["heard"]:
             self._send_call_text(" ".join(state["heard"]))
             state["heard"] = []
+        if state.pop("reply_ready", False) and getattr(self, "store", None) is not None:
+            # BUG FIX: the call used to notice a new reply only at the next screen redraw (up to 0.7 s)
+            self.record = self.store.load(self.patient_id)
         filler = getattr(self, "_maybe_say_filler", None)
         if filler:
             filler()
@@ -214,6 +222,25 @@ class CallAudioMixin:
         self._draw_call_wave()
         self._update_silence_popup()
         self.c.itemconfigure("call_timer", text=self._call_clock())
+
+    def _connect_prewarm(self):
+        """Let the conversation service start voicing Sarah's reply the moment the AI has written it,
+        while the safety checks finish (so she starts talking right when the reply is shown)."""
+        service = getattr(self, "service", None)
+        if service is None:
+            return
+        state = self.call_state
+
+        def prepare(text, lang):
+            if state.get("speaker_enabled") and self.call_open:
+                from ...voice import deepseek_voice, natural_voice
+                if deepseek_voice.available(lang):
+                    debug_log.log("voice", "voicing the reply early with DeepSeek (while safety checks finish)")
+                    deepseek_voice.prepare(text)
+                elif natural_voice.available():
+                    debug_log.log("voice", "voicing the reply early (while safety checks finish)")
+                    natural_voice.prewarm(text, lang)
+        service.prepare_voice = prepare
 
     def _maybe_say_filler(self):
         """The reply is taking a moment: say "One moment, let me think." instead of leaving silence."""
@@ -231,6 +258,7 @@ class CallAudioMixin:
         debug_log.log("call", "reply not ready yet: filler", after=f"{time.monotonic() - since:.1f}s",
                       text=debug_log.snippet(line))
         self._speak_on_call(line)
+        state["speaking_filler"] = True
 
     def _speak_new_replies(self):
         """Say every new reply, in order, never cutting one off (BUG FIX: starting a second reply used
@@ -250,7 +278,8 @@ class CallAudioMixin:
         queue = self.call_state.setdefault("voice_queue", [])
         if new and self.call_state.get("speaker_enabled"):
             queue.extend(new)
-        if queue and not self.call_state.get("sarah_speaking"):
+        # the real reply never waits behind "one moment": it simply takes over from the filler
+        if queue and (not self.call_state.get("sarah_speaking") or self.call_state.get("speaking_filler")):
             text = "\n\n".join(queue)
             queue.clear()
             self._speak_on_call(text)
@@ -269,6 +298,7 @@ class CallAudioMixin:
         # "speaking" = a reply is on its way or playing (mic closed, silence card waits);
         # "audio" = sound is ACTUALLY coming out (only then does her mouth move).
         state["sarah_speaking"] = True
+        state["speaking_filler"] = False
         if state.get("heard"):
             debug_log.log("call", "heard (DROPPED)", why="Sarah started talking",
                           text=debug_log.snippet(" ".join(state["heard"])))
@@ -302,11 +332,16 @@ class CallAudioMixin:
 
     def _send_call_text(self, text):
         debug_log.log("call", "sent to Sarah", text=debug_log.snippet(text))
-        self.call_state["waiting_since"] = time.monotonic()
-        self.call_state["filler_said"] = False
+        state = self.call_state
+        state["waiting_since"] = time.monotonic()
+        state["filler_said"] = False
         patient_id = self.patient_id
         self.service.busy.add(patient_id)
-        self.run_in_background(lambda: self.service.handle_message(patient_id, text, "call"))
+
+        def reply_saved():   # called from the worker thread the moment the reply is stored
+            state["reply_ready"] = True
+        self.run_in_background(lambda: self.service.handle_message(patient_id, text, "call",
+                                                                   on_update=reply_saved))
 
     def toggle_call_mute(self):
         self.call_state["muted"] = not self.call_state.get("muted")
