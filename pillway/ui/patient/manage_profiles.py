@@ -1,14 +1,93 @@
 """Profile editor and account switching page."""
 
 import tkinter as tk
+from tkinter import filedialog, messagebox, ttk
 
-from ..theme import (
-    BORDER,
-    INK,
-    RED,
-    TEXT_MUTED,
-    WHITE,
+from ..theme import BORDER, INK, RED, TEXT_DARK, TEXT_MUTED, WHITE
+
+
+PROFILE_FIELDS = (
+    ("Personal information", (
+        ("First name*", "first_name", "entry"),
+        ("Last name*", "last_name", "entry"),
+        ("Date of birth*", "date_of_birth", "entry"),
+        ("Phone number*", "phone", "entry"),
+        ("Sex at birth*", "sex", "sex"),
+        ("Relationship", "relationship", "relationship"),
+        ("Email", "email", "entry"),
+    )),
+    ("Health card", (
+        ("Health card number (optional)", "health_card", "entry"),
+    )),
+    ("Insurance", (
+        ("Cardholder name", "insurance_cardholder", "entry"),
+        ("Insurance provider", "insurance_provider", "entry"),
+        ("Carrier number", "insurance_carrier_number", "entry"),
+        ("Contract/group number", "insurance_group_number", "entry"),
+        ("Member ID/certificate number", "insurance_member_number", "entry"),
+    )),
+    ("Delivery address", (
+        ("Street number and name*", "street_address", "entry"),
+        ("Province*", "province", "province"),
+        ("City*", "city", "entry"),
+        ("Postal code*", "postal_code", "entry"),
+        ("Unit or apartment number", "apartment", "entry"),
+        ("Entry or buzzer code", "buzzer_code", "entry"),
+        ("Delivery instructions", "delivery_instructions", "entry"),
+    )),
 )
+
+PHOTO_FIELDS = ("insurance_card_front", "insurance_card_back")
+COMPLETION_FIELDS = tuple(
+    field for _title, fields in PROFILE_FIELDS for _label, field, _kind in fields
+) + PHOTO_FIELDS
+PROFILE_PAGES = PROFILE_FIELDS + (("Insurance card photos", ()),)
+
+
+def profile_completion(record):
+    """Return completion across every field shown in the profile editor."""
+    values = profile_form_values(record.get("profile", {}))
+    completed = sum(bool(str(values.get(field) or "").strip()) for field in COMPLETION_FIELDS)
+    return round(completed * 100 / len(COMPLETION_FIELDS))
+
+
+def profile_form_values(profile):
+    address = str(profile.get("address") or "")
+    parts = [part.strip() for part in address.split(",") if part.strip()]
+    street = profile.get("street_address") or (parts[0] if parts else "")
+    city = profile.get("city") or ""
+    province = profile.get("province") or ""
+    if len(parts) > 1 and not city:
+        location = parts[-1].split()
+        if location and len(location[-1]) == 2 and location[-1].isalpha():
+            province = province or location.pop().upper()
+        city = " ".join(location)
+    province = {
+        "AB": "Alberta", "BC": "British Columbia", "MB": "Manitoba",
+        "NB": "New Brunswick", "NL": "Newfoundland and Labrador",
+        "NS": "Nova Scotia", "NT": "Northwest Territories", "NU": "Nunavut",
+        "ON": "Ontario", "PE": "Prince Edward Island", "QC": "Quebec",
+        "SK": "Saskatchewan", "YT": "Yukon",
+    }.get(str(province).upper(), province)
+
+    values = {key: str(profile.get(key) or "") for _title, fields in PROFILE_FIELDS for _label, key, _kind in fields}
+    values.update(
+        street_address=str(street),
+        city=str(city),
+        province=str(province),
+        insurance_card_front=str(profile.get("insurance_card_front") or ""),
+        insurance_card_back=str(profile.get("insurance_card_back") or ""),
+    )
+    return values
+
+
+def format_profile_address(values):
+    street = values.get("street_address", "").strip()
+    city = values.get("city", "").strip()
+    province = values.get("province", "").strip()
+    postal_code = values.get("postal_code", "").strip()
+    location = " ".join(part for part in (city, province, postal_code) if part)
+    return ", ".join(part for part in (street, location) if part)
 
 
 class ManageProfilesMixin:
@@ -30,9 +109,9 @@ class ManageProfilesMixin:
                   tag="delete_all_local_data")
         self.clickable("delete_all_local_data", self.delete_all_local_data)
         if self.profile_status:
-            self.text(x1, y + self.S(130), self.profile_status, 13, RED)
-        y += self.S(151)
-        list_y = y
+            self.text(x1, by1 + button_h + self.S(17), self.profile_status, 13, RED)
+
+        list_y = by1 + button_h + self.S(24)
         list_w = x2 - x1
         list_h = max(self.S(80), self.h - list_y - self.S(20))
         outer = tk.Frame(self, bg=WHITE, bd=0, highlightthickness=0)
