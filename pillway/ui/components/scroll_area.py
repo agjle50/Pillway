@@ -20,6 +20,16 @@ BUTTON_STYLES = {
 }
 
 
+def safe_tag(tag):
+    """Canvas tag names must not contain spaces.
+
+    BUG FIX: real Tk splits a tag like "btn::Read aloud" into two tags ("btn::Read" and
+    "aloud"), so a click binding on the full name never fires: "Read aloud", "Resolve",
+    "Add note"... silently did nothing on Windows. Every space becomes "_".
+    """
+    return "_".join(str(tag).split())
+
+
 class ScrollAreaMixin:
     def make_scroll(self, x1, y1, x2, y2, bg=WHITE):
         """Create a scrollable canvas in the box. Draw on the returned canvas, then call finish_scroll()."""
@@ -74,7 +84,7 @@ class ScrollAreaMixin:
     def btn(self, canvas, x1, y1, label, func, kind="ghost", tag=None, size=12, min_w=0, height=None):
         """Draw a button starting at (x1, y1). Returns its right edge x."""
         fill, ink, outline = BUTTON_STYLES[kind]
-        tag = tag or f"btn::{id(func)}::{label}::{x1:.0f}::{y1:.0f}"
+        tag = safe_tag(tag or f"btn::{id(func)}::{label}::{x1:.0f}::{y1:.0f}")
         height = height or self.S(38)
         probe = canvas.create_text(0, -1000, text=label, font=self.font(size, "bold"))
         box = canvas.bbox(probe)

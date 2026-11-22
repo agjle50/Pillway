@@ -36,7 +36,7 @@ class PatientDashboardMixin:
         gap = min(self.S(150), (px2 - px1 - self.S(40)) / len(TABS))
         for i, (name, icon, label_key) in enumerate(TABS):
             x = pcx + (i - (len(TABS) - 1) / 2) * gap
-            tag = f"tab::{name}"
+            tag = "tab::" + "_".join(name.split())
             sel = name == self.tab
             col = RED if sel else TEXT_MUTED
             self.c.create_rectangle(x - gap / 2 + self.S(6), py1 + self.S(8), x + gap / 2 - self.S(6),
