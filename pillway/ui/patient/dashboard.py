@@ -75,6 +75,10 @@ class PatientDashboardMixin:
 
     def select_tab(self, name):
         self._cancel_checkup_animation()
+        if self.call_open:
+            self.close_call_preview()
+        elif self.chat_open:
+            self._end_chat_session()
         self._stop_call_input()
         self.tab = name
         self.chat_open = False

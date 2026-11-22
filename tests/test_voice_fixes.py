@@ -3,6 +3,7 @@
 import queue
 import sys
 import threading
+from types import ModuleType, SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -57,6 +58,27 @@ class ReadAloudTests(unittest.TestCase):
         self.assertNotIn("Bonjour", " ".join(args))       # text is never part of the command
         self.assertEqual(env["PILLWAY_TTS_TEXT"], "Bonjour; Remove-Item C:\\ -Recurse")
         self.assertEqual(env["PILLWAY_TTS_LANG"], "fr")
+        self.assertEqual(env["PILLWAY_TTS_VOICE"], "female")
+        self.assertIn("VoiceGender]::Female", tts._WINDOWS_SCRIPT)
+        self.assertIn("SpeakSsml", tts._WINDOWS_SCRIPT)
+
+    def test_pyttsx3_prefers_a_female_voice_for_sarah(self):
+        voices = [
+            SimpleNamespace(name="David", id="male", gender="Male", languages=[b"\x05en-us"]),
+            SimpleNamespace(name="Zira", id="female", gender="Female", languages=[b"\x05en-us"]),
+        ]
+        engine = SimpleNamespace(
+            getProperty=lambda name: voices,
+            setProperty=lambda name, value: selected.append((name, value)),
+            say=lambda _text: None,
+            runAndWait=lambda: None,
+        )
+        selected = []
+        module = ModuleType("pyttsx3")
+        module.init = lambda: engine
+        with patch.dict(sys.modules, {"pyttsx3": module}):
+            tts._speak_pyttsx3("Hello", "en", 1)
+        self.assertIn(("voice", "female"), selected)
 
 
 class SpeechFallbackTests(unittest.TestCase):

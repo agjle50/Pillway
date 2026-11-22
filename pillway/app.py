@@ -282,6 +282,8 @@ class PillwayApp(
             self.draw_settings()
         elif self.section == "Manage profiles":
             self.draw_manage_profiles()
+        elif self.section == "Edit profile":
+            self.draw_profile_editor()
         elif self.section == "Microphone":
             self.draw_microphone_settings()
         elif self.section != "FAQ" and has_info_page(self.section):
@@ -301,6 +303,10 @@ class PillwayApp(
 
     def go(self, section):
         self._cancel_checkup_animation()
+        if self.call_open:
+            self.close_call_preview()
+        elif self.chat_open:
+            self._end_chat_session()
         self._stop_call_input()
         self.dropdown = None
         self.chat_open = False
@@ -325,7 +331,9 @@ class PillwayApp(
             self.show_menu(which)
 
     def on_escape(self):
-        if self.dropdown:
+        if getattr(self, "dropdown_window", None):
+            self._close_profile_menu()
+        elif self.dropdown:
             self.toggle_dropdown(None)
         elif self.role == "pharmacist" and self.doctor_workspace_open:
             self.return_to_doctor_patient_list()
@@ -347,6 +355,12 @@ class PillwayApp(
         listener = self.call_listener
         voice_listener = self.voice_listener
         microphone_test_listener = self.microphone_test_listener
+        if self.call_open:
+            state = self.call_state or {}
+            if state.get("session_id"):
+                self.service.end_session(self.patient_id, state["session_id"])
+        elif self.chat_open:
+            self._end_chat_session()
         self._stop_call_input()
         self._stop_voice_typing()
         self._stop_microphone_test()

@@ -18,7 +18,7 @@ from ..theme import (
 class WorkspaceRouterMixin:
     def draw_consult_page(self, record, x1, y1, x2, y2):
         """Draw one consultation-record page (modelled on Pillway's own care-plan form)."""
-        patient = {"name": display_name(record)}
+        patient = {"name": display_name(record), "profile": record.get("profile", {}), "record": record}
         content_x, content_w = x1 + self.S(10), x2 - x1 - self.S(20)
         heading_y = y1 + self.S(16)
         self.text(content_x, heading_y, self.doctor_section, 23, INK, "bold")
@@ -42,11 +42,11 @@ class WorkspaceRouterMixin:
         if section == "User account information":
             self._draw_doctor_account_page(content_x, page_y, content_w, page_bottom, patient)
         elif section == "Patient information":
-            self._draw_doctor_patient_page(content_x, page_y, content_w)
+            self._draw_doctor_patient_page(content_x, page_y, content_w, patient)
         elif section == "Checklist for completeness":
             self._draw_doctor_checklist_page(content_x, page_y, content_w)
         elif section == "Diabetes assessment":
-            self._draw_doctor_diabetes_page(content_x, page_y, content_w)
+            self._draw_doctor_diabetes_page(content_x, page_y, content_w, patient)
         elif section == "Resources provided":
             self._draw_doctor_resources_page(content_x, page_y, content_w)
         elif section == "Summary for today's discussion":

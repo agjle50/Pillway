@@ -70,6 +70,23 @@ class DemoBrain:
         return result
 
     def free_reply(self, record, text):
+        session_id = record["conversation"].get("session_id")
+        session = next(
+            (item for item in record.get("sessions", []) if item.get("id") == session_id),
+            {},
+        )
+        previous = session.get("previous_interaction") or {}
+        normalized = normalize(text)
+        recap_request = re.search(
+            r"\b(recap|remind me|last time|what did we|what were we|continue|pick that up|"
+            r"discuss that|about that|résumé|rappellez|rappeler|dernière fois|reprendre|continuer)\b",
+            normalized,
+        )
+        if previous and recap_request:
+            topic = previous.get("topic") or "our last conversation"
+            if record["language"] == "fr":
+                return f"La dernière fois, vous avez parlé de : {topic}. Voulez-vous continuer ou parler d'un nouveau sujet?"
+            return f"Last time, you mentioned: {topic}. Would you like to continue with that, or talk about something new?"
         if record["language"] == "fr":
             return advice("after_flow", "fr")
         robot = self._robots.setdefault(record["id"], MedicalRobot())

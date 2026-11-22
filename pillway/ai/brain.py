@@ -39,8 +39,38 @@ def patient_context(record, limit=8):
     """Only the facts the AI needs, de-identified. Shown by --show-ai-payload."""
     profile = record["profile"]
     meds = [{k: m.get(k) for k in ("name", "dose", "frequency", "indication")} for m in record["medications"]]
+    session_id = record["conversation"].get("session_id")
+    current_session = next(
+        (session for session in record.get("sessions", []) if session.get("id") == session_id),
+        None,
+    )
+    current_messages = (
+        [message for message in record["messages"] if message.get("session_id") == session_id]
+        if session_id else [
+            message for message in record["messages"] if not message.get("session_id")
+        ][-limit:]
+    )
     recent = [{"from": "patient" if m["role"] == "patient" else "assistant",
-               "text": redact_text(m["text"], profile)} for m in record["messages"][-limit:]]
+               "text": redact_text(m["text"], profile)} for m in current_messages[-limit:]]
+    patient_turns = [message for message in current_messages if message.get("role") == "patient"]
+
+    previous_interaction = None
+    previous_session = (current_session or {}).get("previous_interaction")
+    if previous_session:
+        previous_messages = [
+            message for message in record["messages"]
+            if message.get("session_id") == previous_session.get("session_id")
+        ][-limit:]
+        previous_interaction = {
+            "kind": previous_session.get("kind", "CHAT"),
+            "last_contact": previous_session.get("at", ""),
+            "topic": redact_text(previous_session.get("topic", ""), profile),
+            "messages": [
+                {"from": "patient" if message["role"] == "patient" else "assistant",
+                 "text": redact_text(message["text"], profile)}
+                for message in previous_messages
+            ],
+        }
     answers = {qid: a.get("value") for qid, a in record["conversation"]["answers"].items()}
     return {
         "patient": safe_profile(profile),
@@ -49,6 +79,8 @@ def patient_context(record, limit=8):
         "answers_so_far": answers,
         "pharmacist_settings": record["bot_settings"],
         "recent_messages": recent,
+        "session_opening": len(patient_turns) == 1,
+        "previous_interaction": previous_interaction,
     }
 
 

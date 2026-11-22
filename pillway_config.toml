@@ -141,7 +141,7 @@ microphone_device = ""
 listening_mode = "continuous"
 # How jumpy the green voice meter is. 1.0 = normal, 2.0 = more sensitive.
 voice_meter_sensitivity = 1.0
-# Sarah's speaking voice (leave blank for the computer's default) and speed (words per minute).
+# Sarah's voice (blank prefers an installed female voice; set a name to override) and speed (words per minute).
 sarah_voice = ""
 sarah_speech_rate = 165
 

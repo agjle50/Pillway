@@ -14,19 +14,28 @@ from ..theme import (
 
 
 class ConsultPagesMixin:
+    @staticmethod
+    def _patient_value(value, fallback="Not on file"):
+        if isinstance(value, (list, tuple)):
+            value = ", ".join(str(item) for item in value if item)
+        return str(value).strip() if value is not None and str(value).strip() else fallback
+
     def _draw_doctor_account_page(self, x, y, width, bottom, patient):
+        profile = patient["profile"]
         details_h = min(self.S(286), max(self.S(210), (bottom - y) * 0.57))
         self._doctor_card(x, y, width, details_h, "User account information")
         labels = (
             ("Name", patient["name"]),
-            ("Date of birth", "Not provided"),
-            ("Sex", "Not provided"),
-            ("Health card", "Not provided"),
-            ("Phone", "Not provided"),
-            ("Email", "Not provided"),
-            ("Address", "Not provided"),
-            ("Preferred language", "Not provided"),
-            ("Pharmacy / prescriber", "Not provided"),
+            ("Date of birth", self._patient_value(profile.get("date_of_birth"))),
+            ("Sex", self._patient_value(profile.get("sex"))),
+            ("Health card", self._patient_value(profile.get("health_card"))),
+            ("Phone", self._patient_value(profile.get("phone"))),
+            ("Email", self._patient_value(profile.get("email"))),
+            ("Address", self._patient_value(profile.get("address"))),
+            ("Preferred language", self._patient_value(profile.get("language"))),
+            ("Pharmacy / prescriber", self._patient_value(
+                " / ".join(value for value in (profile.get("pharmacy"), profile.get("prescriber")) if value)
+            )),
         )
         gap = self.S(22)
         col_w = (width - self.S(36) - gap * 2) / 3
@@ -62,19 +71,30 @@ class ConsultPagesMixin:
         self.text(x + self.S(18), journey_y + journey_h - self.S(16),
                   "Status not recorded in this local demo.", 9, TEXT_MUTED)
 
-    def _draw_doctor_patient_page(self, x, y, width):
+    def _draw_doctor_patient_page(self, x, y, width, patient):
+        profile = patient["profile"]
         gap = self.S(16)
         card_w = (width - gap) / 2
         card_h = self.S(260)
         self._doctor_card(x, y, card_w, card_h, "Demographics")
         self._doctor_card(x + card_w + gap, y, card_w, card_h, "Lab results")
+        height_weight = " / ".join(
+            value for value in (
+                f"{profile['height_cm']} cm" if profile.get("height_cm") else "",
+                f"{profile['weight_kg']} kg" if profile.get("weight_kg") else "",
+            ) if value
+        )
         left_values = (
-            ("Age", "Not provided"), ("Sex", "Not provided"),
-            ("Height / weight", "Not provided"), ("Medical conditions", "Diabetes; hypertension"),
+            ("Age", self._patient_value(profile.get("age"), "Not on file")),
+            ("Sex", self._patient_value(profile.get("sex"))),
+            ("Height / weight", self._patient_value(height_weight)),
+            ("Medical conditions", self._patient_value(profile.get("conditions"))),
         )
         right_values = (
-            ("A1C", "Not provided"), ("Blood pressure", "Not provided"),
-            ("LDL cholesterol", "Not provided"), ("Targets", "See care-plan reference"),
+            ("A1C", self._patient_value(profile.get("last_a1c"))),
+            ("Blood pressure", self._patient_value(profile.get("last_bp"))),
+            ("LDL cholesterol", self._patient_value(profile.get("last_ldl"))),
+            ("Targets", self._patient_value(profile.get("targets"))),
         )
         for index, (label, value) in enumerate(left_values):
             self._doctor_field(x + self.S(18), y + self.S(54 + index * 48),
@@ -84,10 +104,13 @@ class ConsultPagesMixin:
                                card_w - self.S(36), label, value)
         bottom_y = y + card_h + gap
         self._doctor_card(x, bottom_y, width, self.S(150), "Clinical context")
+        context = "Medical conditions: " + self._patient_value(profile.get("conditions"))
+        allergies = self._patient_value(profile.get("allergies"))
+        if allergies != "Not on file":
+            context += "\nAllergies: " + allergies
         self.c.create_text(
             x + self.S(18), bottom_y + self.S(48),
-            text="The short-assessment baseline for this demo is diabetes and hypertension. "
-                 "Actual measurements and personal targets have not been entered.",
+            text=context,
             fill=TEXT_DARK, anchor="nw", width=width - self.S(36), font=self.font(12),
         )
 
@@ -135,27 +158,28 @@ class ConsultPagesMixin:
             self.text(bx + card_w - self.S(12), by + row_h / 2, "Not recorded",
                       9, TEXT_MUTED, anchor="e")
 
-    def _draw_doctor_diabetes_page(self, x, y, width):
+    def _draw_doctor_diabetes_page(self, x, y, width, patient):
+        profile = patient["profile"]
         gap = self.S(16)
         card_w = (width - gap) / 2
         card_h = self.S(185)
         self._doctor_card(x, y, card_w, card_h, "Diabetes profile")
         self._doctor_card(x + card_w + gap, y, card_w, card_h, "Monitoring & A1C")
         self._doctor_field(x + self.S(18), y + self.S(58), card_w - self.S(36),
-                           "Diabetes type", "Not specified")
+                           "Diabetes type", self._patient_value(profile.get("diabetes_type")))
         self._doctor_field(x + self.S(18), y + self.S(112), card_w - self.S(36),
-                           "Diagnosis date", "Not provided")
+                           "Diagnosis date", self._patient_value(profile.get("diagnosis_date")))
         self._doctor_field(x + card_w + gap + self.S(18), y + self.S(58),
-                           card_w - self.S(36), "Monitoring method", "Not provided")
+                           card_w - self.S(36), "Monitoring method", self._patient_value(profile.get("monitoring")))
         self._doctor_field(x + card_w + gap + self.S(18), y + self.S(112),
-                           card_w - self.S(36), "Recent A1C", "Not provided")
+                           card_w - self.S(36), "Recent A1C", self._patient_value(profile.get("last_a1c")))
         focus_y = y + card_h + gap
         self.rrect(x, focus_y, x + width, focus_y + self.S(100), self.S(10),
                    fill="#fff1ed", outline="#f4cfc5", width=self.S(1))
         self.text(x + self.S(18), focus_y + self.S(24), "Clinical focus", 13, RED, "bold")
         self.c.create_text(
             x + self.S(18), focus_y + self.S(45),
-            text="Follow the patient's clinician-approved plan. No A1C or glucose values "
-                 "are stored in this local demo.",
+            text="Conditions: " + self._patient_value(profile.get("conditions")) +
+                 "\nAllergies: " + self._patient_value(profile.get("allergies")),
             fill=TEXT_DARK, anchor="nw", width=width - self.S(36), font=self.font(10),
         )

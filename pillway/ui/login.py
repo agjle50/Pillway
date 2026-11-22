@@ -68,6 +68,10 @@ class LoginMixin:
         self.render()
 
     def sign_out(self):
+        if self.call_open:
+            self.close_call_preview()
+        elif self.chat_open:
+            self._end_chat_session()
         self._stop_call_input()
         self.role = None
         self.dropdown = None

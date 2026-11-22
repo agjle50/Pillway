@@ -4,9 +4,9 @@ Called by: the "Read aloud" button on the assistant's messages and the Call scre
 
 Order (most reliable first):
   1. The computer's own voice, run as a separate program:
-       Windows -> PowerShell + System.Speech (built into Windows, no install)
-       Mac     -> the `say` command
-       Linux   -> `espeak` if installed
+       Windows -> PowerShell + System.Speech, preferring an installed female voice
+       Mac     -> the `say` command with a female voice
+       Linux   -> `espeak` with a female voice, if installed
   2. pyttsx3 (Python library), only if step 1 isn't available.
   3. A friendly "read-aloud isn't available on this computer" message.
 
@@ -36,11 +36,21 @@ _current = {"process": None, "generation": 0}
 _WINDOWS_SCRIPT = (
     "Add-Type -AssemblyName System.Speech; "
     "$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; "
-    "if ($env:PILLWAY_TTS_LANG -eq 'fr') { "
-    "  $v = $s.GetInstalledVoices() | Where-Object { $_.VoiceInfo.Culture.Name -like 'fr*' } | Select-Object -First 1; "
-    "  if ($v) { $s.SelectVoice($v.VoiceInfo.Name) } } "
+    "$prefix = if ($env:PILLWAY_TTS_LANG -eq 'fr') { 'fr' } else { 'en' }; "
+    "$voices = @($s.GetInstalledVoices() | Where-Object { $_.VoiceInfo.Culture.Name -like ($prefix + '*') }); "
+    "$preferred = $env:PILLWAY_TTS_VOICE; "
+    "$v = $null; "
+    "if ($preferred -and $preferred -ne 'female') { "
+    "  $v = $voices | Where-Object { $_.VoiceInfo.Name -like ('*' + $preferred + '*') } | Select-Object -First 1 }; "
+    "if (-not $v) { "
+    "  $v = $voices | Where-Object { $_.VoiceInfo.Gender -eq [System.Speech.Synthesis.VoiceGender]::Female } | Select-Object -First 1 }; "
+    "if (-not $v) { $v = $voices | Select-Object -First 1 }; "
+    "if ($v) { $s.SelectVoice($v.VoiceInfo.Name) }; "
     "$s.Rate = [int]$env:PILLWAY_TTS_RATE; "
-    "$s.Speak($env:PILLWAY_TTS_TEXT)"
+    "$culture = if ($v) { $v.VoiceInfo.Culture.Name } elseif ($prefix -eq 'fr') { 'fr-CA' } else { 'en-US' }; "
+    "$escaped = [System.Security.SecurityElement]::Escape($env:PILLWAY_TTS_TEXT); "
+    "$ssml = \"<speak version='1.0' xml:lang='$culture' xmlns='http://www.w3.org/2001/10/synthesis'><prosody rate='105%' pitch='+4%'>$escaped</prosody></speak>\"; "
+    "$s.SpeakSsml($ssml)"
 )
 
 
@@ -51,19 +61,31 @@ def _windows_rate(words_per_minute):
 
 def system_command(text, lang):
     """The command + environment for the computer's own voice, or None if there isn't one."""
-    rate = get_settings().call.sarah_speech_rate
+    settings = get_settings().call
+    rate = settings.sarah_speech_rate
+    preferred_voice = settings.sarah_voice or "female"
     env = dict(os.environ)
     if sys.platform == "win32":
         exe = shutil.which("powershell") or shutil.which("pwsh")
         if not exe:
             return None
-        env.update(PILLWAY_TTS_TEXT=text, PILLWAY_TTS_LANG=lang, PILLWAY_TTS_RATE=str(_windows_rate(rate)))
+        env.update(
+            PILLWAY_TTS_TEXT=text, PILLWAY_TTS_LANG=lang,
+            PILLWAY_TTS_RATE=str(_windows_rate(rate)),
+            PILLWAY_TTS_VOICE=preferred_voice,
+        )
         return [exe, "-NoProfile", "-NonInteractive", "-Command", _WINDOWS_SCRIPT], env
     if sys.platform == "darwin" and shutil.which("say"):
-        voice = ["-v", "Amelie"] if lang == "fr" else []
+        voice_name = preferred_voice if preferred_voice.lower() != "female" else (
+            "Amelie" if lang == "fr" else "Samantha"
+        )
+        voice = ["-v", voice_name]
         return ["say", "-r", str(rate), *voice, "--", text], env
     if shutil.which("espeak"):
-        return ["espeak", "-v", "fr" if lang == "fr" else "en", "-s", str(rate), "--", text], env
+        voice_name = preferred_voice if preferred_voice.lower() != "female" else (
+            "fr+f3" if lang == "fr" else "en+f3"
+        )
+        return ["espeak", "-v", voice_name, "-s", str(rate), "--", text], env
     return None
 
 
@@ -99,12 +121,36 @@ def _speak_pyttsx3(text, lang, _generation):
     engine = pyttsx3.init()
     settings = get_settings().call
     engine.setProperty("rate", settings.sarah_speech_rate)
-    if settings.sarah_voice or lang == "fr":
-        for voice in engine.getProperty("voices"):
-            name = f"{voice.name} {voice.id}".lower()
-            if (settings.sarah_voice and settings.sarah_voice.lower() in name) or (lang == "fr" and "fr" in name):
-                engine.setProperty("voice", voice.id)
-                break
+    voices = engine.getProperty("voices")
+    preferred = (settings.sarah_voice or "").lower()
+    language = lang.lower()[:2]
+
+    def voice_text(voice):
+        language_data = getattr(voice, "languages", ())
+        if isinstance(language_data, (str, bytes)):
+            language_data = (language_data,)
+        languages = " ".join(
+            value.decode(errors="ignore") if isinstance(value, bytes) else str(value)
+            for value in language_data
+        )
+        return f"{voice.name} {voice.id} {languages}".lower()
+
+    language_voices = [voice for voice in voices if language in voice_text(voice)]
+    candidates = language_voices or list(voices)
+    if preferred and preferred != "female":
+        selected = next((voice for voice in candidates if preferred in voice_text(voice)), None)
+    else:
+        selected = None
+    if selected is None:
+        selected = next((
+            voice for voice in candidates
+            if str(getattr(voice, "gender", "")).lower() in ("female", "f", "voicegenderfemale")
+            or any(token in voice_text(voice) for token in ("female", "zira", "samantha", "victoria", "hazel", "aria"))
+        ), None)
+    if selected is None and lang == "fr":
+        selected = next((voice for voice in voices if "fr" in voice_text(voice)), None)
+    if selected:
+        engine.setProperty("voice", selected.id)
     engine.say(text)
     engine.runAndWait()
 

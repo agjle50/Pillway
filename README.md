@@ -85,10 +85,12 @@ If a key is ever found in the shared `pillway_config.toml`, the app refuses to s
 
 | Screen | What it's for | What to click |
 |---|---|---|
-| Header | Always shows **EN/FR**, **Talk to a pharmacist**, notifications, profile menu | EN/FR switches language everywhere |
+| Header | Always shows **EN/FR**, **Talk to a pharmacist**, notifications, and an animated account menu with profile progress | Progress reflects the full profile sheet; **Manage profiles** opens the categorized account list |
+| Manage profiles | Separate patient and pharmacist profile categories, each with a **Switch profile** button and an options menu | Choose **Edit profile** or **Delete profile** from the menu; add patient profiles or delete saved data |
+| Edit profile | Personal, health-card, insurance, insurance-photo, and delivery-address pages | Swipe horizontally, use the page dots or section selector, then **Save changes** |
 | Check up | Choose how to check in | **Call** or **Chat** |
 | Consent | Shown once before the first chat or call | **I agree** |
-| Chat | Sarah: summary → "any changes?" → one question at a time → wrap-up → care plan | Type, or tap the round quick-reply buttons. **Read aloud** / **Copy** on every Sarah message. "‹ Change my last answer" goes back one question. |
+| Chat | Sarah: summary → "any changes?" → one question at a time → wrap-up → care plan | Returning patients can ask for a recap, continue, or raise a new concern; Sarah won't expect them to remember the last chat. Type or tap quick replies. |
 | Call | iPhone-style voice check-in: name, timer, green voice ring, mute, end | **Hold** the green button and talk. With no microphone (or in demo mode) tap it to "say" the next scripted line. |
 | Medications | Medicines on file (entered by the pharmacist) + prescriptions the patient adds | **Add prescription** |
 | Orders | Made-up orders | – |
@@ -111,7 +113,7 @@ If a key is ever found in the shared `pillway_config.toml`, the app refuses to s
 | Check-ins | Status, missed days, weekly summary, today's message | **Edit EN / Edit FR** |
 | Bot settings | How Sarah talks to this patient | Toggles, **Edit** instructions, include/skip questions |
 | Custom flag words | Extra words to watch for this patient | **+ Add a word** |
-| Consultation record | Static mock-up of Pillway's own consultation form (Phase 2) | – |
+| Consultation record | Phase 2 mock-up; account and demographic notes use the selected patient's saved details | – |
 
 ## The 5-minute stage script
 

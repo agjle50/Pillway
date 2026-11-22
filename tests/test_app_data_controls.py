@@ -363,6 +363,8 @@ class AppDataControlTests(unittest.TestCase):
 
     def test_call_choice_opens_a_preview_without_claiming_to_connect(self):
         app = SimpleNamespace(
+            patient_id="maria",
+            service=SimpleNamespace(busy=set()),
             call_open=False,
             chat_open=True,
             status="Connecting...",
@@ -379,6 +381,23 @@ class AppDataControlTests(unittest.TestCase):
         app.render.assert_called_once_with()
         PillwayApp.close_call_preview(app)
         self.assertFalse(app.call_open)
+
+    def test_call_choice_waits_while_a_chat_reply_is_processing(self):
+        app = SimpleNamespace(
+            patient_id="maria",
+            service=SimpleNamespace(busy={"maria"}),
+            call_open=False,
+            chat_open=False,
+            status="",
+            render=Mock(),
+            _cancel_checkup_animation=Mock(),
+        )
+
+        PillwayApp.checkup_choice(app, "Call")
+
+        self.assertFalse(app.call_open)
+        self.assertIn("wait", app.status)
+        app.render.assert_called_once_with()
 
     def make_app(self, directory):
         profile_store = ProfileStore(Path(directory) / "profiles.json")

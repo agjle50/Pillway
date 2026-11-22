@@ -29,16 +29,43 @@ class ChatActionsMixin:
         self.chat_open = True
         self.dropdown = None
         record = self.store.load(self.patient_id)
-        if not record["conversation"].get("session_id") or record["sessions"] and record["sessions"][-1]["kind"] != "CHAT":
+        session_id = record["conversation"].get("session_id")
+        active_session = next(
+            (session for session in record["sessions"] if session.get("id") == session_id),
+            None,
+        )
+        if self.patient_id in self.service.busy:
+            if active_session and not active_session.get("end"):
+                self._pending_session_ends.pop((self.patient_id, session_id), None)
+            else:
+                self.chat_open = False
+                self.status = "Sarah is finishing a reply. Please try opening chat again shortly."
+                self.render()
+                return
+        else:
+            for pending_patient, pending_session in list(self._pending_session_ends):
+                if pending_patient == self.patient_id:
+                    self._pending_session_ends.pop((pending_patient, pending_session), None)
             self.service.start_session(self.patient_id, "CHAT")
         self.chat_focus_requested = True
         self.render()
 
     def close_chat(self):
+        if self.call_open:
+            self.close_call_preview()
+            return
+        self._end_chat_session()
         self.chat_open = False
         self.call_open = False
         self.chat_draft = ""
         self.render()
+
+    def _end_chat_session(self):
+        if not self.chat_open:
+            return
+        session_id = self.store.load(self.patient_id)["conversation"].get("session_id")
+        if session_id:
+            self.end_session_when_idle(self.patient_id, session_id)
 
     def chat_focus_in(self, _event=None):
         if self.chat_entry and self.chat_entry.get() == self.chat_placeholder:

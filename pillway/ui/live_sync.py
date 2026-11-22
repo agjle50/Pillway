@@ -19,6 +19,7 @@ class LiveSyncMixin:
         self._last_stamp = None
         self._background_done = False
         self._background_errors = []
+        self._pending_session_ends = {}
         self.after(POLL_MS, self._poll_changes)
 
     def refresh_record(self):
@@ -30,6 +31,10 @@ class LiveSyncMixin:
 
     def _poll_changes(self):
         try:
+            for (patient_id, session_id), duration_s in list(self._pending_session_ends.items()):
+                if patient_id not in self.service.busy:
+                    self._pending_session_ends.pop((patient_id, session_id), None)
+                    self.service.end_session(patient_id, session_id, duration_s)
             stamp = (self.store.stamp(), tuple(sorted(self.service.busy)))
             if self._background_errors:
                 error = self._background_errors.pop(0)
@@ -42,6 +47,12 @@ class LiveSyncMixin:
                     self.render()
         finally:
             self.after(POLL_MS, self._poll_changes)
+
+    def end_session_when_idle(self, patient_id, session_id, duration_s=None):
+        if patient_id in self.service.busy:
+            self._pending_session_ends[(patient_id, session_id)] = duration_s
+        else:
+            self.service.end_session(patient_id, session_id, duration_s)
 
     def _user_is_typing_elsewhere(self):
         """Don't redraw under a pharmacist who is typing in a box (it would lose focus)."""

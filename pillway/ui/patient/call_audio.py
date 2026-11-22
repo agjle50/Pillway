@@ -44,6 +44,10 @@ class CallAudioMixin:
                                 if self.lang == "en" else
                                 f"{microphone_message} Passez au clavardage pour continuer.")
                            )}
+        pending_ends = getattr(self, "_pending_session_ends", {})
+        for pending_patient, pending_session in list(pending_ends):
+            if pending_patient == self.patient_id:
+                pending_ends.pop((pending_patient, pending_session), None)
         self.call_state["session_id"] = self.service.start_session(self.patient_id, "CALL")
         self.record = self.store.load(self.patient_id)
         if meter_available:
@@ -201,7 +205,10 @@ class CallAudioMixin:
         state = getattr(self, "call_state", None) or {}
         self._stop_call_input()
         if state.get("session_id") and hasattr(self, "service"):
-            self.service.end_session(self.patient_id, state["session_id"], int(time.monotonic() - state["started"]))
+            self.end_session_when_idle(
+                self.patient_id, state["session_id"],
+                int(time.monotonic() - state["started"]),
+            )
         self.call_state = {}
         self.call_open = False
         self.render()

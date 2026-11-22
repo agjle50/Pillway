@@ -13,6 +13,7 @@ What happens to one message:
 
 import time
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 
 from config import get_settings
 
@@ -70,8 +71,21 @@ class ConversationService:
         session = {"id": new_id("ses"), "kind": kind, "start": now_iso(), "end": None, "duration_s": None}
 
         def change(record):
+            previous = self._previous_interaction(record)
+            for existing in record["sessions"]:
+                if existing.get("end") is None:
+                    existing["end"] = session["start"]
+            if previous:
+                session["previous_interaction"] = previous
             record["sessions"].append(session)
             record["conversation"]["session_id"] = session["id"]
+            if record["consent"]["accepted"] and previous:
+                record["conversation"]["stage"] = "done"
+                if not record["conversation"].get("pending_flag_followup"):
+                    self._add_sarah(
+                        record, self._returning_greeting(record, previous),
+                        source="code", channel="call" if kind.upper() == "CALL" else "chat",
+                    )
         self.store.update(patient_id, change)
         return session["id"]
 
@@ -80,7 +94,82 @@ class ConversationService:
             for session in record["sessions"]:
                 if session["id"] == session_id:
                     session["end"], session["duration_s"] = now_iso(), duration_s
+            if record["conversation"].get("session_id") == session_id:
+                record["conversation"]["session_id"] = None
         return self.store.update(patient_id, change)
+
+    @staticmethod
+    def _previous_interaction(record):
+        messages_by_session = {}
+        for message in record.get("messages", []):
+            session_id = message.get("session_id")
+            if session_id:
+                messages_by_session.setdefault(session_id, []).append(message)
+        for session in reversed(record.get("sessions", [])):
+            messages = messages_by_session.get(session["id"], [])
+            patient_messages = [message for message in messages if message.get("role") == "patient"]
+            if not patient_messages:
+                continue
+            topic_message = next(
+                (message for message in reversed(patient_messages)
+                 if len(message.get("text", "").split()) >= 3),
+                patient_messages[-1],
+            )
+            contact_time = session.get("end") or patient_messages[-1].get("time") or session.get("start")
+            return {
+                "session_id": session["id"],
+                "kind": session.get("kind", "CHAT"),
+                "at": contact_time,
+                "topic": " ".join(topic_message.get("text", "").split())[:180],
+            }
+        return None
+
+    @staticmethod
+    def _returning_greeting(record, previous):
+        first_name = record.get("profile", {}).get("first_name") or ""
+        is_french = record.get("language") == "fr"
+        kind = (
+            "un appel" if previous.get("kind") == "CALL" else "un clavardage"
+        ) if is_french else (
+            "a phone call" if previous.get("kind") == "CALL" else "a chat"
+        )
+        timestamp = previous.get("at", "")
+        try:
+            last_contact = datetime.fromisoformat(timestamp)
+            now = datetime.now().astimezone()
+            if last_contact.tzinfo is None:
+                last_contact = last_contact.astimezone()
+            days_ago = (now.date() - last_contact.astimezone(now.tzinfo).date()).days
+            if is_french:
+                months = (
+                    "janvier", "février", "mars", "avril", "mai", "juin",
+                    "juillet", "août", "septembre", "octobre", "novembre", "décembre",
+                )
+                when = "aujourd'hui" if days_ago == 0 else "hier" if days_ago == 1 else (
+                    f"il y a {days_ago} jours" if 1 < days_ago < 7 else
+                    f"le {last_contact.day} {months[last_contact.month - 1]}"
+                )
+            else:
+                when = "earlier today" if days_ago == 0 else "yesterday" if days_ago == 1 else (
+                    f"{days_ago} days ago" if 1 < days_ago < 7 else
+                    "on " + last_contact.strftime("%b %d").replace(" 0", " ")
+                )
+        except (TypeError, ValueError):
+            when = "récemment" if is_french else "recently"
+        topic = previous.get("topic", "").strip()
+        if is_french:
+            topic_text = f' Nous avons parlé de « {topic} ».' if topic else ""
+            greeting = f"Bonjour {first_name}, bon retour. Notre dernier échange était {kind} {when}.{topic_text}"
+            return greeting + (
+                " Voulez-vous un bref résumé, reprendre cette conversation ou parler d'un nouveau sujet? "
+                "Vous n'avez pas besoin de vous souvenir de notre dernier échange; nous pouvons repartir à zéro."
+            )
+        topic_text = f' We talked about "{topic}".' if topic else ""
+        greeting = f"Hi {first_name}, welcome back. We last spoke by {kind} {when}.{topic_text}"
+        return greeting + (
+            " Would you like a quick recap, continue that conversation, or talk about something new? "
+            "You don't need to remember what we discussed—we can start fresh."
+        )
 
     # ---- the main entry point --------------------------------------------------
 
