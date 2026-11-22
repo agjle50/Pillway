@@ -13,7 +13,7 @@ from config import get_settings
 
 # Maria's intake questionnaire (filled in on the first screen before the check-in)
 MARIA_INTAKE = {"weight": "78", "weight_unit": "kg", "height": "162", "height_unit": "cm", "checks_bp": "yes",
-                "systolic": "142", "diastolic": "90", "tobacco": "no"}
+                "systolic": "142", "diastolic": "90", "tobacco": "no", "conditions": ["type2", "hypertension"]}
 
 # Sarah speaks first (the "Necessary check-in" popup), so the script starts with Maria's answer to
 # "Has anything changed?".
@@ -25,6 +25,8 @@ STAGE_SCRIPT = [
     "On my right heel, about two weeks, and it's getting bigger",
     "my sugar was 7.8 before breakfast at 8 am",
     "142/90 at 8 am",
+    "More than a year ago",
+    "A few times a week",
     "30 to 90",
     "None",
     "Cost of healthy food",

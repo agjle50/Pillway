@@ -12,7 +12,7 @@ import time
 from config import get_settings
 
 from ...core import check_ins
-from ...core.care_plan import blanks_to_fill
+from ...core.care_plan import blanks_to_fill, to_check
 from ...storage import app_state
 from ...storage.patient_store import display_name, initials
 from ..theme import (AMBER, AMBER_SOFT, BORDER, GREEN, GREEN_SOFT, INK, LIVE_GREEN, NAVY, PAGE_BG, RED,
@@ -199,6 +199,23 @@ class PharmacistDashboardMixin:
             canvas.create_text(x + size - self.S(36), y + self.S(21), text="LIVE", anchor="e", fill=GREEN,
                                font=self.font(9, "bold"), tags=tag)
         self.bind_click(canvas, tag, lambda pid=record["id"]: self.select_doctor_patient(pid))
+        plan = record.get("care_plan") or {}
+        if plan.get("status") in ("draft", "changes_requested"):
+            # shown even when the tile is red for an urgent flag: the drafted plan must never be missed
+            rtag = f"tile_plan::{record['id']}"
+            words = "Plan ready ▸" if plan["status"] == "draft" else "Plan: changes ▸"
+            # between the flag badge (top-left) and the LIVE marker (top-right)
+            left, right = x + self.S(34), x + size - self.S(78)
+            mid, half = (left + right) / 2, min((right - left) / 2, self.S(56))
+            self.rr(canvas, mid - half, y + self.S(9), mid + half, y + self.S(35), self.S(13), fill=AMBER,
+                    outline="", tags=rtag)
+            canvas.create_text(mid, y + self.S(22), text=words, fill=WHITE, font=self.font(12, "bold"), tags=rtag)
+            self.bind_click(canvas, rtag, lambda pid=record["id"]: self.open_patient_care_plan(pid))
+
+    def open_patient_care_plan(self, patient_id):
+        """Straight from the dashboard to this patient's drafted care plan."""
+        self.select_doctor_patient(patient_id)
+        self.select_detail_section("Care plan")
 
     def _tile_status(self, record, open_flags):
         """(words, text colour, pill colour) for a patient tile."""
@@ -211,7 +228,9 @@ class PharmacistDashboardMixin:
             return "Asked for a pharmacist", AMBER, AMBER_SOFT
         plan = record.get("care_plan") or {}
         if plan.get("status") in ("draft", "changes_requested"):
-            return f"Care plan waiting ({len(blanks_to_fill(plan))} targets to set)", AMBER, AMBER_SOFT
+            checks = len(to_check(plan)) + len(blanks_to_fill(plan))
+            return (f"Care plan ready ({checks} value{'s' if checks != 1 else ''} to check)" if checks
+                    else "Care plan ready to approve"), AMBER, AMBER_SOFT
         if check_ins.missed_check_ins(record):
             return f"Missed check-ins ({check_ins.days_since_check_in(record)} days)", AMBER, AMBER_SOFT
         return "All good", GREEN, GREEN_SOFT

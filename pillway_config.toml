@@ -117,8 +117,10 @@ voice_input = true
 text_size = 1.0
 # Show tap-to-answer buttons under Sarah's questions.
 quick_replies = true
-# Most questions Sarah asks in one check-in (there are 10 in data/questions.json; the demo is quicker with 4).
-max_questions_per_check_in = 10
+# Most questions Sarah asks in one check-in. data/questions.json has 13 core questions; only the ones that
+# fit the patient's conditions (diabetes and/or high blood pressure) are asked. Main concerns, the goal and
+# (for diabetes) the foot question are always kept.
+max_questions_per_check_in = 12
 demo_username = "maria"
 demo_password = "demo"
 

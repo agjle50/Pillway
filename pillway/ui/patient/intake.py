@@ -53,10 +53,33 @@ class IntakeMixin:
     def _intake_state(self):
         if not hasattr(self, "intake_form") or self.intake_form is None:
             self.intake_form = {"weight_unit": "kg", "height_unit": "cm", "checks_bp": None,
-                                "tobacco": None, "readiness": None}
+                                "tobacco": None, "readiness": None, "conditions": self._conditions_on_file()}
             self.intake_vars = {name: tk.StringVar(master=self) for name in FIELDS}
             self.intake_errors = {}
         return self.intake_form
+
+    def _conditions_on_file(self):
+        """Pre-tick what the pharmacy already has on file (the patient can change it)."""
+        text = " ".join((self.record or {}).get("profile", {}).get("conditions", [])).lower()
+        picked = []
+        if "type 2" in text:
+            picked.append("type2")
+        if "gestational" in text:
+            picked.append("gestational")
+        if "blood pressure" in text or "hypertension" in text:
+            picked.append("hypertension")
+        return picked
+
+    def _toggle_condition(self, key):
+        picked = self._intake_state()["conditions"]
+        if key == "unsure":
+            picked[:] = [] if "unsure" in picked else ["unsure"]
+        else:
+            if "unsure" in picked:
+                picked.remove("unsure")
+            picked.remove(key) if key in picked else picked.append(key)
+        self.intake_errors.pop("conditions", None)
+        self.render()
 
     def _intake_prefill(self):
         """Editing a finished questionnaire: start from the saved answers."""
@@ -76,6 +99,8 @@ class IntakeMixin:
             self.intake_vars["diastolic"].set(str(answers["bp_diastolic"]))
         if "smoker" in answers:
             form["tobacco"] = "yes" if answers["smoker"] else "no"
+        if answers.get("conditions"):
+            form["conditions"] = list(answers["conditions"])
         form["readiness"] = answers.get("quit_readiness")
 
     def _intake_choose(self, key, value):
@@ -117,8 +142,9 @@ class IntakeMixin:
         # left column: weight/height card, then blood pressure card
         ly = self._intake_card(left, y, "Weight and height", self._draw_weight_height)
         ly = self._intake_card(left, ly + gap, "Blood pressure", self._draw_blood_pressure)
-        # right column: tobacco
-        ry = self._intake_card(right, y, "Tobacco", self._draw_tobacco)
+        # right column: conditions, then tobacco
+        ry = self._intake_card(right, y, "Your conditions", self._draw_conditions)
+        ry = self._intake_card(right, ry + gap, "Tobacco", self._draw_tobacco)
         content_bottom = max(ly, ry)
 
         # buttons
@@ -237,6 +263,23 @@ class IntakeMixin:
             self.text(dx + box_w + self.S(10), y + self.S(35), "mmHg", 13, TEXT_MUTED)
             y = self._error("bp", x1, y + self.S(60), x2 - x1)
         return y
+
+    def _draw_conditions(self, x1, x2, y):
+        """Pillway's program covers diabetes and high blood pressure: which is the patient managing?"""
+        y = self._wrapped(x1, x2, y, "Which of these are you managing? Choose all that apply.", 15, INK, "bold")
+        y += self.S(10)
+        picked = self.intake_form["conditions"]
+        x, row_h = x1, self.S(46)
+        for key, (label_en, _fr) in intake.CONDITIONS.items():
+            probe = self.c.create_text(0, -500, text=self.tr(label_en), font=self.font(14, "bold"))
+            width = self.c.bbox(probe)[2] - self.c.bbox(probe)[0] + self.S(40)
+            self.c.delete(probe)
+            if x + width > x2 and x > x1:
+                x, y = x1, y + row_h
+            self._chips(x, y, ((key, label_en),), key if key in picked else None,
+                        lambda _v, k=key: self._toggle_condition(k), f"intake_cond_{key}")
+            x += width + self.S(10)
+        return self._error("conditions", x1, y + self.S(40), x2 - x1)
 
     def _draw_tobacco(self, x1, x2, y):
         form = self.intake_form

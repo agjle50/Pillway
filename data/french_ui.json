@@ -351,6 +351,12 @@
     "Start": "Commencer",
     "Yes": "Oui",
     "No": "Non",
-    "DeepSeek API key": "Clé d’API DeepSeek"
+    "DeepSeek API key": "Clé d’API DeepSeek",
+    "Your conditions": "Vos problèmes de santé",
+    "Which of these are you managing? Choose all that apply.": "Lesquels de ces problèmes gérez-vous? Choisissez tout ce qui s'applique.",
+    "Type 2 diabetes": "Diabète de type 2",
+    "Gestational diabetes": "Diabète gestationnel",
+    "High blood pressure": "Hypertension artérielle",
+    "Not sure": "Je ne sais pas"
   }
 }

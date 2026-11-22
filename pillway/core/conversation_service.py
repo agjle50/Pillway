@@ -27,7 +27,7 @@ from . import answer_parsing as parse
 from . import care_plan as care_plan_logic
 from . import flagging, intake, reply_builder, tasks
 from .content import advice
-from .conversation_flow import (ANSWER_HANDLERS, _generic_answer, empty_plan, go_back, plan_turn,
+from .conversation_flow import (ANSWER_HANDLERS, _generic_answer, empty_plan, go_back, plan_turn, question_fits,
                                 protein_targets, question_list, question_payload)
 from .output_guard import check_reply
 from .patient_summary import detect_changes
@@ -170,7 +170,33 @@ class ConversationService:
                     session["end"], session["duration_s"] = now_iso(), duration_s
             if record["conversation"].get("session_id") == session_id:
                 record["conversation"]["session_id"] = None
-        return self.store.update(patient_id, change)
+        record = self.store.update(patient_id, change)
+        if self.check_in_ready_for_plan(record):
+            # The patient left after answering the key questions: draft the plan anyway, so the
+            # pharmacist always gets it on the dashboard.
+            from .. import debug_log
+            debug_log.log("careplan", "patient left after the key questions: drafting the care plan", patient=patient_id)
+            kind = next((s.get("kind", "CHAT") for s in record["sessions"] if s["id"] == session_id), "CHAT")
+
+            def draft():
+                def finish(r):
+                    r["conversation"]["stage"] = "done"
+                self.store.update(patient_id, finish)
+                self.make_care_plan(patient_id, "call" if kind == "CALL" else "chat")
+            threading.Thread(target=draft, daemon=True).start()
+        return record
+
+    @staticmethod
+    def check_in_ready_for_plan(record):
+        """No plan yet, and the check-in got far enough: every question answered, or at least the
+        patient's main concerns and goal (what the plan is built around)."""
+        if record.get("care_plan") is not None or not record["consent"]["accepted"]:
+            return False
+        convo = record["conversation"]
+        if convo["stage"] not in ("questions", "wrap_up"):
+            return False
+        remaining = [q for q in question_list(record) if q["id"] not in convo["answers"]]
+        return not remaining or {"concerns", "goal"} <= set(convo["answers"])
 
     @staticmethod
     def _previous_interaction(record):
@@ -410,7 +436,8 @@ class ConversationService:
                                   "example_question": question.get(lang) or question["en"]})
         from .content import load
         extras = [{"id": q["id"], "about": q["topic"], "example_question": q.get(lang) or q["en"]}
-                  for q in load("questions")["questions"] if q.get("optional") and q["id"] not in convo["answers"]]
+                  for q in load("questions")["questions"] if q.get("optional") and q["id"] not in convo["answers"]
+                  and question_fits(record, q)]
         return {**base, "session_type": "first consultation (in place of the pharmacist's 30-minute call)",
                 "stage": convo["stage"], "remaining": remaining,
                 "optional_if_time_allows": extras,
@@ -558,9 +585,17 @@ class ConversationService:
                     convo["question_index"] = questions.index(remaining[0])
                 else:
                     convo["stage"] = "wrap_up"
-            if talk.get("finished") and not remaining and convo["stage"] in ("questions", "wrap_up"):
+            # The check-in is over when every question is answered and the patient has nothing else to
+            # add: the care plan is then ALWAYS drafted, even if the AI forgot to say it was finished.
+            nothing_else = (parse.yes_no_unsure(heard) == "no" or re.search(
+                r"that'?s (?:all|everything|it)|nothing else|no(?:pe)?,? (?:thanks|thank you)|i'?m good|c'est tout|rien d'autre",
+                heard, re.I))
+            if not remaining and convo["stage"] in ("questions", "wrap_up") and (
+                    talk.get("finished") or (nothing_else and convo.get("wrap_up_asked"))):
                 convo["stage"] = "done"
                 wants_care_plan[0] = True
+            if not remaining and convo["stage"] == "wrap_up":
+                convo["wrap_up_asked"] = True     # Sarah has now asked "anything else?"
 
             reply = talk["reply"]
             if talk.get("medication_question"):

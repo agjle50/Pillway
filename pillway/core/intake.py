@@ -36,6 +36,15 @@ SHEET = {
     18: "Average diastolic blood pressure",
 }
 
+# Pillway's program starts with diabetes and hypertension (the challenge brief). The intake asks
+# which of them the patient is managing, so Sarah's questions and the care plan fit them.
+CONDITIONS = {
+    "type2": ("Type 2 diabetes", "Diabète de type 2"),
+    "gestational": ("Gestational diabetes", "Diabète gestationnel"),
+    "hypertension": ("High blood pressure", "Hypertension artérielle"),
+    "unsure": ("Not sure", "Je ne sais pas"),
+}
+
 READINESS = {
     "not_considering": "I am not considering quitting smoking at this time",
     "thinking": "I am thinking about making changes but not ready to quit smoking at this time",
@@ -85,6 +94,15 @@ def validate(form, lang="en"):
     """
     fr = lang == "fr"
     errors, clean = {}, {}
+
+    conditions = form.get("conditions")
+    if conditions is not None:              # the screen always sends a list (older callers may not)
+        picked = [c for c in conditions if c in CONDITIONS]
+        if not picked:
+            errors["conditions"] = ("Choisissez au moins une réponse (ou « Je ne sais pas »)." if fr
+                                    else "Please choose at least one (or \"Not sure\").")
+        else:
+            clean["conditions"] = [c for c in picked if c != "unsure"] if len(picked) > 1 else picked
 
     weight, height = _number(form.get("weight")), _number(form.get("height"))
     if weight == "bad":
@@ -160,6 +178,21 @@ def apply(record, clean):
     if "bp_systolic" in clean:
         profile["last_bp"] = f"{clean['bp_systolic']}/{clean['bp_diastolic']}"
     profile["quit_readiness"] = READINESS.get(clean.get("quit_readiness"), "")
+    # conditions: what the pharmacy has on file + what the patient told us (never removed, never guessed)
+    on_file = profile.setdefault("pharmacy_conditions", list(profile.get("conditions", [])))
+    merged = list(on_file)
+    for key in clean.get("conditions", []):
+        if key == "unsure":
+            continue
+        already = " ".join(merged).lower()
+        if key == "hypertension" and ("blood pressure" in already or "hypertension" in already):
+            continue
+        if key == "type2" and "type 2" in already:
+            continue
+        if key == "gestational" and "gestational" in already:
+            continue
+        merged.append(CONDITIONS[key][0])
+    profile["conditions"] = merged
     record["intake"] = {"completed": True, "time": now_iso(), "version": VERSION, "answers": dict(clean)}
     record["health_profile"] = build_profile(record)
     return record
@@ -256,6 +289,14 @@ def build_profile(record):
     if medications:
         known.append("medications on file: " + ", ".join(medications))
     text = " ".join(conditions).lower()
+    if ("blood pressure" in text or "hypertension" in text) and not any("blood pressure" in a["area"] for a in areas):
+        areas.append({"area": "blood pressure: home readings, salt and activity",
+                      "why": "high blood pressure is one of their conditions",
+                      "ask_about": "their latest home readings, salty or packaged foods, and how active they are"})
+    if "gestational" in text:
+        areas.append({"area": "pregnancy and blood sugar",
+                      "why": "gestational diabetes",
+                      "ask_about": "how they check their sugar and what worries them; leave targets to the pharmacist"})
     if "diabetes" in text:
         areas.append({"area": "blood sugar, feet and eyes",
                       "why": "diabetes is on their pharmacy file",
@@ -308,6 +349,18 @@ def priority_questions(record):
             if word in name:
                 ids += [q for q in questions if q not in ids]
     return ids
+
+
+def condition_flags(record):
+    """(diabetes, high_blood_pressure, known): which program conditions this patient has.
+
+    known is False when nothing is on file and the patient chose "Not sure": then every check-in
+    question is asked, so nothing important is skipped.
+    """
+    text = " ".join(record.get("profile", {}).get("conditions", [])).lower()
+    diabetes = "diabet" in text
+    pressure = "blood pressure" in text or "hypertension" in text
+    return diabetes, pressure, diabetes or pressure
 
 
 def task_entry(record, lang="en"):

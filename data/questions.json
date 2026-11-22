@@ -74,6 +74,9 @@
         "Mes pieds vont bien",
         "J'ai remarqué quelque chose",
         "Je ne les vérifie pas"
+      ],
+      "for": [
+        "diabetes"
       ]
     },
     {
@@ -89,6 +92,9 @@
       "quick_fr": [
         "Je n'ai pas de mesure récente",
         "Je ne la vérifie pas à la maison"
+      ],
+      "for": [
+        "diabetes"
       ]
     },
     {
@@ -104,6 +110,48 @@
       "quick_fr": [
         "Je ne l'ai pas vérifiée",
         "Je n'ai pas de tensiomètre"
+      ]
+    },
+    {
+      "id": "eyes",
+      "topic": "eye health",
+      "care_plan_section": "pharmacist_identified_goals",
+      "source": "https://www.diabetes.ca/living-with-diabetes/managing-complications/eye-damage-diabetic-retinopathy",
+      "en": "Diabetes can affect the eyes without early signs. When was your last eye exam where they put drops in your eyes?",
+      "fr": "Le diabète peut toucher les yeux sans signe au début. À quand remonte votre dernier examen de la vue avec des gouttes dans les yeux?",
+      "quick_en": [
+        "In the last year",
+        "More than a year ago",
+        "Never / not sure"
+      ],
+      "quick_fr": [
+        "Dans la dernière année",
+        "Il y a plus d'un an",
+        "Jamais / je ne sais pas"
+      ],
+      "optional": false,
+      "for": [
+        "diabetes"
+      ]
+    },
+    {
+      "id": "salt",
+      "topic": "salt",
+      "care_plan_section": "blood_pressure",
+      "for": [
+        "blood pressure"
+      ],
+      "en": "Salt raises blood pressure. How often do you eat salty or packaged foods, like canned soup, deli meat, chips or takeout?",
+      "fr": "Le sel fait monter la tension. À quelle fréquence mangez-vous des aliments salés ou transformés, comme des soupes en conserve, des charcuteries, des croustilles ou des repas à emporter?",
+      "quick_en": [
+        "Most days",
+        "A few times a week",
+        "Rarely"
+      ],
+      "quick_fr": [
+        "La plupart des jours",
+        "Quelques fois par semaine",
+        "Rarement"
       ]
     },
     {
@@ -181,26 +229,10 @@
         "Une ou deux fois",
         "Souvent"
       ],
-      "optional": true
-    },
-    {
-      "id": "eyes",
-      "topic": "eye health",
-      "care_plan_section": "pharmacist_identified_goals",
-      "source": "https://www.diabetes.ca/living-with-diabetes/managing-complications/eye-damage-diabetic-retinopathy",
-      "en": "When was your last eye exam where they put drops in to check the back of your eyes?",
-      "fr": "À quand remonte votre dernier examen des yeux avec des gouttes pour vérifier le fond de l'œil?",
-      "quick_en": [
-        "In the last year",
-        "More than a year ago",
-        "Never / not sure"
-      ],
-      "quick_fr": [
-        "Dans la dernière année",
-        "Il y a plus d'un an",
-        "Jamais / je ne sais pas"
-      ],
-      "optional": true
+      "optional": true,
+      "for": [
+        "diabetes"
+      ]
     },
     {
       "id": "mood",

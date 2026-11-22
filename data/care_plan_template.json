@@ -1,5 +1,5 @@
 {
- "_about": "Pillway's SIMPLE care plan. Four short sections in everyday words. 'suggested' lines get a value the AI (or the backup rules) proposes from the patient's answers; the pharmacist must check each one (it's highlighted with the reason) and can change it. 'computed' = worked out by the app (protein from weight). Lines are only included when the patient's answers make them relevant (rules in pillway/core/care_plan.py). 'recommendations' is the fixed list from Pillway's guidelines: the AI can only choose from it, never invent new ones. The longer original template (copied from 'diabets care plan.pdf') is in git history.",
+ "_about": "Pillway's SIMPLE care plan. Four short sections in everyday words. 'suggested' lines get a value the AI (or the backup rules) proposes from the patient's answers; the pharmacist must check each one (it's highlighted with the reason) and can change it. 'computed' = worked out by the app (protein from weight). Lines are only included when the patient's answers make them relevant (rules in pillway/core/care_plan.py). Topics follow Pillway's brief (diet, health and lifestyle, smoking, eye health/retinopathy, feet, blood sugar, blood pressure) and only fit the patient's conditions. 'recommendations' is the fixed list from Pillway's guidelines: the AI can only choose from it, never invent new ones. The longer original template (copied from 'diabets care plan.pdf') is in git history.",
  "source_pdf": "docs/diabets care plan.pdf",
  "journey_steps": [
   {
@@ -113,6 +113,12 @@
    "en": "Talk to your pharmacist about support to quit smoking, when you feel ready.",
    "fr": "Parlez à votre pharmacien du soutien pour arrêter de fumer, quand vous serez prêt(e).",
    "when": "uses tobacco and is ready or thinking about quitting"
+  },
+  {
+   "id": "eye_exam",
+   "en": "Get a dilated eye exam every 1 to 2 years, or as your eye doctor advises: diabetes can damage the eyes (retinopathy) before you notice any change.",
+   "fr": "Faites un examen de la vue avec dilatation tous les 1 à 2 ans, ou selon les conseils de votre optométriste : le diabète peut endommager les yeux (rétinopathie) avant que vous remarquiez un changement.",
+   "when": "diabetes (eye health / retinopathy)"
   }
  ],
  "sections": [
@@ -193,6 +199,12 @@
      "kind": "template",
      "en": "Check your blood pressure at the same time each day and write it down.",
      "fr": "Mesurez votre tension artérielle à la même heure chaque jour et notez-la."
+    },
+    {
+     "id": "salt_daily",
+     "kind": "template",
+     "en": "Maintain a low-sodium diet and reduce processed foods: check labels, and cook at home more often.",
+     "fr": "Adoptez une alimentation faible en sodium et réduisez les aliments transformés : lisez les étiquettes et cuisinez plus souvent à la maison."
     }
    ]
   },
@@ -213,6 +225,27 @@
      "kind": "template",
      "en": "Tell your {pharmacy} pharmacist about any side effects or new medicines.",
      "fr": "Informez votre pharmacien {pharmacy} de tout effet secondaire ou nouveau médicament."
+    }
+   ]
+  },
+  {
+   "id": "resources",
+   "en": "Helpful resources",
+   "fr": "Ressources utiles",
+   "lines": [
+    {
+     "id": "res_diabetes",
+     "kind": "resource",
+     "for": "diabetes",
+     "en": "Diabetes Canada, tools and resources (plain-language guides on food, feet, eyes and more): https://www.diabetes.ca/living-with-diabetes/tools-and-resources",
+     "fr": "Diabète Canada, outils et ressources (guides simples sur l'alimentation, les pieds, les yeux et plus) : https://www.diabetes.ca/living-with-diabetes/tools-and-resources"
+    },
+    {
+     "id": "res_pressure",
+     "kind": "resource",
+     "for": "blood pressure",
+     "en": "Hypertension Canada, blood pressure basics and how to measure it at home: https://hypertension.ca",
+     "fr": "Hypertension Canada, les bases de la tension artérielle et comment la mesurer à la maison : https://hypertension.ca"
     }
    ]
   }

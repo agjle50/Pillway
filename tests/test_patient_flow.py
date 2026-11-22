@@ -92,7 +92,11 @@ class StageScriptTests(unittest.TestCase):
         plan = record["care_plan"]
         self.assertEqual(plan["status"], "draft")
         ids = [s["id"] for s in plan["sections"]]
-        self.assertEqual(ids, ["smart_goals", "targets", "recommended", "every_day", "medications"])
+        self.assertEqual(ids, ["smart_goals", "targets", "recommended", "every_day", "medications", "resources"])
+        all_ids = {line["id"] for s in plan["sections"] for line in s["lines"]}
+        self.assertIn("rec_eye_exam", all_ids)        # retinopathy: a Pillway care plan topic
+        self.assertIn("salt_daily", all_ids)          # she has high blood pressure
+        self.assertTrue({"res_diabetes", "res_pressure"} <= all_ids)
         # suggested values are filled in but wait for the pharmacist
         a1c = care_plan.find_line(plan, "a1c_target")
         self.assertEqual(a1c["value"], "7.0")
