@@ -251,10 +251,58 @@ class VoiceCutOffTests(unittest.TestCase):
                 raise RuntimeError("voice service hiccup")
             said.append(chunk)
             return "first.mp3"
-        with patch.object(natural_voice, "available", return_value=True), \
+        with patch.object(natural_voice, "ONE_PIECE", 100), \
+                patch.object(natural_voice, "available", return_value=True), \
                 patch.object(natural_voice, "synthesize", side_effect=fake_synthesize), \
                 patch.object(natural_voice, "play"), \
                 patch.object(tts, "_speak_system", side_effect=lambda text, lang, gen: said.append(text)):
             tts._speak_natural(long_text, "en", tts._current["generation"])
         self.assertEqual(len(said), 2)
         self.assertIn("More words follow", said[1])   # the rest was read, not silently dropped
+
+
+class FillerTests(unittest.TestCase):
+    def test_a_slow_reply_gets_a_short_filler_once_and_then_the_reply(self):
+        app = call_app()
+        app.patient_id = "maria"
+        app.service = SimpleNamespace(busy={"maria"})
+        app.call_caption_lines = lambda: lines
+        lines = []
+        app._speak_on_call = lambda text: PillwayApp._speak_on_call(app, text)
+        app.call_state["waiting_since"] = time.monotonic() - 2      # 2 s and still no reply
+        with patch("pillway.ui.patient.call_audio.speak") as speak:
+            PillwayApp._maybe_say_filler(app)
+            PillwayApp._maybe_say_filler(app)                       # never twice for one reply
+            self.assertEqual(speak.call_count, 1)
+            self.assertIn("moment", speak.call_args.args[0])
+            lines.append({"role": "sarah", "id": "r1", "text": "Here's my answer."})
+            PillwayApp._speak_new_replies(app)                      # waits: filler still playing
+            self.assertEqual(speak.call_count, 1)
+            speak.call_args.kwargs["on_done"]()
+            PillwayApp._speak_new_replies(app)
+        self.assertEqual(speak.call_args.args[0], "Here's my answer.")
+
+    def test_a_quick_reply_gets_no_filler(self):
+        app = call_app()
+        app.patient_id, app.service = "maria", SimpleNamespace(busy={"maria"})
+        app.call_state["waiting_since"] = time.monotonic() - 0.4
+        with patch("pillway.ui.patient.call_audio.speak") as speak:
+            PillwayApp._maybe_say_filler(app)
+        speak.assert_not_called()
+
+
+class KeyLookupTests(unittest.TestCase):
+    def test_the_key_saved_in_the_app_wins_and_wrong_company_keys_are_skipped(self):
+        import tempfile
+        from pathlib import Path
+        from config import load_settings
+        root = Path(tempfile.mkdtemp())
+        (root / ".gitignore").write_text("pillway_config.local.toml\n")
+        (root / "pillway_config.toml").write_text('[ai]\nprovider = "deepseek"\n')
+        (root / "pillway_config.local.toml").write_text('[ai]\napi_key = " sk-fromtheapp1234 "\n')
+        settings = load_settings(root, env={"DEEPSEEK_API_KEY": "sk-oldoldold9999"})
+        self.assertEqual(settings.api_key, "sk-fromtheapp1234")        # spaces cleaned, app key wins
+        self.assertTrue(any("NOT used" in w for w in settings.warnings))
+        (root / "pillway_config.local.toml").write_text('[ai]\napi_key = "AIzaOLDGEMINIKEY"\n')
+        settings = load_settings(root, env={"DEEPSEEK_API_KEY": "Bearer sk-rightkey5678"})
+        self.assertEqual(settings.api_key, "sk-rightkey5678")          # the Gemini key is skipped

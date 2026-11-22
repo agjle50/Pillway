@@ -22,7 +22,7 @@ from .speech_input import MIC_BLOCKED_HINT, audio_level
 
 RATE = 16000
 BLOCK = 1600                       # 0.1 s
-END_SILENCE = 0.8                  # seconds of quiet that end a sentence
+END_SILENCE = 0.6                  # seconds of quiet that end a sentence (shorter = Sarah answers sooner)
 MAX_UTTERANCE = 20.0               # seconds; longer speech is cut and sent in pieces
 PRE_ROLL = 3                       # blocks kept from just before speech started
 
@@ -87,7 +87,7 @@ def transcribe(model, raw, lang):
     import numpy as np
     audio = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
     segments, _info = model.transcribe(
-        audio, language="fr" if lang == "fr" else "en", beam_size=2, vad_filter=False,
+        audio, language="fr" if lang == "fr" else "en", beam_size=1, vad_filter=False,
         condition_on_previous_text=False, initial_prompt=PROMPT.get(lang, PROMPT["en"]),
         no_speech_threshold=0.6, temperature=0.0)
     parts = [seg.text.strip() for seg in segments if getattr(seg, "no_speech_prob", 0) < 0.6]

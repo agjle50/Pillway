@@ -73,7 +73,9 @@ def speech_text(text, lang="en"):
     return re.sub(r"\s{2,}", " ", text).strip(" ,")
 
 
-ONE_PIECE = 420      # replies up to this many characters are voiced in one go (no gaps at all)
+# Replies up to this many characters are voiced in ONE piece: no gaps or pauses between parts.
+# (Sarah's replies are a few sentences, so in practice every reply is one smooth piece.)
+ONE_PIECE = 3000
 
 
 def sentences(text):

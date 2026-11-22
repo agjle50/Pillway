@@ -163,7 +163,7 @@ class CallMixin:
         if state.get("muted"):
             return "Votre micro est coupé" if fr else "Your mic is muted"
         if self.patient_id in self.service.busy:
-            return "Sarah réfléchit…" if fr else "Thinking…"
+            return "Sarah réfléchit…" if fr else "Sarah is thinking…"
         return "Sarah vous écoute" if fr else "Listening"
 
     # ---- "we can't hear you" card -----------------------------------------------------------

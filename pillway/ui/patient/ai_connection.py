@@ -82,6 +82,13 @@ class AIConnectionMixin:
                   f"Key …{settings.api_key[-4:]} from {settings.api_key_source}." if live else
                   self.service.brain.status_note() or f"Paste a {label} below to connect.")
         self.text(x1 + self.S(20), top + self.S(58), detail, 13, TEXT_DARK)
+        ignored = [item for item in getattr(settings, "api_keys_found", []) if not item["used"]
+                   and item["ends"] != settings.api_key[-4:]]
+        if ignored:   # another key on this computer could be confusing: say which one is used
+            names = ", ".join(f"…{i['ends']} ({i['kind']}) in {i['source']}" for i in ignored)
+            self.c.create_text(x2 + self.S(16), top, anchor="nw", width=int(self.S(300)), fill=RED,
+                               font=self.font(12), text=f"Other keys found and NOT used: {names}. "
+                               "Remove them if they're old (see python Pillway.py --check-ai).")
 
         # key field
         y = top + self.S(116)
@@ -111,7 +118,8 @@ class AIConnectionMixin:
                   + billing))
 
     def save_ai_key(self):
-        key = (self.ai_key_entry.get() if getattr(self, "ai_key_entry", None) else "").strip()
+        from config.loader import clean_key
+        key = clean_key(self.ai_key_entry.get() if getattr(self, "ai_key_entry", None) else "")
         provider = get_settings().ai.provider
         if not KEY_PATTERNS[provider].match(key):
             start = "sk-" if provider == "deepseek" else "AIza"
@@ -126,6 +134,8 @@ class AIConnectionMixin:
             self.render()
             return
         settings.api_key, settings.api_key_source = key, LOCAL_FILE
+        for item in getattr(settings, "api_keys_found", []):
+            item["used"] = item["source"] == LOCAL_FILE
         settings.ai.demo_mode = False
         self._reconnect_ai()
         self.ai_connection_status = "Saved. Testing the connection…"
