@@ -23,11 +23,17 @@ RED_TEXT = "#c42b2b"       # brand red, deepened for small text on white (5.9:1 
 TEXT_SUBTLE = "#5d6880"    # timestamps and hints (still 5.6:1 on white)
 BORDER_SOFT = "#e3e7ee"    # dividers inside cards
 NAV_SELECTED = "#1d2570"   # selected row in the pharmacist's dark sidebar
-# Google-style (Material) surfaces, tinted from the brand navy
-SURFACE = "#f6f7fc"        # window background behind the white sheets
-SURFACE_HIGH = "#eceef8"   # Sarah's bubbles, message box, quiet buttons
+# Pillway surfaces: a cool blue-grey canvas behind white cards.
+SURFACE = "#e9edf6"
+SURFACE_HIGH = "#f3f5fa"
 TONAL = "#dfe3f6"          # selected item in the side menu (navy text on it: 13:1)
 ORANGE = "#f28c28"
+HOVER = "#f1f3f7"
+SIDEBAR_BG = "#080c38"
+SIDEBAR_HOVER = "#151b55"
+SIDEBAR_SELECTED = "#ffffff"
+SIDEBAR_TEXT = "#f4f5ff"
+SIDEBAR_SELECTED_TEXT = "#ef3f3f"
 AMBER = "#b26a00"
 AMBER_SOFT = "#fff4e5"
 GREEN = "#1e7a46"
@@ -41,7 +47,7 @@ INK = "#101a3c"
 NAV_TEXT = "#edf0ff"
 NAV_ICON = "#c3cbef"
 DIVIDER = "#2a3170"
-SHADOW = "#e8ebf2"
+SHADOW = "#e1e5ed"
 TOGGLE_OFF = "#d5dae4"
 CHAT_BG = "#ffffff"
 PAGE_BG = "#f5f6fa"
@@ -51,7 +57,8 @@ BLACK_SIDEBAR_TEXT = "#e9e9ef"
 FOCUS = "#2563eb"
 
 # Fonts: the first one installed on this computer wins (Windows, Mac, then Linux).
-FONT_CHOICES = ("Segoe UI", "SF Pro Text", "SF Pro", "Helvetica Neue", "Arial", "DejaVu Sans")
+FONT_CHOICES = ("Century Gothic", "Arial Rounded MT Bold", "Segoe UI", "SF Pro Text",
+                "SF Pro", "Helvetica Neue", "Arial", "DejaVu Sans")
 FONT = FONT_CHOICES[0]
 
 # The design canvas size. Everything is drawn at this size and scaled to the window.

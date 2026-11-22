@@ -84,7 +84,8 @@ class AppDataControlTests(unittest.TestCase):
         items[0][2]()
 
         self.assertEqual(title, "Notifications")
-        self.assertIn("New patient ticket: Maria Rossi", items[0][0])
+        self.assertEqual(items[0][0], "Maria Rossi")
+        self.assertEqual(items[0][1], "17:00")
         app.select_doctor_patient.assert_called_once_with("maria")
         self.assertTrue(PillwayApp.unread_notifications(app))
 
@@ -98,6 +99,17 @@ class AppDataControlTests(unittest.TestCase):
         _title, items = PillwayApp.dropdown_items(app)
 
         self.assertEqual(items[0][0], "No notifications yet")
+
+    def test_patient_notifications_show_only_patient_and_time(self):
+        app = SimpleNamespace(
+            role="patient",
+            dropdown="notifications",
+            notifications=[("Maria Rossi", "2026-11-21T17:00:00-05:00")],
+        )
+
+        _title, items = PillwayApp.dropdown_items(app)
+
+        self.assertEqual(items, [("Maria Rossi", "17:00", None)])
 
     def test_clickable_plays_a_short_system_sound_before_running_action(self):
         class ClickHarness:

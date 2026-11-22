@@ -1,14 +1,105 @@
 """Profile editor and account switching page."""
 
 import tkinter as tk
+from tkinter import filedialog, messagebox
 
 from ..theme import (
     BORDER,
+    BORDER_SOFT,
+    HOVER,
     INK,
+    PAGE_BG,
     RED,
+    SHADOW,
     TEXT_MUTED,
     WHITE,
 )
+
+PROFILE_FIELDS = (
+    ("Personal information", (
+        ("First name*", "first_name", "entry"),
+        ("Last name*", "last_name", "entry"),
+        ("Date of birth*", "date_of_birth", "entry"),
+        ("Phone number*", "phone", "entry"),
+        ("Sex at birth*", "sex", "sex"),
+        ("Relationship", "relationship", "relationship"),
+        ("Email", "email", "entry"),
+    )),
+    ("Health card", (
+        ("Health card number (optional)", "health_card", "entry"),
+    )),
+    ("Insurance", (
+        ("Cardholder name", "insurance_cardholder", "entry"),
+        ("Insurance provider", "insurance_provider", "entry"),
+        ("Carrier number", "insurance_carrier_number", "entry"),
+        ("Contract/group number", "insurance_group_number", "entry"),
+        ("Member ID/certificate number", "insurance_member_number", "entry"),
+    )),
+    ("Delivery address", (
+        ("Street number and name*", "street_address", "entry"),
+        ("Province*", "province", "province"),
+        ("City*", "city", "entry"),
+        ("Postal code*", "postal_code", "entry"),
+        ("Unit or apartment number", "apartment", "entry"),
+        ("Entry or buzzer code", "buzzer_code", "entry"),
+        ("Delivery instructions", "delivery_instructions", "entry"),
+    )),
+)
+
+PHOTO_FIELDS = ("insurance_card_front", "insurance_card_back")
+COMPLETION_FIELDS = tuple(
+    field for _, fields in PROFILE_FIELDS for _, field, _ in fields
+) + PHOTO_FIELDS
+PROFILE_PAGES = PROFILE_FIELDS + (("Insurance card photos", ()),)
+
+
+def profile_form_values(profile):
+    address = str(profile.get("address") or "")
+    parts = [part.strip() for part in address.split(",") if part.strip()]
+    street = profile.get("street_address") or (parts[0] if parts else "")
+    city = profile.get("city") or ""
+    province = profile.get("province") or ""
+    if len(parts) > 1 and not city:
+        location = parts[-1].split()
+        if location and len(location[-1]) == 2 and location[-1].isalpha():
+            province = province or location.pop().upper()
+        city = " ".join(location)
+    province = {
+        "AB": "Alberta", "BC": "British Columbia", "MB": "Manitoba",
+        "NB": "New Brunswick", "NL": "Newfoundland and Labrador",
+        "NS": "Nova Scotia", "NT": "Northwest Territories", "NU": "Nunavut",
+        "ON": "Ontario", "PE": "Prince Edward Island", "QC": "Quebec",
+        "SK": "Saskatchewan", "YT": "Yukon",
+    }.get(str(province).upper(), province)
+
+    values = {
+        key: str(profile.get(key) or "")
+        for _, fields in PROFILE_FIELDS
+        for _, key, _ in fields
+    }
+    values.update(
+        street_address=str(street),
+        city=str(city),
+        province=str(province),
+        insurance_card_front=str(profile.get("insurance_card_front") or ""),
+        insurance_card_back=str(profile.get("insurance_card_back") or ""),
+    )
+    return values
+
+
+def format_profile_address(values):
+    street = values.get("street_address", "").strip()
+    city = values.get("city", "").strip()
+    province = values.get("province", "").strip()
+    postal_code = values.get("postal_code", "").strip()
+    location = " ".join(part for part in (city, province, postal_code) if part)
+    return ", ".join(part for part in (street, location) if part)
+
+
+def profile_completion(record):
+    values = profile_form_values(record.get("profile", {}))
+    completed = sum(bool(values.get(field, "").strip()) for field in COMPLETION_FIELDS)
+    return round(completed * 100 / len(COMPLETION_FIELDS))
 
 
 class ManageProfilesMixin:
@@ -35,23 +126,23 @@ class ManageProfilesMixin:
         list_y = y
         list_w = x2 - x1
         list_h = max(self.S(80), self.h - list_y - self.S(20))
-        outer = tk.Frame(self, bg=WHITE, bd=0, highlightthickness=0)
+        outer = tk.Frame(self, bg=PAGE_BG, bd=0, highlightthickness=0)
         self.profiles_view_frame = outer
-        canvas = tk.Canvas(outer, bg=WHITE, bd=0, highlightthickness=0)
+        canvas = tk.Canvas(outer, bg=PAGE_BG, bd=0, highlightthickness=0)
         scrollbar = tk.Scrollbar(outer, orient="vertical", command=canvas.yview)
         canvas.configure(yscrollcommand=scrollbar.set)
         canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
-        body = tk.Frame(canvas, bg=WHITE, padx=max(10, int(self.S(4))))
+        body = tk.Frame(canvas, bg=PAGE_BG, padx=max(10, int(self.S(4))))
         body_window = canvas.create_window((0, 0), window=body, anchor="nw")
-        body.bind("<Configure>", lambda _event: canvas.configure(scrollregion=canvas.bbox("all")))
+        body.bind("<Configure>", lambda *_: canvas.configure(scrollregion=canvas.bbox("all")))
         canvas.bind("<Configure>", lambda event: canvas.itemconfigure(body_window, width=event.width))
         role_labels = (("Patient", "Patient profiles"), ("Pharmacist", "Pharmacist profiles"))
         for role, label in role_labels:
             profiles = [profile for profile in self.profiles.values() if profile["role"] == role]
             if not profiles:
                 continue
-            tk.Label(body, text=label, bg=WHITE, fg=INK,
+            tk.Label(body, text=label, bg=PAGE_BG, fg=INK,
                      font=self.font(18, "bold"), anchor="w").pack(
                          fill="x", pady=(self.S(12), self.S(8)))
             for profile in profiles:
@@ -64,22 +155,50 @@ class ManageProfilesMixin:
         )
 
     def _draw_profile_card(self, parent, profile):
-        card = tk.Frame(
-            parent, bg=WHITE, bd=0, highlightthickness=1,
-            highlightbackground=BORDER, padx=self.S(18), pady=self.S(14),
-        )
+        height = max(1, int(self.S(156)))
+        card = tk.Canvas(parent, bg=PAGE_BG, bd=0, highlightthickness=0, height=height)
         card.pack(fill="x", pady=(0, self.S(10)))
-        details = tk.Frame(card, bg=WHITE)
+        content = tk.Frame(card, bg=WHITE, padx=self.S(16), pady=self.S(12))
+        window = card.create_window(self.S(14), self.S(10), window=content, anchor="nw")
+
+        def rounded(width, item_height, offset=0):
+            radius = self.S(16)
+            top = self.S(3) + offset
+            left, right = self.S(4), width - self.S(4)
+            bottom = item_height - self.S(4) + offset
+            return [
+                left + radius, top, right - radius, top, right, top, right, top + radius,
+                right, bottom - radius, right, bottom, right - radius, bottom,
+                left + radius, bottom, left, bottom, left, bottom - radius, left, top + radius,
+                left, top,
+            ]
+
+        shadow = card.create_polygon(
+            *rounded(800, height, self.S(3)), smooth=True, fill=SHADOW, outline=""
+        )
+        surface = card.create_polygon(
+            *rounded(800, height), smooth=True, fill=WHITE, outline=BORDER_SOFT, width=1
+        )
+        card.tag_lower(shadow)
+        card.tag_lower(surface)
+
+        def resize(event):
+            card.coords(shadow, *rounded(event.width, height, self.S(3)))
+            card.coords(surface, *rounded(event.width, height))
+            card.itemconfigure(window, width=max(1, event.width - self.S(28)))
+
+        card.bind("<Configure>", resize, add="+")
+        details = tk.Frame(content, bg=WHITE)
         details.pack(fill="x")
         tk.Label(details, text=profile["name"], bg=WHITE, fg=INK,
                  font=self.font(16, "bold"), anchor="w").pack(side="left")
         if profile["id"] == self.active_profile_id:
             tk.Label(details, text="Current profile", bg="#f5f6f8", fg=TEXT_MUTED,
                      font=self.font(10, "bold"), padx=self.S(9), pady=self.S(4)).pack(side="right")
-        tk.Label(card, text=profile.get("description", ""), bg=WHITE, fg=TEXT_MUTED,
+        tk.Label(content, text=profile.get("description", ""), bg=WHITE, fg=TEXT_MUTED,
                  font=self.font(11), anchor="w", wraplength=max(200, int(self.S(700)))).pack(
                      fill="x", pady=(self.S(5), self.S(12)))
-        actions = tk.Frame(card, bg=WHITE)
+        actions = tk.Frame(content, bg=WHITE)
         actions.pack(fill="x")
         tk.Button(
             actions, text="Switch profile",
@@ -90,27 +209,72 @@ class ManageProfilesMixin:
             padx=self.S(14), pady=self.S(8),
         ).pack(side="right")
         menu_button = tk.Button(
-            actions, text="...", command=lambda selected=profile["id"]:
+            actions, text="⋯", command=lambda selected=profile["id"]:
             self._show_profile_actions(selected, menu_button),
             bg=WHITE, fg=INK, activebackground="#f5f6f8",
-            relief="solid", bd=1, font=self.font(13, "bold"), cursor="hand2",
-            padx=self.S(12), pady=self.S(6),
+            relief="flat", bd=0, highlightthickness=1,
+            highlightbackground=BORDER_SOFT, font=self.font(18, "bold"), cursor="hand2",
+            padx=self.S(10), pady=self.S(3),
         )
         menu_button.pack(side="right", padx=(0, self.S(8)))
+
+        def set_hover(active):
+            color = HOVER if active else WHITE
+            card.itemconfigure(surface, fill=color)
+            self._set_profile_card_color(content, color)
+
+        def switch_from_card(_event=None):
+            if profile["id"] != self.active_profile_id:
+                self.switch_profile(profile["id"])
+            return "break"
+
+        def bind_card(widget):
+            if isinstance(widget, tk.Button):
+                widget.bind("<Enter>", lambda *_: set_hover(True), add="+")
+                widget.bind("<Leave>", lambda *_: set_hover(False), add="+")
+                return
+            widget.bind("<Enter>", lambda *_: set_hover(True), add="+")
+            widget.bind("<Leave>", lambda *_: set_hover(False), add="+")
+            widget.bind("<Button-1>", switch_from_card, add="+")
+            for child in widget.winfo_children():
+                bind_card(child)
+
+        bind_card(card)
+        card.bind("<Enter>", lambda *_: set_hover(True), add="+")
+        card.bind("<Leave>", lambda *_: set_hover(False), add="+")
+
+    def _set_profile_card_color(self, widget, color):
+        try:
+            widget.configure(bg=color)
+        except tk.TclError:
+            return
+        for child in widget.winfo_children():
+            if not isinstance(child, tk.Button):
+                self._set_profile_card_color(child, color)
 
     def _show_profile_actions(self, profile_id, button):
         profile = self.profiles[profile_id]
         role_count = sum(item["role"] == profile["role"] for item in self.profiles.values())
-        menu = tk.Menu(self, tearoff=0, font=self.font(11), bg=WHITE, fg=INK,
-                       activebackground="#eef1f6", activeforeground=INK)
+        items = []
         if profile["role"] == "Patient":
-            menu.add_command(label="Edit profile", command=lambda: self.edit_profile(profile_id))
-        menu.add_command(
-            label="Delete profile", command=lambda: self.delete_profile(profile_id),
-            state="normal" if role_count > 1 else "disabled",
+            items.append(
+                ("Edit profile", lambda: self.edit_profile(profile_id), INK)
+            )
+        items.append(
+            ("Switch profile",
+             lambda: self.switch_profile(profile_id)
+             if profile_id != self.active_profile_id else None,
+             INK if profile_id != self.active_profile_id else TEXT_MUTED)
         )
-        menu.tk_popup(button.winfo_rootx(), button.winfo_rooty() + button.winfo_height())
-        menu.grab_release()
+        items.append(
+            ("Delete profile",
+             lambda: self.delete_profile(profile_id) if role_count > 1 else None,
+             RED if role_count > 1 else TEXT_MUTED)
+        )
+        width = int(self.S(220))
+        x = button.winfo_rootx() + button.winfo_width() - width
+        y = button.winfo_rooty() + button.winfo_height()
+        self._show_branded_menu(x, y, items, width=width, row_height=int(self.S(46)))
 
     def edit_profile(self, profile_id):
         if profile_id not in self.profiles:
@@ -186,7 +350,7 @@ class ManageProfilesMixin:
         tk.Button(
             controls, text="Previous", command=lambda: self._set_profile_page(page_index - 1),
             state="normal" if page_index else "disabled",
-            bg=WHITE, fg=INK, relief="solid", bd=1,
+            bg=HOVER, fg=INK, relief="flat", bd=0,
             font=self.font(11), cursor="hand2", padx=self.S(12), pady=self.S(7),
         ).pack(side="left")
         dots = tk.Frame(controls, bg=WHITE)
@@ -199,12 +363,13 @@ class ManageProfilesMixin:
                 activebackground=WHITE, relief="flat", bd=0,
                 font=self.font(12), cursor="hand2", padx=self.S(3),
             ).pack(side="left")
-        selector = ttk.Combobox(
-            controls, state="readonly", values=[item[0] for item in PROFILE_PAGES],
-            font=self.font(10), width=22,
+        selector = tk.Button(
+            controls, text=f"{title}  v",
+            command=lambda: self._show_profile_page_menu(selector),
+            bg=WHITE, fg=INK, activebackground=HOVER, activeforeground=INK,
+            relief="flat", bd=0, font=self.font(10), cursor="hand2",
+            padx=self.S(10), pady=self.S(8),
         )
-        selector.current(page_index)
-        selector.bind("<<ComboboxSelected>>", lambda _event: self._set_profile_page(selector.current()))
         selector.pack(side="left", padx=self.S(8))
         if page_index == len(PROFILE_PAGES) - 1:
             tk.Button(
@@ -225,6 +390,18 @@ class ManageProfilesMixin:
             width=max(1, int(x2 - x1)), height=max(1, int(panel_h)),
         )
         self._bind_profile_swipe(panel)
+
+    def _show_profile_page_menu(self, button):
+        x = button.winfo_rootx()
+        y = button.winfo_rooty() + button.winfo_height()
+        items = [
+            (title, lambda selected=index: self._set_profile_page(selected), INK)
+            for index, (title, _fields) in enumerate(PROFILE_PAGES)
+        ]
+        self._show_branded_menu(
+            x, y, items, width=max(int(self.S(220)), button.winfo_width()),
+            row_height=int(self.S(42)),
+        )
 
     def _profile_variables(self, record):
         profile = record.get("profile", {})
@@ -273,7 +450,7 @@ class ManageProfilesMixin:
         row = tk.Frame(parent, bg=WHITE)
         row.pack(fill="x", pady=(0, self.S(9)))
         tk.Label(row, text=label, bg=WHITE, fg=TEXT_MUTED,
-                 font=self.font(11), anchor="w").pack(fill="x", pady=(0, self.S(4)))
+                 font=self.font(12), anchor="w").pack(fill="x", pady=(0, self.S(5)))
         if kind == "sex":
             choices = ("", "Female", "Male", "Intersex", "Prefer not to say")
         elif kind == "relationship":
@@ -287,16 +464,87 @@ class ManageProfilesMixin:
             )
         else:
             choices = ()
+        field_height = max(1, int(self.S(46)))
+        field = tk.Canvas(
+            row, bg=WHITE, height=field_height, bd=0, highlightthickness=0,
+            cursor="hand2" if choices else "xterm",
+        )
+        field.pack(fill="x")
+
+        def rounded(width, height):
+            radius = self.S(9)
+            return [
+                radius, 1, width - radius, 1, width - 1, 1, width - 1, radius,
+                width - 1, height - radius, width - 1, height - 1,
+                width - radius, height - 1, radius, height - 1,
+                1, height - 1, 1, height - radius, 1, radius, 1, 1,
+            ]
+
+        shape = field.create_polygon(
+            *rounded(500, field_height), smooth=True, fill=WHITE,
+            outline=BORDER_SOFT, width=1,
+        )
         if choices:
-            widget = ttk.Combobox(row, textvariable=variable, values=choices, font=self.font(13))
-            widget.pack(fill="x", ipady=max(6, int(self.S(6))))
+            value = tk.Label(
+                field, text=variable.get() or "Select...", bg=WHITE,
+                fg=INK if variable.get() else TEXT_MUTED,
+                font=self.font(13), anchor="w", cursor="hand2",
+            )
+            variable.trace_add(
+                "write",
+                lambda *_args, label_widget=value, source=variable: label_widget.configure(
+                    text=source.get() or "Select...",
+                    fg=INK if source.get() else TEXT_MUTED,
+                ),
+            )
+            value_window = field.create_window(
+                self.S(14), field_height / 2, window=value,
+                anchor="w", width=max(1, int(self.S(200))), height=field_height - self.S(8),
+            )
+            arrow = field.create_text(
+                0, field_height / 2, text="v", fill=TEXT_MUTED,
+                font=self.font(11, "bold"), anchor="e",
+            )
+
+            def open_choices(_event=None):
+                x = field.winfo_rootx()
+                y = field.winfo_rooty() + field.winfo_height()
+                menu_items = []
+                for choice in choices:
+                    label_text = choice or "Select..."
+                    menu_items.append(
+                        (label_text, lambda selected=choice: variable.set(selected), INK)
+                    )
+                self._show_branded_menu(
+                    x, y, menu_items, width=field.winfo_width(),
+                    row_height=int(self.S(40)),
+                )
+                return "break"
+
+            value.bind("<Button-1>", open_choices, add="+")
+            field.bind("<Button-1>", open_choices, add="+")
+
+            def resize(event):
+                field.coords(shape, *rounded(event.width, field_height))
+                field.coords(arrow, event.width - self.S(14), field_height / 2)
+                field.itemconfigure(value_window, width=max(1, event.width - self.S(48)))
+
+            field.bind("<Configure>", resize, add="+")
         else:
             widget = tk.Entry(
                 row, textvariable=variable, bg=WHITE, fg=INK, insertbackground=INK,
-                relief="solid", bd=1, highlightthickness=1, highlightbackground=BORDER,
-                highlightcolor=INK, font=self.font(13),
+                relief="flat", bd=0, highlightthickness=0, font=self.font(13),
             )
-            widget.pack(fill="x", ipady=max(8, int(self.S(8))))
+            entry_window = field.create_window(
+                self.S(14), field_height / 2, window=widget, anchor="w",
+                width=max(1, int(self.S(200))), height=field_height - self.S(8),
+            )
+
+            def resize(event):
+                field.coords(shape, *rounded(event.width, field_height))
+                field.itemconfigure(entry_window, width=max(1, event.width - self.S(28)))
+
+            field.bind("<Configure>", resize, add="+")
 
     def _draw_insurance_uploads(self, parent, variables):
         section = tk.Frame(

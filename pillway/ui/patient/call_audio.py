@@ -1,4 +1,4 @@
-"""The Call screen's behavior: continuous microphone input, green meter, transcript, and ending the call.
+"""The Call screen's behavior: microphone input, waveform level, transcript and call lifecycle.
 
 Called by: ui/patient/call.py buttons.
 - Speech-to-text is OFFLINE (Vosk, see voice/speech_input.py), chosen in [call] of the config.
@@ -17,6 +17,7 @@ from config import get_settings
 from ...storage.paths import data_folder
 from ...voice.speech_input import LocalSpeechInput, resolve_input_device
 from ...voice.tts import speak, stop as stop_speaking
+from ..theme import WHITE
 
 
 def microphone_status():
@@ -115,17 +116,8 @@ class CallAudioMixin:
         self._call_poll_job = self.after(75, self._tick_call)
 
     def _update_call_widgets(self):
-        """Update the voice ring, meter, timer and mic status without a full redraw."""
-        bbox = self.c.bbox("call_ring")
-        if bbox:
-            cx, cy = (bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2
-            ring = self.S(74) + self.call_state["level"] * self.S(40)
-            live = self.call_state["level"] > 0.05 and not self.call_state["muted"]
-            self.c.coords("call_ring", cx - ring, cy - ring, cx + ring, cy + ring)
-            self.c.itemconfigure(
-                "call_ring", outline=self._call_meter_colour(self.call_state["level"])
-                if live else "#3a3a3c",
-            )
+        """Animate the voice waveform, input level and call timer without a redraw."""
+        self._draw_call_wave()
         track = self.c.coords("call_meter_track")
         if track:
             level = self.call_state["level"] if not self.call_state["muted"] else 0.0
@@ -136,14 +128,10 @@ class CallAudioMixin:
             visible = self.call_state.get("meter_available") and level > 0.025
             self.c.itemconfigure(
                 "call_meter_fill", state="normal" if visible else "hidden",
-                fill=self._call_meter_colour(level),
+                fill=WHITE,
             )
             self.c.itemconfigure("call_meter_status", text=self._call_meter_status())
         self.c.itemconfigure("call_timer", text=self._call_clock())
-        self.c.itemconfigure("call_status", text=self.call_state.get("status", ""))
-
-    def _call_meter_colour(self, level):
-        return self._blend_color("#ff3b30", "#34c759", max(0.0, min(1.0, level)))
 
     def _speak_new_replies(self):
         for message in self.call_caption_lines():

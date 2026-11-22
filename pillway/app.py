@@ -58,6 +58,7 @@ from .ui.profile_actions import ProfileActionsMixin
 from .ui.shell.header import HeaderMixin
 from .ui.shell.sidebar import SidebarMixin
 from .ui.theme import BASE_H, BASE_W, SURFACE, WHITE, pick_font
+from .ui import theme
 
 
 def enable_high_dpi():
@@ -99,6 +100,7 @@ class PillwayApp(
         self.configure(bg=SURFACE)
         self.protocol("WM_DELETE_WINDOW", self.close_application)
         pick_font(self)
+        self.option_add("*Font", (theme.FONT, 11))
 
         self.c = tk.Canvas(self, bg=SURFACE, highlightthickness=0, bd=0)
         self.c.pack(fill="both", expand=True)
@@ -336,7 +338,9 @@ class PillwayApp(
             self.show_menu(which)
 
     def on_escape(self):
-        if getattr(self, "dropdown_window", None):
+        if getattr(self, "_branded_menu_window", None):
+            self._close_branded_menu()
+        elif getattr(self, "dropdown_window", None):
             self._close_profile_menu()
         elif self.dropdown:
             self.toggle_dropdown(None)

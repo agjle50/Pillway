@@ -5,8 +5,10 @@ Called by: ui/patient/medications.py.
 
 import os
 import tkinter as tk
+from datetime import datetime
 from tkinter import filedialog
 
+from ...storage.patient_store import display_name
 from ..theme import (RED_TEXT, 
     BORDER,
     INK,
@@ -155,7 +157,7 @@ class PrescriptionMixin:
             return
         self.prescriptions.append(medication)
         self.notifications.insert(
-            0, ("New medication prescribed", f"{medication} has been added to your medications.")
+            0, (display_name(self.record), datetime.now().isoformat(timespec="minutes"))
         )
         self.prescription_flow = False
         self.prescription_stage = None
