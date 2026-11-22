@@ -41,7 +41,7 @@ class AIClient:
     def available(self):
         return self._sdk is not None
 
-    def build_request(self, job, system_text, user_text, profile=None):
+    def build_request(self, job, system_text, user_text, profile=None, temperature=None):
         """The exact request that would be sent (used by --show-ai-payload too)."""
         ai = self.settings.ai
         if ai.deidentify_before_ai:
@@ -50,14 +50,14 @@ class AIClient:
         if ai.prompt_caching:
             system[0]["cache_control"] = {"type": "ephemeral"}
         return {"model": getattr(ai, f"{job}_model"), "max_tokens": ai.max_tokens,
-                "temperature": ai.temperature, "system": system,
+                "temperature": ai.temperature if temperature is None else temperature, "system": system,
                 "messages": [{"role": "user", "content": user_text}]}
 
-    def complete(self, job, system_text, user_text, schema, profile=None):
+    def complete(self, job, system_text, user_text, schema, profile=None, temperature=None):
         """Ask the AI and return (clean_json, status). status is "ok" or "unavailable"."""
         if not self.available:
             return None, UNAVAILABLE
-        request = self.build_request(job, system_text, user_text, profile)
+        request = self.build_request(job, system_text, user_text, profile, temperature)
         self.last_payload = request
         for attempt in range(self.settings.ai.retries + 1):
             started = time.monotonic()

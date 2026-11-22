@@ -100,7 +100,27 @@ def check_voice():
     except Exception as error:
         _bad(f"Vosk isn't installed ({error})", "python -m pip install -r requirements.txt")
 
-    print("\n5. Windows built-in speech recognition (backup)")
+    print("\n5. Which engines Sarah will actually use")
+    from . import natural_voice, whisper_input
+    if natural_voice.available():
+        _ok("Sarah's voice: natural neural voice (needs internet; falls back to the computer's voice)")
+    else:
+        _bad("Sarah's voice: the computer's built-in voice (sounds robotic)",
+             "python -m pip install edge-tts   (and check natural_voice = true in pillway_config.toml)")
+    if whisper_input.available():
+        _ok(f"Understanding you: Whisper '{settings.whisper_model}' model (most accurate)")
+    else:
+        _bad("Understanding you: the small Vosk model (makes more mistakes)",
+             "python -m pip install faster-whisper")
+    from config import get_settings as _gs
+    ai = _gs().ai
+    if ai.demo_mode or not _gs().api_key:
+        _bad("Sarah's brain: DEMO MODE (scripted replies, no real conversation)",
+             "add your API key to pillway_config.local.toml and set demo_mode = false")
+    else:
+        _ok(f"Sarah's brain: live AI, '{ai.conversation_style}' conversation")
+
+    print("\n6. Windows built-in speech recognition (backup)")
     if windows_speech.available():
         _ok("available as a backup if the offline model can't be used")
     else:

@@ -40,6 +40,7 @@ class FakeSDK:
 def live_service(sdk):
     settings = use_temp_settings(demo_mode=False)
     settings.api_key = "sk-ant-test-key-1234"
+    settings.ai.conversation_style = "scripted"   # these tests cover the original scripted pipeline
     brain = Brain()
     brain.client._sdk = sdk
     service = ConversationService(brain=brain)
