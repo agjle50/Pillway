@@ -157,6 +157,7 @@ Everything lives in **`pillway_config.toml`** (heavily commented). Save, then re
 | Use the cheapest model for everything | `care_plan_model = "deepseek-flash"` (the others already use it) |
 | Change the safety-check model | `flag_model = "deepseek-v4-pro"` (stronger, slower) |
 | Switch to Google Gemini | `provider = "gemini"` + a Gemini key + `python -m pip install google-genai` |
+| Change Sarah's voice | `[call] voice_engine = "deepseek"` (default: streamed, starts ~1 s after the reply, English) / `"microsoft"` (free, speed varies 1-12 s) / `"computer"` (offline). `deepseek_voice = "stella"` or `"tide"` |
 | Make the care plan "think" first | `care_plan_thinking = "low"` (slower: up to a minute) |
 | Faster or deeper replies | `thinking_level = "low"` (fastest) / `"medium"` / `"high"` |
 | Change the monthly follow-up topics | edit `data/follow_up_topics.json` (one topic per follow-up call) |
@@ -178,6 +179,7 @@ Everything lives in **`pillway_config.toml`** (heavily commented). Save, then re
 | **Voice not working (read-aloud or microphone)** | First run **`python Pillway.py --check-voice`**. It speaks a test sentence, listens for 4 seconds, and prints **PROBLEM** lines with the fix for each one. |
 | **Microphone hears nothing** | Windows: **Settings → Privacy & security → Microphone** → turn on *Microphone access* **and** *Let desktop apps access your microphone*, then restart VS Code. Mac: **System Settings → Privacy & Security → Microphone** → allow Terminal / VS Code. |
 | **Speech-to-text never types anything** | The first use downloads a ~40 MB offline model (needs internet once; do it before the venue). On Windows, if that can't work, the app switches to Windows' built-in speech recognition automatically (`speech_to_text_engine = "auto"` in `pillway_config.toml`; set `"windows"` to force it). You can always tap **Switch to chat**. |
+| **Sarah is slow to start talking on a call** | Use `voice_engine = "deepseek"` (default). Run with the terminal open: `DeepSeek voice starts (after_request=…)` shows the voice delay and `speech transcribed (seconds=…)` the speech-recognition time. If transcription is slow, keep `whisper_model = "base"`. |
 | **Sarah answers herself on a call** (hears her own voice through the speakers) | Fixed: the mic is closed while she talks and for ~1 s after. Run with the terminal visible: lines like `mic OFF (reason=Sarah is talking)` and `heard (DROPPED)` show it working. If it still happens, use headphones or raise the tail (`ECHO_TAIL_SECONDS` in `pillway/ui/patient/call_audio.py`). |
 | **Read-aloud is silent** | The app uses the computer's own voice (PowerShell speech on Windows, `say` on Mac). Check the volume and the output device. `--check-voice` shows the exact error. |
 | **App looks too big or small** | Resize the window; everything is drawn as vectors and scales. Windows: Settings → Display → Scale at 100–150%. |

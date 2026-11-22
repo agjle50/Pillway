@@ -170,7 +170,11 @@ def run(listener, model=None):
             except queue.Empty:
                 continue
             try:
+                began = time.monotonic()
                 text = transcribe(model, audio, lang)
+                from .. import debug_log
+                debug_log.log("speech", "transcribed", seconds=round(time.monotonic() - began, 2),
+                              audio_seconds=round(len(audio) / 2 / RATE, 1))
             except Exception as error:
                 events.put(("error", f"Speech recognition failed: {type(error).__name__}: {error}"))
                 stop.set()

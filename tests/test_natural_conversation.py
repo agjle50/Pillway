@@ -166,3 +166,27 @@ class WorkflowTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GuidanceFirstTests(unittest.TestCase):
+    def test_medication_questions_get_general_info_then_always_reach_the_pharmacist(self):
+        import json
+        reply = {"reply": "Metformin is usually taken with meals, and many people find that easier on the stomach. "
+                          "What time of day suits you best depends on your plan.",
+                 "heard_as": "", "answered": [], "asking": None, "small_talk": False, "finished": False,
+                 "possible_issues": [], "summary_updates": [], "medication_question": False}
+        service = natural_service(FakeSDK([json.dumps(reply)]))
+        record = service.handle_message("maria", "Can I take my metformin at night instead?")
+        last = record["messages"][-1]["text"]
+        self.assertIn("usually taken with meals", last)                    # general guidance first
+        self.assertIn("great question for your pharmacist", last)         # then the hand-off
+        self.assertTrue(any("Medication question" in r["reason"] for r in record["pharmacist_requests"]))
+
+    def test_a_promise_to_tell_the_pharmacist_is_always_kept(self):
+        import json
+        reply = {"reply": "That can be common at first. I've let your pharmacist know so they can check.",
+                 "heard_as": "", "answered": [], "asking": None, "small_talk": False, "finished": False,
+                 "possible_issues": [], "summary_updates": [], "medication_question": False}
+        service = natural_service(FakeSDK([json.dumps(reply)]))
+        record = service.handle_message("maria", "I've been a bit tired after lunch")
+        self.assertTrue(record["pharmacist_requests"])

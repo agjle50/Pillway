@@ -182,6 +182,33 @@ def _speak_pyttsx3(text, lang, _generation):
     engine.runAndWait()
 
 
+def _speak_deepseek(text, lang, generation):
+    """DeepSeek's streamed voice: starts as soon as the first audio arrives (see deepseek_voice.py)."""
+    from . import deepseek_voice, natural_voice
+    if not deepseek_voice.available(lang):
+        raise RuntimeError("DeepSeek voice not chosen, not available for this language, or no key")
+    try:
+        deepseek_voice.speak(text, should_stop=lambda: generation != _current["generation"],
+                             on_playing=lambda value: _playing(generation, value))
+    except natural_voice.Unfinished as unfinished:
+        debug_log.log("voice", "DeepSeek voice failed part-way: another voice reads the rest")
+        if generation == _current["generation"]:
+            for engine in (_speak_natural_only, _speak_system_clean):
+                try:
+                    engine(unfinished.remaining, lang, generation)
+                    return
+                except Exception:
+                    continue
+
+
+def _speak_natural_only(text, lang, generation):
+    from . import natural_voice
+    if not natural_voice.available():
+        raise RuntimeError("natural voice not installed or turned off")
+    natural_voice.speak(text, lang, should_stop=lambda: generation != _current["generation"],
+                        on_playing=lambda value: _playing(generation, value))
+
+
 def _speak_natural(text, lang, generation):
     """Lifelike neural voice (needs internet + edge-tts); see voice/natural_voice.py."""
     from . import natural_voice
@@ -204,7 +231,7 @@ def _speak_system_clean(text, lang, generation):
     _speak_system(speech_text(text, lang), lang, generation)
 
 
-ENGINES = (_speak_natural, _speak_system_clean, _speak_pyttsx3)
+ENGINES = (_speak_deepseek, _speak_natural, _speak_system_clean, _speak_pyttsx3)
 
 
 def stop():

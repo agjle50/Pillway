@@ -84,6 +84,8 @@ SCHEMA = {
         "voice_meter_sensitivity": (1.0, float, (0.1, 5.0)),
         "sarah_voice": ("", str, None),
         "sarah_speech_rate": (165, int, (80, 300)),
+        "voice_engine": ("deepseek", str, ["deepseek", "microsoft", "computer"]),
+        "deepseek_voice": ("stella", str, ["stella", "tide"]),
         "natural_voice": (True, bool, None),
         "natural_voice_en": ("en-US-AvaMultilingualNeural", str, None),
         "natural_voice_fr": ("fr-CA-SylvieNeural", str, None),

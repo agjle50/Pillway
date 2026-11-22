@@ -247,7 +247,7 @@ class VoiceCutOffTests(unittest.TestCase):
         said = []
 
         def fake_synthesize(chunk, lang):
-            if said:                                  # the second part fails (e.g. a network hiccup)
+            if not chunk.startswith("First"):         # the second part fails (e.g. a network hiccup)
                 raise RuntimeError("voice service hiccup")
             said.append(chunk)
             return "first.mp3"
@@ -269,23 +269,21 @@ class FillerTests(unittest.TestCase):
         app.call_caption_lines = lambda: lines
         lines = []
         app._speak_on_call = lambda text: PillwayApp._speak_on_call(app, text)
-        app.call_state["waiting_since"] = time.monotonic() - 2      # 2 s and still no reply
+        app.call_state["waiting_since"] = time.monotonic() - 5      # 5 s and still no reply
         with patch("pillway.ui.patient.call_audio.speak") as speak:
             PillwayApp._maybe_say_filler(app)
             PillwayApp._maybe_say_filler(app)                       # never twice for one reply
             self.assertEqual(speak.call_count, 1)
             self.assertIn("moment", speak.call_args.args[0])
             lines.append({"role": "sarah", "id": "r1", "text": "Here's my answer."})
-            PillwayApp._speak_new_replies(app)                      # waits: filler still playing
-            self.assertEqual(speak.call_count, 1)
-            speak.call_args.kwargs["on_done"]()
-            PillwayApp._speak_new_replies(app)
+            PillwayApp._speak_new_replies(app)        # the reply takes over from the filler at once
+        self.assertEqual(speak.call_count, 2)
         self.assertEqual(speak.call_args.args[0], "Here's my answer.")
 
     def test_a_quick_reply_gets_no_filler(self):
         app = call_app()
         app.patient_id, app.service = "maria", SimpleNamespace(busy={"maria"})
-        app.call_state["waiting_since"] = time.monotonic() - 0.4
+        app.call_state["waiting_since"] = time.monotonic() - 1.9   # a normal reply time: no filler
         with patch("pillway.ui.patient.call_audio.speak") as speak:
             PillwayApp._maybe_say_filler(app)
         speak.assert_not_called()
@@ -306,3 +304,37 @@ class KeyLookupTests(unittest.TestCase):
         (root / "pillway_config.local.toml").write_text('[ai]\napi_key = "AIzaOLDGEMINIKEY"\n')
         settings = load_settings(root, env={"DEEPSEEK_API_KEY": "Bearer sk-rightkey5678"})
         self.assertEqual(settings.api_key, "sk-rightkey5678")          # the Gemini key is skipped
+
+
+class FastVoiceTests(unittest.TestCase):
+    def test_the_ai_reply_is_voiced_early_and_still_matches_after_lines_are_added(self):
+        from pillway.voice import natural_voice
+        ai_reply = "Thanks, I've noted 142/90 at 8 am. How many minutes did you walk last week?"
+        final = ai_reply + "\n\nI've shared this with your pharmacist so they can keep an eye on it."
+        self.assertEqual(natural_voice.chunks_for(final)[0], natural_voice.chunks_for(ai_reply)[0])
+        self.assertEqual(len(natural_voice.chunks_for(ai_reply)), 1)      # one smooth piece
+
+    def test_a_stalled_voice_request_is_raced_by_a_second_one(self):
+        from pillway.voice import natural_voice
+        calls = []
+
+        def fake(text, lang):
+            calls.append(time.monotonic())
+            if len(calls) == 1:
+                time.sleep(3)                      # the first request stalls
+                return "slow.mp3"
+            return "fast.mp3"
+        with patch.object(natural_voice, "HEDGE_AFTER", 0.2), patch.object(natural_voice, "synthesize", fake):
+            started = time.monotonic()
+            result = natural_voice.synthesize_fast("Hello", "en")
+        self.assertEqual(result, "fast.mp3")
+        self.assertLess(time.monotonic() - started, 1.5)
+
+    def test_the_call_picks_up_a_saved_reply_on_the_next_tick(self):
+        app = call_app()
+        app.patient_id = "maria"
+        app.store = SimpleNamespace(load=Mock(return_value={"messages": ["new"]}))
+        app.record = {"messages": []}
+        app.call_state["reply_ready"] = True
+        PillwayApp._tick_call(app)
+        self.assertEqual(app.record, {"messages": ["new"]})

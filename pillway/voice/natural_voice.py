@@ -16,6 +16,7 @@ Voiced sentences are cached on disk, so repeated lines are instant and work offl
 
 import asyncio
 import hashlib
+import os
 import queue
 import re
 import shutil
@@ -35,7 +36,8 @@ def available():
         import edge_tts  # noqa: F401
     except ImportError:
         return False
-    return get_settings().call.natural_voice
+    settings = get_settings().call
+    return settings.natural_voice and settings.voice_engine != "computer"
 
 
 # ---- 1. say it like a person ---------------------------------------------------------------
@@ -117,15 +119,92 @@ def synthesize(text, lang):
     path = folder / f"{key}.mp3"
     if path.exists() and path.stat().st_size > 0:
         return path
-    partial = path.with_suffix(".part")
+    # a unique temporary name, so two attempts at the same text never write into one file
+    partial = path.with_name(f"{key}.{threading.get_ident()}.{time.monotonic_ns()}.part")
+    proxy = os.environ.get("HTTPS_PROXY") or os.environ.get("https_proxy") or None
 
     async def run():
-        await edge_tts.Communicate(text, voice, rate=rate, pitch=pitch).save(str(partial))
-    asyncio.run(asyncio.wait_for(run(), timeout=20))
-    if not partial.exists() or partial.stat().st_size == 0:
-        raise RuntimeError("The natural voice returned no audio.")
-    partial.replace(path)
+        await edge_tts.Communicate(text, voice, rate=rate, pitch=pitch, proxy=proxy).save(str(partial))
+    try:
+        asyncio.run(asyncio.wait_for(run(), timeout=12))
+        if not partial.exists() or partial.stat().st_size == 0:
+            raise RuntimeError("The natural voice returned no audio.")
+        partial.replace(path)
+    finally:
+        if partial.exists():
+            partial.unlink()
     return path
+
+
+HEDGE_AFTER = 1.2    # seconds: if the voice service hasn't answered by then, ask it a second time
+
+
+def synthesize_fast(text, lang):
+    """synthesize(), but quick even when the voice service stalls (BUG FIX: some requests hang 4-5 s).
+
+    Measured: a normal reply is voiced in about 0.7 s, but now and then a request stalls for
+    several seconds. If the first try isn't done after HEDGE_AFTER seconds, a second try starts in
+    parallel and whichever finishes first is used.
+    """
+    from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+    started = time.monotonic()
+    pool = ThreadPoolExecutor(max_workers=2)
+    try:
+        tries = [pool.submit(synthesize, text, lang)]
+        done, _ = wait(tries, timeout=HEDGE_AFTER)
+        if not done:
+            tries.append(pool.submit(synthesize, text, lang))
+        errors = []
+        pending = set(tries)
+        while pending:
+            done, pending = wait(pending, return_when=FIRST_COMPLETED)
+            for future in done:
+                if future.exception() is None:
+                    _log("voice ready", seconds=round(time.monotonic() - started, 2), tries=len(tries),
+                         chars=len(text))
+                    return future.result()
+                errors.append(future.exception())
+        raise errors[-1]
+    finally:
+        pool.shutdown(wait=False)
+
+
+def _log(message, **details):
+    try:
+        from .. import debug_log
+        debug_log.log("voice", message, **details)
+    except Exception:
+        pass
+
+
+def chunks_for(text, lang="en"):
+    """The pieces Sarah's reply is voiced in: one per PARAGRAPH (never mid-sentence).
+
+    A reply is normally one paragraph = one smooth piece. Lines the app adds after the AI's reply
+    ("I've shared this with your pharmacist...") are their own paragraph, so the AI's part can be
+    voiced in advance (prewarm) while the safety checks finish, and still match exactly.
+    """
+    pieces = []
+    for paragraph in re.split(r"\n\s*\n", text or ""):
+        spoken = speech_text(paragraph, lang)
+        if not spoken:
+            continue
+        if pieces and len(pieces[-1]) < 25:          # a tiny paragraph joins the next one
+            pieces[-1] = f"{pieces[-1]} {spoken}"
+        else:
+            pieces.extend(sentences(spoken))
+    return pieces
+
+
+def prewarm(text, lang="en"):
+    """Start voicing `text` in the background now, so speaking it later starts instantly."""
+    def work():
+        for chunk in chunks_for(text, lang)[:1]:     # the first piece decides how soon she starts
+            try:
+                synthesize_fast(chunk, lang)
+            except Exception as error:
+                _log("prewarm failed (will voice it when speaking)", error=f"{type(error).__name__}")
+    threading.Thread(target=work, daemon=True).start()
 
 
 # ---- 3. play it (stoppable) ----------------------------------------------------------------
@@ -231,10 +310,10 @@ class Unfinished(RuntimeError):
 
 def _synthesize_with_retry(chunk, lang):
     try:
-        return synthesize(chunk, lang)
+        return synthesize_fast(chunk, lang)
     except Exception:
         time.sleep(0.3)
-        return synthesize(chunk, lang)      # one retry: the voice service sometimes hiccups
+        return synthesize_fast(chunk, lang)      # one more go: the voice service sometimes hiccups
 
 
 def speak(text, lang, should_stop, on_playing=None):
@@ -243,25 +322,29 @@ def speak(text, lang, should_stop, on_playing=None):
     If a LATER part can't be voiced, raises Unfinished(remaining text) so tts.py can read the
     rest with the computer's own voice (BUG FIX: it used to stop quietly after the first sentence).
     """
-    chunks = sentences(speech_text(text, lang))
+    chunks = chunks_for(text, lang)
     if not chunks:
         return
-    first = synthesize(chunks[0], lang)            # fail fast (no internet -> fallback voice)
+    from concurrent.futures import ThreadPoolExecutor
+    pool = ThreadPoolExecutor(max_workers=max(1, min(4, len(chunks) - 1)))
+    later = [pool.submit(_synthesize_with_retry, chunk, lang) for chunk in chunks[1:]]   # all at once
+    pool.shutdown(wait=False)
+    first = synthesize_fast(chunks[0], lang)       # fail fast (no internet -> fallback voice)
     ready = queue.Queue()
     ready.put(first)
 
-    def prepare_rest():
-        for index, chunk in enumerate(chunks[1:], start=1):
+    def collect_rest():
+        for index, future in enumerate(later, start=1):
             if should_stop():
                 break
             try:
-                ready.put(_synthesize_with_retry(chunk, lang))
+                ready.put(future.result())
             except Exception as error:  # hand over what's left so it is still read out
                 ready.put(Unfinished(" ".join(chunks[index:]), f"{type(error).__name__}: {error}"))
                 return
         ready.put(None)
-    if len(chunks) > 1:
-        threading.Thread(target=prepare_rest, daemon=True).start()
+    if later:
+        threading.Thread(target=collect_rest, daemon=True).start()
     else:
         ready.put(None)
     while not should_stop():
