@@ -41,6 +41,9 @@ class PatientDashboardMixin:
     def draw_dashboard(self):
         px1, py1, px2, py2 = self.panel_box()
         self.draw_sheet(px1, py1, px2, py2)
+        if self.intake_should_show():
+            self.draw_intake(px1, py1, px2, py2)
+            return
         if self.call_open:
             self.draw_call_preview(px1, py1, px2, py2)
             return
@@ -102,6 +105,8 @@ class PatientDashboardMixin:
 
     def select_tab(self, name):
         self._cancel_checkup_animation()
+        if getattr(self, "intake_open", False):
+            self.intake_open = False
         if self.call_open:
             self.close_call_preview()
         elif self.chat_open:

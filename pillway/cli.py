@@ -7,6 +7,7 @@ Called by: Pillway.py.
   --role patient|pharmacist   open straight into one side (run two windows side by side)
   --demo              force demo mode for this run (no AI, no internet needed)
   --rehearse          run the 5-minute stage script without the window and time each reply
+  --debug             print admin debug lines (mic on/off, what was heard, AI timings) in the terminal
 """
 
 import argparse
@@ -25,6 +26,7 @@ def parse_args(argv=None):
     parser.add_argument("--demo", action="store_true", help="force demo mode (no AI) for this run")
     parser.add_argument("--check-voice", action="store_true", help="test read-aloud and the microphone, then exit")
     parser.add_argument("--rehearse", action="store_true", help="run the stage script in the terminal and time it")
+    parser.add_argument("--debug", action="store_true", help="print admin debug lines in the terminal")
     return parser.parse_args(argv)
 
 
@@ -79,8 +81,8 @@ def show_ai_payload():
     print("What the AI company would receive for a sample message\n" + "=" * 56)
     print(f"Sample message typed by the patient: {sample}\n")
     print(f"model: {request['model']}")
-    print(f"system prompt: {len(request['system'][0]['text'])} characters of Sarah's rules (no patient data)")
-    print("user message:\n" + request["messages"][0]["content"])
+    print(f"system prompt: {len(request['system'])} characters of Sarah's rules (no patient data)")
+    print("user message:\n" + request["contents"])
     print("\nNever sent: name, phone, email, address, health card number, date of birth.")
 
 
@@ -100,6 +102,9 @@ def run(argv=None):
         return None
     if args.demo:
         settings.ai.demo_mode = True
+    if args.debug:
+        from pillway import debug_log
+        debug_log.force(True)
     if args.check_config:
         check_config()
         return None

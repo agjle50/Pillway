@@ -35,11 +35,14 @@ def sarah_texts(record):
 class StageScriptTests(unittest.TestCase):
     def test_full_stage_script(self):
         service = fresh_service()
+        service.submit_intake("maria", {"weight": "78", "weight_unit": "kg", "height": "162", "height_unit": "cm",
+                                        "checks_bp": "yes", "systolic": "142", "diastolic": "90",
+                                        "tobacco": "no"})
         for text in STAGE_SCRIPT:
             record = service.handle_message("maria", text)
         replies = sarah_texts(record)
         self.assertIn("142/90", replies[0])
-        self.assertIn("Are there any changes", replies[0])
+        self.assertIn("Has anything changed", replies[0])
         self.assertIn("Ramipril", replies[1])
         self.assertIn("I've let your pharmacist know", replies[1])
         self.assertIn("limit protein", replies[2])

@@ -123,6 +123,7 @@ SCHEMA = {
     },
     "dev": {
         "dev_mode": (False, bool, None),
+        "debug_logs": (True, bool, None),
     },
 }
 

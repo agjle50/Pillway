@@ -24,6 +24,8 @@ class TasksMixin:
         self.text(x1 + self.S(34), y + self.S(14), self.t("tasks.title"), 18, INK, "bold")
         self.c.create_line(x1, y + self.S(36), x2, y + self.S(36), fill=BORDER)
         y += self.S(36)
+        if self.record and hasattr(self, "draw_intake_task"):
+            y = self.draw_intake_task(x1, x2, y + self.S(12))
         if not self.tasks:
             self.text((x1 + x2) / 2, y + self.S(80), self.t("tasks.empty"), 16, TEXT_MUTED, anchor="center")
             return

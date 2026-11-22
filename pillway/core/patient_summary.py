@@ -8,7 +8,7 @@ medicines, new readings, new conditions, lifestyle changes). Small talk is ignor
 import re
 
 from .answer_parsing import bp_reading, has_phrase
-from .content import advice, load
+from .content import advice
 from .safety_rules import check_message
 from .text_normalize import normalize, words
 
@@ -31,18 +31,44 @@ def _join(items, lang):
 
 
 def intake_summary(record, lang):
-    """Step 2: the hard-coded summary of what the short intake questionnaire told us."""
+    """Step 2: read back ONLY what we actually know, so Sarah never presumes.
+
+    Known = the patient's own questionnaire answers + what the pharmacy has on file
+    (conditions and medications from their prescriptions). Nothing is filled in or guessed:
+    a fact we don't have is simply not mentioned.
+    """
+    from .intake import is_done
+    fr = lang == "fr"
     profile = record["profile"]
+    answers = (record.get("intake") or {}).get("answers", {}) if is_done(record) else {}
     conditions = [c.split(" (")[0].lower() for c in profile.get("conditions", [])]
-    if lang == "fr":
+    if fr:
         conditions = [c.replace("type 2 diabetes", "le diabète de type 2").replace("high blood pressure", "l'hypertension")
                       for c in conditions]
     meds = [f"{m['name']} {m.get('dose', '')}".strip() for m in record.get("medications", [])]
-    smoking = advice("intake_bits.smoker" if profile.get("smoker") else "intake_bits.non_smoker", lang)
-    template = load("questions")["intro"]
-    return template[f"summary_{lang}"].format(
-        conditions=_join(conditions, lang) or "your health", last_bp=profile.get("last_bp", "not on file"),
-        smoking_text=smoking, medications=_join(meds, lang) or advice("intake_bits.no_meds", lang))
+    parts = []
+    if conditions:
+        parts.append(("Votre dossier à la pharmacie indique " if fr else "Your pharmacy file shows ")
+                     + _join(conditions, lang) + ".")
+    if meds:
+        parts.append(("Vous prenez " if fr else "You're taking ") + _join(meds, lang) + ".")
+    if answers:
+        bits = []
+        if answers.get("bp_systolic"):
+            bp = f"{answers['bp_systolic']}/{answers['bp_diastolic']}"
+            bits.append(f"votre tension moyenne est d'environ {bp}" if fr else f"your blood pressure averages about {bp}")
+        elif answers.get("checks_bp_regularly") is False:
+            bits.append("vous ne mesurez pas souvent votre tension" if fr
+                        else "you don't check your blood pressure often")
+        if "smoker" in answers:
+            bits.append(advice("intake_bits.smoker" if answers["smoker"] else "intake_bits.non_smoker", lang))
+        if bits:
+            parts.append(("Dans votre questionnaire, vous avez indiqué que " if fr
+                          else "In your questionnaire you told me ") + _join(bits, lang) + ".")
+    if not parts:
+        return ("Je ne sais encore rien de votre santé, alors je vais vous poser quelques questions."
+                if fr else "I don't know anything about your health yet, so I'll ask you a few questions.")
+    return " ".join(parts)
 
 
 def side_effect_matches(text, medications):

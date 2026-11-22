@@ -87,6 +87,7 @@ def run(listener):
     import threading
 
     events, stop_event, muted = listener.events, listener.stop_event, listener.muted_event
+    listener.active_engine = "windows"
     events.put(("status", "Using Windows speech recognition…"))
     process = start_process()
     saw_error = []

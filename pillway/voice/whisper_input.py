@@ -178,6 +178,9 @@ def run(listener, model=None):
                 return
             if text:
                 events.put(("final", text))
+            else:
+                from .. import debug_log
+                debug_log.log("speech", "Whisper heard only noise (ignored)")
     thread = threading.Thread(target=worker, daemon=True)
     thread.start()
 

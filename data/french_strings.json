@@ -18,6 +18,7 @@
     "consent.1": {"en": "Sarah is an automated assistant, not a doctor or pharmacist.", "fr": "Sarah est une assistante automatisée, et non un médecin ou un pharmacien."},
     "consent.2": {"en": "Your pharmacist may view this chat.", "fr": "Votre pharmacien peut consulter cette conversation."},
     "consent.3": {"en": "Your answers are used to build your care plan.", "fr": "Vos réponses servent à préparer votre plan de soins."},
+    "consent.privacy": {"en": "Sarah doesn't save everything you say. She only keeps the medical details that matter for your care, and shares them only with your Pillway pharmacist and care team.", "fr": "Sarah n'enregistre pas tout ce que vous dites. Elle garde seulement les détails médicaux importants pour vos soins, et les partage uniquement avec votre pharmacien Pillway et votre équipe de soins."},
     "consent.4": {"en": "In an emergency, call 911.", "fr": "En cas d'urgence, composez le 911."},
     "consent.agree": {"en": "I agree", "fr": "J'accepte"},
     "consent.not_now": {"en": "Not now", "fr": "Pas maintenant"},

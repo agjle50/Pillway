@@ -10,6 +10,8 @@ import zipfile
 from array import array
 from pathlib import Path
 
+from .. import debug_log
+
 
 MODEL_NAME = "vosk-model-small-en-us-0.15"
 MODEL_URL = f"https://alphacephei.com/vosk/models/{MODEL_NAME}.zip"
@@ -173,6 +175,7 @@ class LocalSpeechInput:
         self.language = "en"            # "fr" makes Whisper listen for French
         self.stop_event = threading.Event()
         self.muted_event = threading.Event()
+        self.active_engine = ""         # "whisper", "vosk" or "windows" once one has started
         self.thread = threading.Thread(target=self._run, daemon=True)
 
     def start(self):
@@ -201,7 +204,9 @@ class LocalSpeechInput:
         """Vosk couldn't start: on Windows, switch to Windows' own recognizer instead."""
         from . import windows_speech
         if self._engine() in ("auto", "windows") and windows_speech.available():
-            print(f"[speech] offline model unavailable ({reason}); using Windows speech recognition")
+            debug_log.log("speech", "offline model unavailable; using Windows speech recognition",
+                          reason=debug_log.snippet(reason))
+            self.active_engine = "windows"
             windows_speech.run(self)
             return True
         return False
@@ -212,10 +217,13 @@ class LocalSpeechInput:
             from . import whisper_input
             if whisper_input.available():
                 try:
+                    self.active_engine = "whisper"
+                    debug_log.log("speech", "engine: Whisper (on-device)")
                     whisper_input.run(self)
                     return
                 except Exception as error:  # e.g. model download blocked: try the next engine
                     print(f"[speech] Whisper unavailable ({type(error).__name__}: {error})")
+                    debug_log.log("speech", "Whisper unavailable", error=f"{type(error).__name__}: {error}")
                     if engine == "whisper":
                         self.events.put(("error", f"Whisper speech recognition failed: {error}"))
                         return
@@ -241,6 +249,8 @@ class LocalSpeechInput:
             return
 
         try:
+            self.active_engine = "vosk" if self.transcribe else "meter"
+            debug_log.log("speech", f"engine: {self.active_engine}")
             self.events.put(("state", "preparing"))
             recognizer = None
             audio_chunks = queue.Queue(maxsize=20)
@@ -302,9 +312,24 @@ class LocalSpeechInput:
                 callback=on_audio,
             ):
                 self.events.put(("state", "listening"))
+                was_muted = False
                 while not recognition_failed.is_set():
                     if self.stop_event.is_set() and audio_chunks.empty():
                         break
+                    if self.muted_event.is_set():
+                        # Sarah is talking: forget any half-heard words so her voice can't
+                        # leak into the patient's next sentence.
+                        if not was_muted and recognizer is not None:
+                            recognizer.Reset()
+                        was_muted = True
+                        while not audio_chunks.empty():
+                            try:
+                                audio_chunks.get_nowait()
+                            except queue.Empty:
+                                break
+                        self.stop_event.wait(0.05)
+                        continue
+                    was_muted = False
                     try:
                         raw_audio = audio_chunks.get(timeout=0.1)
                     except queue.Empty:
