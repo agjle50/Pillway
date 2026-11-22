@@ -187,8 +187,15 @@ def _speak_natural(text, lang, generation):
     from . import natural_voice
     if not natural_voice.available():
         raise RuntimeError("natural voice not installed or turned off")
-    natural_voice.speak(text, lang, should_stop=lambda: generation != _current["generation"],
-                        on_playing=lambda value: _playing(generation, value))
+    try:
+        natural_voice.speak(text, lang, should_stop=lambda: generation != _current["generation"],
+                            on_playing=lambda value: _playing(generation, value))
+    except natural_voice.Unfinished as unfinished:
+        # the first sentence was already said: read ONLY the rest, with the computer's voice
+        debug_log.log("voice", "natural voice failed part-way: computer voice reads the rest",
+                      reason=str(unfinished)[:80])
+        if generation == _current["generation"]:
+            _speak_system(natural_voice.speech_text(unfinished.remaining, lang), lang, generation)
 
 
 def _speak_system_clean(text, lang, generation):

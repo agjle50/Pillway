@@ -131,6 +131,20 @@ def synthesize(text, lang):
 _counter = [0]
 
 
+def finished_playing(mode, position_ms, length_ms, elapsed_s):
+    """Has the clip really finished? (BUG FIX for "she stops after a sentence".)
+
+    Windows' player can say "stopped" for a moment while a clip is still loading. The old code
+    believed it after 0.05 s and skipped the clip. Now a clip only counts as finished when its
+    position reached the end, or it has been silent well past its length.
+    """
+    if mode == "playing":
+        return False
+    if length_ms and position_ms >= length_ms - 150:
+        return True
+    return elapsed_s * 1000 > (length_ms or 0) + 2000      # stuck: give up 2 s after it should have ended
+
+
 def _play_windows(path, should_stop, on_playing=None):
     import ctypes
     winmm = ctypes.windll.winmm
@@ -143,15 +157,30 @@ def _play_windows(path, should_stop, on_playing=None):
         if error:
             raise RuntimeError(f"Windows audio error {error}")
         return buffer.value
+
+    def number(command):
+        try:
+            return int(mci(command) or 0)
+        except (RuntimeError, ValueError):
+            return 0
     mci(f'open "{path}" type mpegvideo alias {alias}')
     try:
+        mci(f"set {alias} time format milliseconds")
+        length = number(f"status {alias} length")
         mci(f"play {alias}")
+        started = time.monotonic()
         if on_playing:
             on_playing(True)              # sound is starting now: her mouth may move
         time.sleep(0.05)
         while not should_stop():
-            if mci(f"status {alias} mode") != "playing":
+            mode = mci(f"status {alias} mode")
+            if finished_playing(mode, number(f"status {alias} position"), length, time.monotonic() - started):
                 break
+            if mode != "playing" and time.monotonic() - started < 1.0:
+                try:
+                    mci(f"play {alias}")  # it hadn't really started yet: nudge it
+                except RuntimeError:
+                    pass
             time.sleep(0.04)
     finally:
         if on_playing:
@@ -190,8 +219,28 @@ def play(path, should_stop, on_playing=None):
     (_play_windows if sys.platform == "win32" else _play_process)(Path(path), should_stop, on_playing)
 
 
+class Unfinished(RuntimeError):
+    """The first part was spoken but a later part couldn't be voiced: `remaining` is what's left."""
+
+    def __init__(self, remaining, reason):
+        super().__init__(reason)
+        self.remaining = remaining
+
+
+def _synthesize_with_retry(chunk, lang):
+    try:
+        return synthesize(chunk, lang)
+    except Exception:
+        time.sleep(0.3)
+        return synthesize(chunk, lang)      # one retry: the voice service sometimes hiccups
+
+
 def speak(text, lang, should_stop, on_playing=None):
-    """Voice and play `text`, sentence by sentence. Raises if the natural voice can't be used."""
+    """Voice and play `text`, sentence by sentence. Raises if the natural voice can't be used.
+
+    If a LATER part can't be voiced, raises Unfinished(remaining text) so tts.py can read the
+    rest with the computer's own voice (BUG FIX: it used to stop quietly after the first sentence).
+    """
     chunks = sentences(speech_text(text, lang))
     if not chunks:
         return
@@ -200,13 +249,13 @@ def speak(text, lang, should_stop, on_playing=None):
     ready.put(first)
 
     def prepare_rest():
-        for chunk in chunks[1:]:
+        for index, chunk in enumerate(chunks[1:], start=1):
             if should_stop():
                 break
             try:
-                ready.put(synthesize(chunk, lang))
-            except Exception as error:  # keep going with what we have
-                ready.put(error)
+                ready.put(_synthesize_with_retry(chunk, lang))
+            except Exception as error:  # hand over what's left so it is still read out
+                ready.put(Unfinished(" ".join(chunks[index:]), f"{type(error).__name__}: {error}"))
                 return
         ready.put(None)
     if len(chunks) > 1:
@@ -217,7 +266,7 @@ def speak(text, lang, should_stop, on_playing=None):
         item = ready.get()
         if item is None:
             return
-        if isinstance(item, Exception):  # part of it was already spoken: stop quietly, don't repeat
-            print(f"[natural voice] {type(item).__name__}: {item}")
-            return
+        if isinstance(item, Unfinished):
+            print(f"[natural voice] couldn't voice the rest ({item}); reading it with the computer's voice")
+            raise item
         play(item, should_stop, on_playing)

@@ -189,14 +189,24 @@ class CallAudioMixin:
         self.c.itemconfigure("call_timer", text=self._call_clock())
 
     def _speak_new_replies(self):
+        """Say every new reply, in order, never cutting one off (BUG FIX: starting a second reply used
+        to stop the first after its first sentence). Replies that arrive while Sarah is talking wait
+        in a queue and are said when she finishes; several at once are said as one piece."""
+        new = []
         for message in self.call_caption_lines():
             if message["role"] == "sarah" and message["id"] not in self.call_state["spoken"]:
                 self.call_state["spoken"].add(message["id"])
                 debug_log.log("call", "Sarah replied", source=message.get("source"),
                               speaker="on" if self.call_state.get("speaker_enabled") else "off",
                               text=debug_log.snippet(message["text"]))
-                if self.call_state.get("speaker_enabled"):
-                    self._speak_on_call(message["text"])
+                new.append(message["text"])
+        queue = self.call_state.setdefault("voice_queue", [])
+        if new and self.call_state.get("speaker_enabled"):
+            queue.extend(new)
+        if queue and not self.call_state.get("sarah_speaking"):
+            text = "\n\n".join(queue)
+            queue.clear()
+            self._speak_on_call(text)
 
     def _speak_on_call(self, text):
         """Speak Sarah's reply with the microphone CLOSED, so she never hears (and answers) herself.
@@ -269,6 +279,7 @@ class CallAudioMixin:
 
     def toggle_call_speaker(self):
         self.call_state["speaker_enabled"] = not self.call_state.get("speaker_enabled", False)
+        self.call_state["voice_queue"] = []
         debug_log.log("call", "speaker " + ("on" if self.call_state["speaker_enabled"] else "off"))
         if not self.call_state["speaker_enabled"]:
             stop_speaking()

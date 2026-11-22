@@ -214,3 +214,47 @@ class CheckInAndCarePlanTests(unittest.TestCase):
         self.assertEqual((a1c["value"], a1c["ai"], a1c["confirmed"]), ("7.5", True, False))
         self.assertIn("rec_quit_smoking", ids)          # she's thinking about quitting (rules)
         self.assertTrue(care_plan.find_line(plan, "goal_0")["ai"])
+
+
+class VoiceCutOffTests(unittest.TestCase):
+    def test_a_second_reply_waits_instead_of_cutting_the_first_off(self):
+        first = {"role": "sarah", "id": "r1", "text": "First reply. It has two sentences."}
+        second = {"role": "sarah", "id": "r2", "text": "Second reply."}
+        app = call_app()
+        lines = [first]
+        app.call_caption_lines = lambda: lines
+        app._speak_on_call = lambda text: PillwayApp._speak_on_call(app, text)
+        with patch("pillway.ui.patient.call_audio.speak") as speak:
+            PillwayApp._speak_new_replies(app)
+            lines.append(second)
+            PillwayApp._speak_new_replies(app)        # arrives while she's still talking
+            self.assertEqual(speak.call_count, 1)    # the first one is NOT interrupted
+            speak.call_args.kwargs["on_done"]()       # first one finished
+            PillwayApp._speak_new_replies(app)
+        self.assertEqual(speak.call_count, 2)
+        self.assertEqual(speak.call_args.args[0], "Second reply.")
+
+    def test_windows_player_waits_for_the_real_end_of_a_clip(self):
+        from pillway.voice.natural_voice import finished_playing
+        self.assertFalse(finished_playing("stopped", 0, 4000, 0.1))      # still loading: not finished
+        self.assertTrue(finished_playing("stopped", 3950, 4000, 4.0))    # reached the end
+        self.assertTrue(finished_playing("stopped", 0, 4000, 7.0))       # stuck: give up
+        self.assertFalse(finished_playing("playing", 1000, 4000, 1.0))
+
+    def test_if_the_rest_cant_be_voiced_it_is_still_read_out(self):
+        from pillway.voice import natural_voice, tts
+        long_text = "First sentence that is long enough to stand alone here. " + "More words follow. " * 30
+        said = []
+
+        def fake_synthesize(chunk, lang):
+            if said:                                  # the second part fails (e.g. a network hiccup)
+                raise RuntimeError("voice service hiccup")
+            said.append(chunk)
+            return "first.mp3"
+        with patch.object(natural_voice, "available", return_value=True), \
+                patch.object(natural_voice, "synthesize", side_effect=fake_synthesize), \
+                patch.object(natural_voice, "play"), \
+                patch.object(tts, "_speak_system", side_effect=lambda text, lang, gen: said.append(text)):
+            tts._speak_natural(long_text, "en", tts._current["generation"])
+        self.assertEqual(len(said), 2)
+        self.assertIn("More words follow", said[1])   # the rest was read, not silently dropped
