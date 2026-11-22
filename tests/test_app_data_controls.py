@@ -111,7 +111,7 @@ class AppDataControlTests(unittest.TestCase):
 
         self.assertEqual(items, [("Maria Rossi", "17:00", None)])
 
-    def test_clickable_plays_a_short_system_sound_before_running_action(self):
+    def test_clickable_runs_action_silently(self):
         class ClickHarness:
             def __init__(self):
                 self.sound_count = 0
@@ -119,7 +119,6 @@ class AppDataControlTests(unittest.TestCase):
             def bell(self):
                 self.sound_count += 1
 
-            _play_click_sound = PillwayApp._play_click_sound
             _invoke_clickable = PillwayApp._invoke_clickable
 
         app = ClickHarness()
@@ -127,7 +126,7 @@ class AppDataControlTests(unittest.TestCase):
 
         result = PillwayApp._invoke_clickable(app, action)
 
-        self.assertEqual(app.sound_count, 1)
+        self.assertEqual(app.sound_count, 0)  # never the Windows "ding"
         action.assert_called_once_with()
         self.assertEqual(result, "break")
 

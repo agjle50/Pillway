@@ -85,16 +85,9 @@ class CanvasHelpersMixin:
         self.c.tag_bind(tag, "<Leave>", lambda e: self.c.configure(cursor=""))
 
     def _invoke_clickable(self, func):
-        self._play_click_sound()
+        # No click sound: Tk's bell() is the Windows error "ding".
         func()
         return "break"
-
-    def _play_click_sound(self):
-        self.bell()
-
-    def _sound_on_native_button_click(self, event):
-        if event.widget.winfo_class() in ("Button", "TButton"):
-            self._play_click_sound()
 
     def _dispatch_expanded_click(self, event):
         candidates = []
