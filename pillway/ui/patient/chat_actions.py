@@ -128,6 +128,7 @@ class ChatActionsMixin:
             device=input_device,
             transcribe=True,
         )
+        self.voice_listener.language = self.lang
         self.voice_typing_active = True
         self.voice_typing_had_text = False
         self.voice_typing_error = False

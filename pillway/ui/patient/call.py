@@ -1,27 +1,56 @@
-"""Check up -> Call: hands-free voice conversation with Sarah in a bright Pillway call view.
+"""Check up -> Call: a hands-free voice call with Sarah.
 
 Called by: ui/patient/dashboard.py when self.call_open is True.
-The live sine waveform and input level respond to microphone volume. Microphone
-and session logic: ui/patient/call_audio.py. The mic stays live until muted or the call ends.
+Layout (top to bottom): "Pillway call" + timer; Sarah's illustrated avatar (her mouth moves
+while she speaks); her name; live captions; an Apple-style frosted "liquid glass" bar with
+Mute / Speaker / End. Bottom-right, well inside the margin: YOUR microphone orb, whose bars
+grow with how loudly you speak. If no voice is heard for a while (or there's no microphone),
+a small Pillway card appears top-right saying you may be muted or the mic isn't working.
+Artwork: ui/patient/call_art.py. Microphone and session logic: ui/patient/call_audio.py.
 """
 
 import math
+import time
 
 from config import get_settings
 
-from ...storage.patient_store import display_name, initials
-from ..theme import HOVER, INK, ORANGE, RED, WHITE
+from ...storage.patient_store import initials
+from ..theme import BORDER, INK, NAVY, RED, RED_SOFT, TEXT_DARK, WHITE
+from . import call_art
 
-CALL_BG = "#f27032"
-CALL_HALO = "#f68442"
-CALL_PANEL = "#d9572b"
+CALL_BG = "#f0703a"         # plain-shapes fallback (no Pillow)
 CALL_GREY = "#fff1e8"
-CALL_RED = "#d93636"
+CALL_RED = "#e5383b"
+SILENCE_SECONDS = 8         # show "we can't hear you" after this long without a voice
+BAR_COUNT = 64
 
 
 class CallMixin:
+    # ---- artwork (cached PhotoImages) ------------------------------------------------------
+
+    def _call_photo(self, key, make):
+        cache = self.__dict__.setdefault("_call_photo_cache", {})
+        if key not in cache:
+            from PIL import ImageTk
+            if len(cache) > 40:
+                cache.clear()
+            cache[key] = ImageTk.PhotoImage(make(), master=self)
+        return cache[key]
+
+    def _art_ok(self):
+        import os
+        return call_art.available() and not os.environ.get("PILLWAY_PLAIN_SHAPES")
+
+    # ---- the screen ----------------------------------------------------------------------
+
     def draw_call_preview(self, x1, y1, x2, y2):
-        self.rrect(x1, y1, x2, y2, self.S(28), fill=CALL_BG, outline=CALL_BG)
+        w, h = round(x2 - x1), round(y2 - y1)
+        art = self._art_ok()
+        if art:
+            self.c.create_image(round(x1), round(y1), anchor="nw",
+                                image=self._call_photo(("bg", w, h), lambda: call_art.background(w, h)))
+        else:
+            self.rrect(x1, y1, x2, y2, self.S(8), fill=CALL_BG, outline=CALL_BG)
         if not self.record["consent"]["accepted"]:
             self.draw_consent(x1, y1, x2, y2)
             return
@@ -29,187 +58,240 @@ class CallMixin:
             self._begin_call()
         state = self.call_state
         cx = (x1 + x2) / 2
-        heading = "APPEL PILLWAY" if self.lang == "fr" else "PILLWAY CALL"
-        self.text(cx, y1 + self.S(42), heading, 12, CALL_GREY, "bold", anchor="center")
-        self.text(x2 - self.S(30), y1 + self.S(42), self._call_clock(), 14, WHITE,
-                  "bold", anchor="e", tag="call_timer")
+        self.text(cx, y1 + self.S(36), "Appel Pillway" if self.lang == "fr" else "Pillway call", 14, WHITE, "bold",
+                  anchor="center")
+        self.text(x2 - self.S(28), y1 + self.S(36), self._call_clock(), 16, WHITE, "bold", anchor="e",
+                  tag="call_timer")
 
-        avatar_y = y1 + min(self.S(245), (y2 - y1) * 0.32)
-        radius = min(self.S(62), (y2 - y1) * 0.13)
-        state["wave_center"] = (cx, avatar_y)
-        state["wave_radius"] = radius
-        self.c.create_oval(
-            cx - radius - self.S(24), avatar_y - radius - self.S(24),
-            cx + radius + self.S(24), avatar_y + radius + self.S(24),
-            fill=CALL_HALO, outline="", tags="call_avatar_halo",
-        )
-        self.c.create_oval(
-            cx - radius, avatar_y - radius, cx + radius, avatar_y + radius,
-            fill="#fffaf6", outline=WHITE, width=self.S(5), tags="call_avatar",
-        )
-        self.text(cx, avatar_y, initials(self.record), 29, INK, "bold",
-                  anchor="center", tag="call_avatar_initials")
+        # Sarah
+        size = round(min(self.S(170), h * 0.25))
+        avatar_y = y1 + self.S(70) + size / 2
+        if art:
+            closed = self._call_photo(("avatar", size, False), lambda: call_art.avatar(size, False))
+            opened = self._call_photo(("avatar", size, True), lambda: call_art.avatar(size, True))
+            state["avatar_images"] = (closed, opened)
+            self.c.create_image(round(cx), round(avatar_y), image=closed, tags="call_avatar")
+        else:
+            r = size / 2
+            self.circle(self.c, cx - r, avatar_y - r, cx + r, avatar_y + r, fill="#fff6ee")
+            self.text(cx, avatar_y, "S", 40, INK, "bold", anchor="center")
+        name = get_settings().branding.assistant_name
+        name_y = avatar_y + size / 2 + self.S(30)
+        self.text(cx, name_y, name, 28, WHITE, "bold", anchor="center")
+        self.text(cx, name_y + self.S(30), self._call_status_line(), 14, CALL_GREY, anchor="center",
+                  tag="call_status_line")
+
+        # glass control bar
+        bar_w = min(self.S(500), w - self.S(260))
+        bar_h = self.S(104)
+        bar_box = (cx - bar_w / 2, y2 - self.S(40) - bar_h, cx + bar_w / 2, y2 - self.S(40))
+        if art:
+            local = tuple(round(v - o) for v, o in zip(bar_box, (x1, y1, x1, y1)))
+            radius = bar_h / 2
+            pad = max(8, round(radius * 0.6))  # call_art.glass adds this much room for the shadow
+            photo = self._call_photo(("glass", w, h, local),
+                                     lambda: call_art.glass(call_art.background(w, h), local, radius)[0])
+            self.c.create_image(round(x1 + local[0] - pad), round(y1 + local[1] - pad), anchor="nw", image=photo)
+        else:
+            self.rrect(*bar_box, bar_h / 2, fill="#f59a6c", outline="#fbc2a2", width=self.S(1.5))
+
+        # captions sit between the name and the glass bar
+        caption_top = name_y + self.S(66)
+        self._draw_captions(cx, caption_top, min(self.S(680), w - self.S(120)), bar_box[1] - self.S(20))
+        self._draw_call_controls(cx, (bar_box[1] + bar_box[3]) / 2 - self.S(10), x1, x2)
+
+        # your microphone orb, bottom-right with a generous margin
+        orb_r = self.S(40)
+        reach = orb_r + self.S(46)
+        ox, oy = x2 - self.S(40) - reach, y2 - self.S(40) - reach
+        state["orb"] = (ox, oy, orb_r)
+        self.circle(self.c, ox - orb_r, oy - orb_r, ox + orb_r, oy + orb_r, fill=WHITE, tags="call_orb")
+        self.text(ox, oy, initials(self.record), 20, NAVY, "bold", anchor="center", tag="call_orb")
+        if state.get("muted"):
+            br = self.S(15)
+            bx, by = ox + orb_r * 0.72, oy + orb_r * 0.72
+            self.circle(self.c, bx - br, by - br, bx + br, by + br, fill=CALL_RED, outline=WHITE,
+                        width=self.S(2), tags="call_orb")
+            self.draw_icon("mic", bx, by, self.S(15), WHITE, "call_orb_mic", bg=CALL_RED)
+            self.c.create_line(bx - self.S(7), by + self.S(7), bx + self.S(7), by - self.S(7), fill=WHITE,
+                               width=self.S(2), tags="call_orb")
         self._draw_call_wave()
-        name_y = avatar_y + radius + self.S(34)
-        self.text(cx, name_y, display_name(self.record), 25, WHITE, "bold", anchor="center")
-        subtitle = "Sarah est avec vous" if self.lang == "fr" else "Sarah is here with you"
-        self.text(cx, name_y + self.S(30), subtitle, 13, CALL_GREY, anchor="center")
 
-        caption_top = name_y + self.S(64)
-        caption_bottom = y2 - self.S(
-            286 if state.get("mic_missing") or state.get("speech_disabled") else 226
-        )
-        self._draw_captions(
-            cx, caption_top, min(self.S(700), x2 - x1 - self.S(60)), caption_bottom
-        )
-        self._draw_call_controls(cx, y2 - self.S(132), x1, x2)
-        meter_width = min(self.S(148), x2 - x1 - self.S(80))
-        meter_x1 = cx - meter_width / 2
-        meter_y = y2 - self.S(32)
-        self.text(cx, meter_y - self.S(17), self._call_meter_status(), 11, WHITE,
-                  anchor="center", tag="call_meter_status")
-        self.c.create_line(
-            meter_x1, meter_y, meter_x1 + meter_width, meter_y,
-            fill="#f9aa7c", width=self.S(5), capstyle="round", tags="call_meter_track",
-        )
-        self.c.create_line(
-            meter_x1, meter_y, meter_x1, meter_y,
-            fill=WHITE, width=self.S(5), capstyle="round", tags="call_meter_fill",
-        )
-        if state.get("mic_missing") or state.get("speech_disabled"):
-            self._draw_no_mic_help(x1, x2, y2)
+        self._draw_silence_popup(x2, y1)
+        self._update_silence_popup()
+
+    # ---- your voice meter -----------------------------------------------------------------
 
     def _draw_call_wave(self):
+        """The bars around YOUR orb: longer when you speak louder (Sarah has no ring)."""
         state = self.call_state
-        if "wave_center" not in state:  # the call screen hasn't been laid out yet
+        if "orb" not in state:  # the call screen hasn't been laid out yet
             return
-        cx, cy = state["wave_center"]
-        radius = state["wave_radius"]
+        ox, oy, r = state["orb"]
         level = 0.0 if state.get("muted") else state.get("level", 0.0)
-        phase = self.call_elapsed() * 2.8
-        count = 72
-        for index in range(count):
-            angle = 2 * math.pi * index / count
-            pulse = (math.sin(angle * 7 - phase) + 1) / 2
-            inner = radius + self.S(16)
-            outer = inner + self.S(2 + 4 * pulse + level * (9 + 34 * pulse))
-            coords = (
-                cx + math.cos(angle) * inner,
-                cy + math.sin(angle) * inner,
-                cx + math.cos(angle) * outer,
-                cy + math.sin(angle) * outer,
-            )
-            tag = f"call_wave_{index}"
+        smooth = state.get("level_smooth", 0.0)
+        smooth = smooth + (level - smooth) * (0.55 if level > smooth else 0.18)  # fast up, slow down
+        state["level_smooth"] = smooth
+        phase = self.call_elapsed() * 3.1
+        inner = r + self.S(7)
+        for index in range(BAR_COUNT):
+            angle = 2 * math.pi * index / BAR_COUNT - math.pi / 2
+            ripple = 0.55 + 0.45 * math.sin(index * 0.83 + phase) * math.sin(index * 0.27 - phase * 0.6)
+            length = self.S(3) + smooth * self.S(42) * max(0.15, ripple)
+            coords = (ox + math.cos(angle) * inner, oy + math.sin(angle) * inner,
+                      ox + math.cos(angle) * (inner + length), oy + math.sin(angle) * (inner + length))
+            tag = f"call_bar_{index}"
             if self.c.find_withtag(tag):
                 self.c.coords(tag, *coords)
             else:
-                self.c.create_line(
-                    *coords, fill=WHITE, width=self.S(2.5), capstyle="round", tags=("call_wave", tag),
-                )
-        avatar_radius = radius + self.S(4) * level
-        self.c.coords(
-            "call_avatar", cx - avatar_radius, cy - avatar_radius,
-            cx + avatar_radius, cy + avatar_radius,
-        )
-        halo_radius = avatar_radius + self.S(24)
-        self.c.coords(
-            "call_avatar_halo", cx - halo_radius, cy - halo_radius,
-            cx + halo_radius, cy + halo_radius,
-        )
-        self.c.coords("call_avatar_initials", cx, cy)
+                self.c.create_line(*coords, fill=WHITE, width=max(1, self.S(2.6)), capstyle="round",
+                                   tags=("call_bars", tag))
+        # Sarah's mouth moves while she is speaking
+        images = state.get("avatar_images")
+        if images:
+            talking = state.get("sarah_speaking") and int(self.call_elapsed() * 6) % 2 == 0
+            self.c.itemconfigure("call_avatar", image=images[1 if talking else 0])
+        self.c.itemconfigure("call_status_line", text=self._call_status_line())
+
+    def _call_status_line(self):
+        state = self.call_state or {}
+        fr = self.lang == "fr"
+        if state.get("sarah_speaking"):
+            return "Sarah parle…" if fr else "Speaking…"
+        if state.get("muted"):
+            return "Votre micro est coupé" if fr else "Your mic is muted"
+        if self.patient_id in self.service.busy:
+            return "Sarah réfléchit…" if fr else "Thinking…"
+        return "Sarah vous écoute" if fr else "Listening"
+
+    # ---- "we can't hear you" card -----------------------------------------------------------
+
+    def _draw_silence_popup(self, right, top):
+        state = self.call_state
+        width, height = self.S(330), self.S(118)
+        x2, y1 = right - self.S(24), top + self.S(62)
+        x1, y2 = x2 - width, y1 + height
+        tag = "call_popup"
+        self.rrect(x1 + self.S(1), y1 + self.S(3), x2 + self.S(1), y2 + self.S(3), self.S(8), fill="#c9542f",
+                   tags=tag)
+        self.rrect(x1, y1, x2, y2, self.S(8), fill=WHITE, outline=BORDER, tags=tag)
+        r = self.S(17)
+        icx, icy = x1 + self.S(30), y1 + self.S(32)
+        self.circle(self.c, icx - r, icy - r, icx + r, icy + r, fill=RED_SOFT, tags=tag)
+        self.draw_icon("mic", icx, icy, self.S(18), RED, "call_popup", bg=RED_SOFT)
+        self.c.create_line(icx - self.S(8), icy + self.S(8), icx + self.S(8), icy - self.S(8), fill=RED,
+                           width=self.S(2), tags=tag)
+        self.text(x1 + self.S(58), y1 + self.S(28), "", 15, INK, "bold", tag=(tag, "call_popup_title"))
+        self.c.create_text(x1 + self.S(58), y1 + self.S(46), text="", anchor="nw", fill=TEXT_DARK,
+                           width=width - self.S(74), font=self.font(13), tags=(tag, "call_popup_body"))
+        link = "call_popup_link"
+        self.text(x1 + self.S(58), y2 - self.S(18), self.t("call.switch_chat"), 13, RED, "bold",
+                  tag=(tag, link))
+        self.clickable(link, self.switch_call_to_chat)
+        self.c.itemconfigure(tag, state="hidden")
+        state["popup_shown"] = None
+
+    def _update_silence_popup(self):
+        state = self.call_state
+        now = time.monotonic()
+        if state.get("level", 0) > 0.05 or state.get("sarah_speaking") or self.patient_id in self.service.busy:
+            state["last_voice"] = now
+        quiet_for = now - state.setdefault("last_voice", now)
+        fr = self.lang == "fr"
+        if state.get("mic_missing") or state.get("speech_disabled"):
+            kind = "missing"
+        elif state.get("muted") and quiet_for > SILENCE_SECONDS:
+            kind = "muted"
+        elif quiet_for > SILENCE_SECONDS:
+            kind = "silent"
+        else:
+            kind = None
+        if kind == state.get("popup_shown"):
+            return
+        state["popup_shown"] = kind
+        if kind is None:
+            self.c.itemconfigure("call_popup", state="hidden")
+            return
+        title, body = {
+            "missing": (("Micro introuvable", "Vérifiez que votre micro est branché et autorisé, ou passez au clavardage.")
+                        if fr else ("No microphone found",
+                                    "Check that your mic is plugged in and allowed, or switch to chat.")),
+            "muted": (("Votre micro est coupé", "Touchez Activer le micro pour parler à Sarah.")
+                      if fr else ("You're on mute", "Tap Unmute to talk to Sarah.")),
+            "silent": (("On ne vous entend pas", "Votre micro est peut-être coupé ou ne fonctionne pas.")
+                       if fr else ("We can't hear you", "You may be muted, or your microphone isn't working.")),
+        }[kind]
+        self.c.itemconfigure("call_popup", state="normal")
+        self.c.itemconfigure("call_popup_title", text=title)
+        self.c.itemconfigure("call_popup_body", text=body)
+
+    # ---- captions and controls ------------------------------------------------------------
 
     def _draw_captions(self, cx, top, width, bottom):
-        """Large captions: the last two lines of the call, trimmed so they never cover the buttons."""
+        """The last two lines of the call, trimmed so they never run into the glass bar."""
         y = top
         for message in self.call_caption_lines()[-2:]:
             mine = message["role"] == "patient"
-            colour = RED if message.get("tier") == 1 else "#ffcc00" if message.get("tier") == 2 else (
-                "#d1d1d6" if mine else WHITE)
-            prefix = ("You: " if self.lang == "en" else "Vous : ") if mine else "Sarah: "
+            colour = "#ffe1d6" if mine else WHITE
+            if message.get("tier") == 1:
+                colour = "#fff3b0"
+            prefix = ("Vous : " if self.lang == "fr" else "You: ") if mine else ""
             if message.get("tier"):
                 prefix = "⚑ " + prefix
             text = " ".join(message["text"].split())
-            room = max(60, int((bottom - y) / self.S(24)) * 60)
+            room = max(60, int((bottom - y) / self.S(26)) * 62)
             if len(text) > room:
                 text = text[:room].rsplit(" ", 1)[0] + "…"
             item = self.c.create_text(cx, y, text=prefix + text, fill=colour, anchor="n", justify="center",
-                                      font=self.font(15, "bold" if message.get("tier") else "normal"), width=width)
-            y = self.c.bbox(item)[3] + self.S(12)
+                                      font=self.font(15 if mine else 18, "bold" if message.get("tier") else "normal"),
+                                      width=width)
+            y = self.c.bbox(item)[3] + self.S(14)
             if y > bottom:
                 break
 
     def _draw_call_controls(self, cx, cy, x1, x2):
         state = self.call_state
-        spacing = min(self.S(108), (x2 - x1) / 3.2)
-        small = min(self.S(34), (x2 - x1) / 12)
+        spacing = self.S(118)
         muted = state.get("muted")
-        self._draw_call_control("call_mute", cx - spacing, cy, small, "mic",
-                                WHITE if muted else CALL_PANEL, CALL_BG if muted else WHITE,
-                                self.toggle_call_mute)
-        if muted:
-            self.c.create_line(cx - spacing - self.S(16), cy + self.S(16), cx - spacing + self.S(16), cy - self.S(16),
-                               fill=CALL_BG, width=self.S(3), tags="call_mute")
-        mic_label = self.t("call.unmute") if muted else self.t("call.mute")
-        self.text(cx - spacing, cy + small + self.S(17), mic_label, 12, WHITE, anchor="center")
-
         speaker_on = state.get("speaker_enabled", False)
-        self._draw_call_control("call_speaker", cx, cy, small, "speaker",
-                                CALL_PANEL, WHITE, self.toggle_call_speaker)
-        if not speaker_on:
-            self.c.create_line(
-                cx - self.S(17), cy + self.S(17), cx + self.S(17), cy - self.S(17),
-                fill=WHITE, width=self.S(3), tags="call_speaker",
-            )
-        speaker_label = self.t("call.speaker") if speaker_on else self.t("call.speaker_off")
-        self.text(cx, cy + small + self.S(17), speaker_label, 12, WHITE, anchor="center")
-        self._draw_call_control("end_call_preview", cx + spacing, cy, small, "phone",
-                                CALL_RED, WHITE, self.close_call_preview)
-        self.text(cx + spacing, cy + small + self.S(17), self.t("call.end"), 12, WHITE, anchor="center")
+        self._draw_call_control("call_mute", cx - spacing, cy, "mic", solid=muted, action=self.toggle_call_mute,
+                                crossed=muted)
+        self.text(cx - spacing, cy + self.S(44), self.t("call.unmute") if muted else self.t("call.mute"), 13,
+                  WHITE, anchor="center")
+        self._draw_call_control("call_speaker", cx, cy, "speaker", solid=False, action=self.toggle_call_speaker,
+                                crossed=not speaker_on)
+        self.text(cx, cy + self.S(44), self.t("call.speaker") if speaker_on else self.t("call.speaker_off"), 13,
+                  WHITE, anchor="center")
+        self._draw_call_control("end_call_preview", cx + spacing, cy, "phone", solid=False, red=True,
+                                action=self.close_call_preview)
+        self.text(cx + spacing, cy + self.S(44), self.t("call.end").capitalize(), 13, WHITE, anchor="center")
 
-    def _draw_call_control(self, tag, cx, cy, radius, icon, fill, icon_color, action):
-        shadow_tag = f"{tag}::shadow"
-        background_tag = f"{tag}::background"
-        self.c.create_oval(
-            cx - radius + self.S(1), cy - radius + self.S(3),
-            cx + radius + self.S(1), cy + radius + self.S(3),
-            fill="#d95e35", outline="", tags=shadow_tag,
-        )
-        self.c.create_oval(
-            cx - radius, cy - radius, cx + radius, cy + radius,
-            fill=fill, outline="", tags=(tag, background_tag),
-        )
-        self.draw_icon(icon, cx, cy, self.S(24), icon_color, tag, bg=fill)
+    def _draw_call_control(self, tag, cx, cy, icon, solid=False, red=False, action=None, crossed=False):
+        """A round button on the glass bar: frosted glass, solid white (on), or red (End)."""
+        size = round(self.S(60))
+        icon_colour = "#e05a2c" if solid else WHITE
+        if self._art_ok():
+            fill, alpha, hover_alpha = ((230, 56, 59), 255, 255) if red else (
+                ((255, 255, 255), 255, 235) if solid else ((255, 255, 255), 55, 95))
+            normal = self._call_photo(("btn", size, fill, alpha), lambda: call_art.glass_circle(size, fill, alpha))
+            hover = self._call_photo(("btn", size, fill, hover_alpha, "h"),
+                                     lambda: call_art.glass_circle(size, fill, hover_alpha))
+            self.c.create_image(round(cx), round(cy), image=normal, tags=(tag, f"{tag}::bg"))
+            self.c.tag_bind(tag, "<Enter>", lambda _e: self.c.itemconfigure(f"{tag}::bg", image=hover), add="+")
+            self.c.tag_bind(tag, "<Leave>", lambda _e: self.c.itemconfigure(f"{tag}::bg", image=normal), add="+")
+            bg = "#e6383b" if red else ("#ffffff" if solid else "#f49166")
+        else:
+            r = size / 2
+            bg = CALL_RED if red else (WHITE if solid else "#f59a6c")
+            self.circle(self.c, cx - r, cy - r, cx + r, cy + r, fill=bg, tags=tag)
+        self.draw_icon(icon, cx, cy, self.S(24), icon_colour, tag, bg=bg)
+        if crossed:
+            self.c.create_line(cx - self.S(13), cy + self.S(13), cx + self.S(13), cy - self.S(13),
+                               fill=icon_colour, width=self.S(2.6), capstyle="round", tags=tag)
         self.clickable(tag, action)
-        self.c.tag_bind(
-            tag, "<Enter>",
-            lambda *_: (
-                self.recolor(background_tag, fill=HOVER),
-                self.recolor(f"{tag}_icon", fill=ORANGE),
-            ),
-            add="+",
-        )
-        self.c.tag_bind(
-            tag, "<Leave>",
-            lambda *_: (
-                self.recolor(background_tag, fill=fill),
-                self.recolor(f"{tag}_icon", fill=icon_color),
-            ),
-            add="+",
-        )
 
     def _draw_no_mic_help(self, x1, x2, y2):
-        width = min(self.S(700), x2 - x1 - self.S(40))
-        cx = (x1 + x2) / 2
-        top = y2 - self.S(224)
-        message = self.t("call.speech_disabled") if self.call_state.get("speech_disabled") else self.t("call.no_mic")
-        item = self.c.create_text(cx, top, text=message, fill=WHITE, font=self.font(11),
-                                  width=width, justify="center", anchor="s")
-        box = self.c.bbox(item)
-        tag = "call_switch_chat"
-        self.rrect(cx - self.S(90), box[1] - self.S(52), cx + self.S(90), box[1] - self.S(10), self.S(20),
-                   fill=WHITE, outline="#fff4e8", tags=tag)
-        self.text(cx, box[1] - self.S(31), self.t("call.switch_chat"), 13, CALL_BG, "bold", anchor="center", tag=tag)
-        self.clickable(tag, self.switch_call_to_chat)
+        """Kept for old callers: the 'no microphone' message is now the corner card."""
 
     def _call_clock(self):
         seconds = int(self.call_elapsed())

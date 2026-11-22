@@ -170,6 +170,7 @@ class LocalSpeechInput:
         self.model_root = Path(model_root)
         self.events = events
         self.transcribe = transcribe
+        self.language = "en"            # "fr" makes Whisper listen for French
         self.stop_event = threading.Event()
         self.muted_event = threading.Event()
         self.thread = threading.Thread(target=self._run, daemon=True)
@@ -206,7 +207,23 @@ class LocalSpeechInput:
         return False
 
     def _run(self):
-        if self._engine() == "windows" and self.transcribe:
+        engine = self._engine()
+        if self.transcribe and engine in ("auto", "whisper"):
+            from . import whisper_input
+            if whisper_input.available():
+                try:
+                    whisper_input.run(self)
+                    return
+                except Exception as error:  # e.g. model download blocked: try the next engine
+                    print(f"[speech] Whisper unavailable ({type(error).__name__}: {error})")
+                    if engine == "whisper":
+                        self.events.put(("error", f"Whisper speech recognition failed: {error}"))
+                        return
+                    self.events.put(("status", "Using the backup speech recognizer…"))
+            elif engine == "whisper":
+                self.events.put(("error", "Whisper isn't installed. Run: python -m pip install faster-whisper"))
+                return
+        if engine == "windows" and self.transcribe:
             if self._use_windows_backup("engine set to windows"):
                 return
         try:

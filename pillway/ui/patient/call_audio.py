@@ -17,7 +17,6 @@ from config import get_settings
 from ...storage.paths import data_folder
 from ...voice.speech_input import LocalSpeechInput, resolve_input_device
 from ...voice.tts import speak, stop as stop_speaking
-from ..theme import WHITE
 
 
 def microphone_status():
@@ -63,6 +62,7 @@ class CallAudioMixin:
         self.call_listener = LocalSpeechInput(data_folder() / "models", self.call_events,
                                               device=resolve_input_device(get_settings().call.microphone_device),
                                               transcribe=transcribe)
+        self.call_listener.language = self.lang
         self.call_listener.start()
 
     def _tick_call(self):
@@ -116,21 +116,9 @@ class CallAudioMixin:
         self._call_poll_job = self.after(75, self._tick_call)
 
     def _update_call_widgets(self):
-        """Animate the voice waveform, input level and call timer without a redraw."""
+        """Animate your voice meter, Sarah's mouth, the 'can't hear you' card and the timer."""
         self._draw_call_wave()
-        track = self.c.coords("call_meter_track")
-        if track:
-            level = self.call_state["level"] if not self.call_state["muted"] else 0.0
-            fill_width = max(0.0, (track[2] - track[0]) * level)
-            self.c.coords(
-                "call_meter_fill", track[0], track[1], track[0] + fill_width, track[3],
-            )
-            visible = self.call_state.get("meter_available") and level > 0.025
-            self.c.itemconfigure(
-                "call_meter_fill", state="normal" if visible else "hidden",
-                fill=WHITE,
-            )
-            self.c.itemconfigure("call_meter_status", text=self._call_meter_status())
+        self._update_silence_popup()
         self.c.itemconfigure("call_timer", text=self._call_clock())
 
     def _speak_new_replies(self):
@@ -146,8 +134,10 @@ class CallAudioMixin:
         if listener:
             listener.set_muted(True)
         state = self.call_state
+        state["sarah_speaking"] = True   # her avatar's mouth moves; the silence card waits
 
         def done():
+            state["sarah_speaking"] = False
             # back on (unless the patient pressed mute themselves meanwhile)
             if listener and not state.get("muted"):
                 listener.set_muted(False)
