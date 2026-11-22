@@ -49,14 +49,37 @@ def available():
     return True
 
 
-def load_model(model_root, events):
+_model = {"instance": None, "size": None}
+_model_lock = threading.Lock()
+
+
+def load_model(model_root, events=None):
+    """Load Whisper ONCE and keep it (BUG FIX: it was reloaded every time the mic opened)."""
     from config import get_settings
-    from faster_whisper import WhisperModel
     size = get_settings().call.whisper_model
-    events.put(("status", "Getting speech recognition ready…"))
-    folder = model_root / "whisper"
-    folder.mkdir(parents=True, exist_ok=True)
-    return WhisperModel(size, device="cpu", compute_type="int8", download_root=str(folder))
+    with _model_lock:
+        if _model["instance"] is not None and _model["size"] == size:
+            return _model["instance"]
+        from faster_whisper import WhisperModel
+        folder = model_root / "whisper"
+        folder.mkdir(parents=True, exist_ok=True)
+        if events is not None:
+            downloaded = any(folder.glob(f"*{size}*"))
+            events.put(("status", "Getting speech recognition ready…" if downloaded else
+                        f"Downloading the speech model (one time only, '{size}'). This can take a few minutes…"))
+        _model["instance"] = WhisperModel(size, device="cpu", compute_type="int8", download_root=str(folder))
+        _model["size"] = size
+        return _model["instance"]
+
+
+def preload(model_root):
+    """Get the model ready in the background when the app starts, so the mic works instantly later."""
+    def work():
+        try:
+            load_model(model_root)
+        except Exception as error:
+            print(f"[speech] Whisper preload failed: {type(error).__name__}: {error}")
+    threading.Thread(target=work, daemon=True).start()
 
 
 def transcribe(model, raw, lang):
@@ -106,6 +129,12 @@ class Segmenter:
             return audio if spoken >= 3 else None              # ignore clicks and coughs (< 0.3 s)
         return None
 
+    def flush(self):
+        """Stop pressed mid-sentence: hand over what was said so far (BUG FIX: it was thrown away)."""
+        audio, spoken, was_speaking = b"".join(self.buffer), self.loud_blocks, self.speaking
+        self.reset()
+        return audio if was_speaking and spoken >= 2 and audio else None
+
     def reset(self):
         self.speaking, self.quiet_blocks, self.loud_blocks, self.buffer, self.history = False, 0, 0, [], []
 
@@ -131,8 +160,11 @@ def run(listener, model=None):
             except queue.Full:
                 pass
 
+    capture_done = threading.Event()
+
     def worker():
-        while not stop.is_set() or not sentences.empty():
+        # keeps going after Stop until every captured sentence has been transcribed
+        while not (capture_done.is_set() and sentences.empty()):
             try:
                 audio = sentences.get(timeout=0.2)
             except queue.Empty:
@@ -142,6 +174,7 @@ def run(listener, model=None):
             except Exception as error:
                 events.put(("error", f"Speech recognition failed: {type(error).__name__}: {error}"))
                 stop.set()
+                capture_done.set()
                 return
             if text:
                 events.put(("final", text))
@@ -169,7 +202,19 @@ def run(listener, model=None):
                 finished = segmenter.feed(raw, level)
                 if finished:
                     sentences.put(finished)
-    deadline = time.monotonic() + 3
+        while listener.transcribe and not muted.is_set() and not blocks.empty():  # audio still in the pipe
+            raw = blocks.get_nowait()
+            finished = segmenter.feed(raw, audio_level(raw))
+            if finished:
+                sentences.put(finished)
+        if listener.transcribe and not muted.is_set():
+            last = segmenter.flush()
+            if last:
+                sentences.put(last)
+    capture_done.set()
+    if sentences.qsize() or thread.is_alive():
+        events.put(("status", "Finishing…"))
+    deadline = time.monotonic() + 30   # wait for the last words before saying "stopped"
     while thread.is_alive() and time.monotonic() < deadline:
         time.sleep(0.05)
     events.put(("state", "stopped"))

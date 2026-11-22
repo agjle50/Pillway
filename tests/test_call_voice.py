@@ -71,3 +71,62 @@ class SegmenterTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class WhisperRunTests(unittest.TestCase):
+    """The full listen loop with a fake microphone and a fake Whisper model."""
+
+    def run_listener(self, loud_blocks, stop_after_quiet):
+        import queue
+        import sys
+        import threading
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        class Stream:
+            def __init__(self, callback=None, **_):
+                self.callback = callback
+
+            def __enter__(self):
+                def feed():
+                    loud = (b"\x00\x30" * whisper_input.BLOCK)
+                    quiet = (b"\x01\x00" * whisper_input.BLOCK)
+                    for _ in range(5):
+                        self.callback(quiet, 0, None, None)
+                    for _ in range(loud_blocks):
+                        self.callback(loud, 0, None, None)
+                    for _ in range(stop_after_quiet):
+                        self.callback(quiet, 0, None, None)
+                    time.sleep(0.3)
+                    listener.stop_event.set()          # the user taps the mic to stop
+                threading.Thread(target=feed, daemon=True).start()
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+        class Model:
+            def transcribe(self, audio, **_):
+                time.sleep(0.2)                        # transcription takes a moment
+                return [SimpleNamespace(text=" Can I take this with food?", no_speech_prob=0.05)], None
+
+        import time
+        listener = SimpleNamespace(events=queue.Queue(), stop_event=threading.Event(), muted_event=threading.Event(),
+                                   transcribe=True, device=None, language="en")
+        fake_sd = SimpleNamespace(RawInputStream=Stream)
+        with patch.dict(sys.modules, {"sounddevice": fake_sd}):
+            whisper_input.run(listener, model=Model())
+        events = []
+        while not listener.events.empty():
+            events.append(listener.events.get())
+        return events
+
+    def test_stopping_right_after_speaking_keeps_the_words(self):
+        events = self.run_listener(loud_blocks=12, stop_after_quiet=1)   # stopped before the 0.8 s pause
+        finals = [value for kind, value in events if kind == "final"]
+        self.assertEqual(finals, ["Can I take this with food?"])
+        self.assertEqual(events[-1], ("state", "stopped"))               # "stopped" comes AFTER the words
+
+    def test_a_normal_pause_sends_the_sentence_once(self):
+        events = self.run_listener(loud_blocks=12, stop_after_quiet=12)
+        self.assertEqual([v for k, v in events if k == "final"], ["Can I take this with food?"])
