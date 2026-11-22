@@ -74,7 +74,7 @@ class ChatActionsMixin:
         self.render()
 
     def read_aloud(self, text):
-        self.flash(self.t("chat.read_aloud") + "…")
+        self.flash_light(self.t("chat.read_aloud") + "…")
         speak(text, self.lang, on_error=lambda message: self._background_errors.append(message))
 
     def voice_typing(self):
@@ -195,7 +195,7 @@ class ChatActionsMixin:
     def copy_chat_message(self, message):
         self.clipboard_clear()
         self.clipboard_append(message)
-        self.flash("Copied" if self.lang == "en" else "Copié")
+        self.flash_light("Copied" if self.lang == "en" else "Copié")
 
     def copy_chat_selection(self, event, fallback):
         try:
