@@ -37,9 +37,11 @@ def check_config():
     print(f"Settings folder : {settings.root}")
     print(f"API key         : {'found (ends ' + settings.masked_key() + ') via ' + settings.api_key_source if settings.api_key else 'none -> demo mode'}")
     print(f"Demo mode       : {ai.demo_mode}")
+    from pillway.ai.client import PROVIDER_NAMES, model_for
+    print(f"AI company      : {PROVIDER_NAMES[ai.provider]} (provider = \"{ai.provider}\")")
     print("Models per job  :")
-    for job in ("chat", "flag", "care_plan", "summary"):
-        print(f"   {job:<10} {getattr(ai, job + '_model')}")
+    for job in ("chat", "call", "flag", "care_plan", "summary"):
+        print(f"   {job:<10} {model_for(job, ai)}")
     print(f"Thresholds      : sugar low {settings.safety.blood_sugar_low}, high {settings.safety.blood_sugar_high}, "
           f"very high {settings.safety.blood_sugar_very_high} mmol/L; BP urgent {settings.safety.bp_systolic_urgent}/"
           f"{settings.safety.bp_diastolic_urgent} (PLACEHOLDERS: confirm with Pillway)")
@@ -56,15 +58,21 @@ def check_config():
 
 def estimate_cost():
     """Very rough: about 15 chat turns, 15 flag checks, 1 care plan, 2 recaps per stage run."""
+    from pillway.ai.client import model_for
     ai = get_settings().ai
-    price = {"lite": (0.10, 0.40), "flash": (0.50, 3.00), "pro": (2.00, 12.00)}  # USD per million tokens (estimate)
+    # USD per million tokens (input, output). DeepSeek: PEAK prices from api-docs.deepseek.com
+    # (Nov 2026; off-peak is half). Gemini: rough estimate.
+    price = {"deepseek-flash": (0.30, 1.20), "deepseek-v4-pro": (1.32, 3.96),
+             "lite": (0.10, 0.40), "flash": (0.50, 3.00), "pro": (2.00, 12.00)}
 
-    def cost(model, calls, tokens_in, tokens_out):
+    def cost(job, calls, tokens_in, tokens_out):
+        model = model_for(job, ai)
         tier = next((name for name in price if name in model), "flash")
         return calls * (tokens_in * price[tier][0] + tokens_out * price[tier][1]) / 1_000_000
-    total = (cost(ai.chat_model, 15, 4000, 250) + cost(ai.flag_model, 15, 1500, 80)
-             + cost(ai.care_plan_model, 1, 3000, 1200) + cost(ai.summary_model, 2, 2500, 120))
-    return f"about US${total:.2f} (rough estimate; check current prices at ai.google.dev/pricing)"
+    total = (cost("chat", 15, 4000, 250) + cost("flag", 15, 1500, 80)
+             + cost("care_plan", 1, 3000, 1200) + cost("summary", 2, 2500, 120))
+    where = "api-docs.deepseek.com/quick_start/pricing" if ai.provider == "deepseek" else "ai.google.dev/pricing"
+    return f"about US${total:.3f} (rough estimate at peak prices; check current prices at {where})"
 
 
 def show_ai_payload():
@@ -80,7 +88,8 @@ def show_ai_payload():
     request = AIClient().build_request("chat", system_prompt(), user, record["profile"])
     print("What the AI company would receive for a sample message\n" + "=" * 56)
     print(f"Sample message typed by the patient: {sample}\n")
-    print(f"model: {request['model']}")
+    from pillway.ai.client import PROVIDER_NAMES
+    print(f"AI company: {PROVIDER_NAMES[get_settings().ai.provider]}   model: {request['model']}")
     print(f"system prompt: {len(request['system'])} characters of Sarah's rules (no patient data)")
     print("user message:\n" + request["contents"])
     print("\nNever sent: name, phone, email, address, health card number, date of birth.")

@@ -9,7 +9,7 @@ How a plan is made (plain words):
      doesn't drink, no protein line until the protein question was answered "no limit", etc.
   2. For each target line the rules propose a starting value WITH A REASON
      (e.g. "Move: 90 minutes a week" because "you said about 30 minutes last week").
-  3. The AI (Gemini) then writes SMART goals from the patient's own goal and concerns, may
+  3. The AI (DeepSeek by default) then writes SMART goals from the patient's own goal and concerns, may
      improve the suggested values (with reasons), and picks recommendations ONLY from Pillway's
      fixed list (data/care_plan_template.json -> recommendations).
   4. Every suggested value is marked "to check": the pharmacist sees it highlighted with the
@@ -127,6 +127,34 @@ def relevant(record):
     return targets, list(dict.fromkeys(recs)), daily
 
 
+# Pillway's guideline ranges. An AI-suggested value outside them is ignored (the rule's value stays).
+def _between(low, high):
+    def check(value):
+        match = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*(?:%|g|minutes|min)?\s*", value)
+        return bool(match) and low <= float(match.group(1)) <= high
+    return check
+
+
+def _bp_ok(value):
+    match = re.fullmatch(r"\s*(\d{2,3})\s*/\s*(\d{2,3})\s*(?:mmhg)?\s*", value.lower())
+    return bool(match) and 110 <= int(match.group(1)) <= 140 and 60 <= int(match.group(2)) <= 90
+
+
+GUIDELINE_RANGES = {
+    "a1c_target": _between(6.0, 8.5),          # usually 7.0 or lower; up to 8.5 for frail older adults
+    "bp_target": _bp_ok,                        # below 130/80 usual; never above 140/90
+    "exercise_target": _between(30, 300),       # a small start is allowed, up to Pillway's 300 target
+    "fibre": _between(30, 50),                  # Pillway: 30-50 g a day
+    "alcohol": _between(0, 2),                  # Pillway: max 2 standard drinks a week
+    "sugar_checks": lambda value: 5 <= len(value) <= 120,
+}
+
+
+def ai_value_ok(line_id, value):
+    check = GUIDELINE_RANGES.get(line_id)
+    return bool(check and check(str(value)))
+
+
 def rule_goals(record):
     """Backup SMART goals (used when the AI is off): specific, measurable, timed."""
     goals = []
@@ -202,6 +230,11 @@ def build_draft(record, ai_plan, source):
                 value, reason, *french = targets[base["id"]]
                 value_fr = french[0] if french else ""
                 ai = by_ai.get(base["id"])
+                if ai and str(ai.get("value", "")).strip() and not ai_value_ok(base["id"], ai["value"]):
+                    from .. import debug_log
+                    debug_log.log("careplan", "AI value outside Pillway's guideline ignored", line=base["id"],
+                                  value=str(ai["value"])[:20])
+                    ai = None
                 if ai and str(ai.get("value", "")).strip() and base["kind"] == "suggested":
                     value, reason = str(ai["value"]).strip()[:60], str(ai.get("reason") or reason)[:200]
                     value_fr = ""

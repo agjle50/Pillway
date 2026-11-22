@@ -9,6 +9,8 @@ Each entry: "key": (default, type, rule)
 """
 
 MODEL_NAMES = [
+    "deepseek-flash",         # DeepSeek's fast, cheap model: chats, calls, safety checks, memory
+    "deepseek-v4-pro",        # DeepSeek's stronger model: the care plan
     "gemini-3.8-flash",       # Google's most capable Flash model: Sarah's conversation
     "gemini-3.5-flash-lite",  # fastest and cheapest: background safety checks and memory
     "gemini-3.1-pro-preview", # deepest reasoning (preview), slower
@@ -17,22 +19,23 @@ MODEL_NAMES = [
 
 SCHEMA = {
     "ai": {
-        "provider": ("gemini", str, ["gemini"]),
-        "chat_model": ("gemini-3.8-flash", str, None),
-        "flag_model": ("gemini-3.5-flash-lite", str, None),
-        "care_plan_model": ("gemini-3.8-flash", str, None),
-        "summary_model": ("gemini-3.8-flash", str, None),
-        "call_model": ("gemini-3.5-flash-lite", str, None),
-        "memory_model": ("gemini-3.5-flash-lite", str, None),
+        "provider": ("deepseek", str, ["deepseek", "gemini"]),
+        "chat_model": ("deepseek-flash", str, None),
+        "flag_model": ("deepseek-flash", str, None),
+        "care_plan_model": ("deepseek-v4-pro", str, None),
+        "summary_model": ("deepseek-flash", str, None),
+        "call_model": ("deepseek-flash", str, None),
+        "memory_model": ("deepseek-flash", str, None),
         "conversation_style": ("natural", str, ["natural", "scripted"]),
-        "thinking_level": ("low", str, ["low", "medium", "high"]),
+        "thinking_level": ("off", str, ["off", "low", "medium", "high"]),
+        "care_plan_thinking": ("off", str, ["off", "low", "high"]),
         "max_tokens": (2048, int, (100, 8000)),
         "timeout_seconds": (20, int, (3, 120)),
         "retries": (1, int, (0, 3)),
         "demo_mode": (False, bool, None),
         "ai_safety_layer_enabled": (True, bool, None),
         "deidentify_before_ai": (True, bool, None),
-        "api_key_env_var": ("GEMINI_API_KEY", str, None),
+        "api_key_env_var": ("DEEPSEEK_API_KEY", str, None),
         "api_key": ("", str, None),  # only allowed in pillway_config.local.toml
     },
     "safety": {

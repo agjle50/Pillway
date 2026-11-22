@@ -1,8 +1,11 @@
 # Install everything with:  python -m pip install -r requirements.txt
 # Python 3.11 or newer is required (the code was written for Python 3.14).
 
-# AI (only needed for live AI mode; demo mode works without it)
-google-genai>=1.0
+# AI: DeepSeek (the default) needs NO extra package (the app uses Python's own web client).
+# Only if you switch to Google Gemini (provider = "gemini" in pillway_config.toml), also run:
+#   python -m pip install google-genai
+# Up-to-date web certificates (fixes "certificate verify failed" on some Macs)
+certifi
 # Reads the optional .env file with your API key
 python-dotenv==1.2.1
 

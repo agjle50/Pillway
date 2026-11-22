@@ -20,7 +20,8 @@ from .validation import ConfigError, cross_checks, validate
 ROOT = Path(__file__).resolve().parent.parent
 SHARED_FILE = "pillway_config.toml"
 LOCAL_FILE = "pillway_config.local.toml"
-KEY_PATTERN = re.compile(r"AIza[0-9A-Za-z_\-]{30,}")   # what a Google (Gemini) API key looks like
+# what a Google (Gemini) or DeepSeek API key looks like (used to spot a key pasted in the wrong file)
+KEY_PATTERN = re.compile(r"AIza[0-9A-Za-z_\-]{30,}|sk-[0-9A-Za-z]{24,}")
 
 
 class Settings(SimpleNamespace):
@@ -100,15 +101,22 @@ def _safety_net(root):
     return warnings
 
 
+PROVIDER_ENV_VARS = {"deepseek": "DEEPSEEK_API_KEY", "gemini": "GEMINI_API_KEY"}
+
+
 def _find_api_key(root, values, env):
-    env_name = values["ai"]["api_key_env_var"]
-    if env.get(env_name):
-        return env[env_name].strip(), f"environment variable {env_name}"
+    # the configured variable first, then the usual one for the chosen provider
+    names = list(dict.fromkeys([values["ai"]["api_key_env_var"],
+                                PROVIDER_ENV_VARS.get(values["ai"]["provider"], "")]))
+    for env_name in filter(None, names):
+        if env.get(env_name):
+            return env[env_name].strip(), f"environment variable {env_name}"
     if values["ai"]["api_key"]:
         return values["ai"]["api_key"].strip(), LOCAL_FILE
-    dotenv_key = _read_dotenv(root / ".env").get(env_name, "")
-    if dotenv_key:
-        return dotenv_key, ".env file"
+    dotenv = _read_dotenv(root / ".env")
+    for env_name in filter(None, names):
+        if dotenv.get(env_name):
+            return dotenv[env_name], ".env file"
     return "", "none"
 
 

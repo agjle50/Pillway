@@ -57,6 +57,13 @@ def rehearse():
         flag = {1: "  [RED: URGENT]", 2: "  [AMBER: WATCH]"}.get(patient.get("tier"), "")
         print(f"\nMARIA: {text}{flag}")
         print(f"SARAH ({sarah['source']}, {seconds:.1f}s): {sarah['text']}")
+    # Live AI is adaptive (it may ask in a different order than the script), so finish politely.
+    for _ in range(3):
+        if record["care_plan"] is not None:
+            break
+        record = service.handle_message("maria", "No, that's everything, thank you")
+        sarah = [m for m in record["messages"] if m["role"] == "sarah"][-1]
+        print(f"\nMARIA: No, that's everything, thank you\nSARAH ({sarah['source']}): {sarah['text']}")
     print("\n" + "=" * 70)
     print("Flags:", [(f["tier"], f["topic"]) for f in record["flags"]])
     print("Care plan:", (record["care_plan"] or {}).get("status"), "| tasks:", len(record["tasks"]))

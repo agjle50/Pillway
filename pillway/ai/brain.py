@@ -192,7 +192,14 @@ class Brain:
         if not get_settings().ai.ai_safety_layer_enabled:
             return None, "disabled"
         if self.live:
-            system = (PROMPTS / "flag_check.md").read_text(encoding="utf-8")
+            safety = get_settings().safety
+            thresholds = (
+                f"- Blood pressure: urgent (tier 1) at {safety.bp_systolic_urgent}/{safety.bp_diastolic_urgent} or "
+                f"higher; watch (tier 2) at {safety.bp_systolic_watch}/{safety.bp_diastolic_watch} or higher, or a "
+                f"top number below {safety.bp_systolic_low} with dizziness; lower readings are not a concern.\n"
+                f"- Blood sugar (mmol/L): urgent below {safety.blood_sugar_low} with symptoms or at "
+                f"{safety.blood_sugar_very_high} or higher; watch above {safety.blood_sugar_high}.")
+            system = (PROMPTS / "flag_check.md").read_text(encoding="utf-8").replace("{thresholds}", thresholds)
             data, status = self._ask("flag", system, record, "Check the latest patient message for safety.", text, "flag")
             if status == OK:
                 return data, "ok"
@@ -214,7 +221,7 @@ class Brain:
             from ..core import care_plan as plan_logic
             from ..core.content import load
             targets, recs, _daily = plan_logic.relevant(record)
-            so_far = {"targets": {k: {"value": v, "reason": r} for k, (v, r) in targets.items()},
+            so_far = {"targets": {k: {"value": t[0], "reason": t[1]} for k, t in targets.items()},
                       "recommended_by_rules": recs,
                       "allowed_recommendations": {i["id"]: i["when"] for i in load("care_plan_template")["recommendations"]},
                       "readiness": (record.get("care_plan") or {}).get("readiness", "not set")}
