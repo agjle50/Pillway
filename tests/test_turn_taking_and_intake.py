@@ -338,3 +338,84 @@ class FastVoiceTests(unittest.TestCase):
         app.call_state["reply_ready"] = True
         PillwayApp._tick_call(app)
         self.assertEqual(app.record, {"messages": ["new"]})
+
+
+class ConditionTailoringTests(unittest.TestCase):
+    """Pillway's program: diabetes and high blood pressure. Questions and plan fit the patient."""
+
+    def setUp(self):
+        use_temp_settings()
+        self.service = ConversationService()
+
+    def _blank_patient(self, conditions):
+        def change(record):
+            record["profile"]["conditions"] = []
+            record["medications"] = []
+        self.service.store.update("maria", change)
+        record, errors = self.service.submit_intake("maria", {**GOOD_FORM, "conditions": conditions})
+        self.assertEqual(errors, {})
+        return record
+
+    def test_high_blood_pressure_only_skips_the_diabetes_questions(self):
+        from pillway.core.conversation_flow import question_list
+        record = self._blank_patient(["hypertension"])
+        ids = [q["id"] for q in question_list(record)]
+        self.assertIn("salt", ids)
+        self.assertIn("blood_pressure", ids)
+        for diabetes_only in ("blood_sugar", "feet", "eyes"):
+            self.assertNotIn(diabetes_only, ids)
+
+    def test_diabetes_gets_feet_and_eyes_and_unknown_gets_everything(self):
+        from pillway.core.conversation_flow import question_list
+        record = self._blank_patient(["type2"])
+        ids = [q["id"] for q in question_list(record)]
+        self.assertTrue({"feet", "eyes", "blood_sugar"} <= set(ids))
+        self.assertNotIn("salt", ids)
+        record = self._blank_patient(["unsure"])
+        ids = [q["id"] for q in question_list(record)]
+        self.assertTrue({"feet", "salt"} <= set(ids))
+
+    def test_the_conditions_question_is_required_on_the_screen(self):
+        _, errors = intake.validate({**GOOD_FORM, "conditions": []})
+        self.assertIn("conditions", errors)
+
+    def test_gestational_diabetes_a1c_is_left_for_the_pharmacist_even_if_the_ai_suggests_one(self):
+        from pillway.core import care_plan
+        record = self._blank_patient(["gestational"])
+        plan = care_plan.build_draft(record, {"values": [{"id": "a1c_target", "value": "7.0", "reason": "x"}]}, "ai")
+        a1c = care_plan.find_line(plan, "a1c_target")
+        self.assertEqual(a1c["value"], "")
+        self.assertIn(a1c, care_plan.blanks_to_fill(plan))
+
+
+class AlwaysDraftedTests(unittest.TestCase):
+    def test_leaving_after_the_key_questions_still_drafts_the_plan_for_the_pharmacist(self):
+        use_temp_settings()
+        service = ConversationService()
+        service.submit_intake("maria", GOOD_FORM)
+        service.accept_consent("maria")
+        session = service.start_session("maria", "CHAT")
+        service.start_check_in("maria")
+
+        def answered(record):   # the patient answered their main concerns and goal, then closed the chat
+            record["conversation"]["stage"] = "questions"
+            for qid, value in (("concerns", "what to eat"), ("goal", "walk more")):
+                record["conversation"]["answers"][qid] = {"value": value, "text": value, "time": "now"}
+        service.store.update("maria", answered)
+        self.assertTrue(service.check_in_ready_for_plan(service.store.load("maria")))
+        service.end_session("maria", session)
+        for _ in range(50):
+            if service.store.load("maria").get("care_plan"):
+                break
+            time.sleep(0.05)
+        record = service.store.load("maria")
+        self.assertEqual(record["care_plan"]["status"], "draft")      # waiting on the pharmacist dashboard
+        self.assertEqual(record["conversation"]["stage"], "done")
+
+    def test_leaving_before_the_key_questions_drafts_nothing(self):
+        use_temp_settings()
+        service = ConversationService()
+        service.submit_intake("maria", GOOD_FORM)
+        service.accept_consent("maria")
+        service.start_check_in("maria")
+        self.assertFalse(service.check_in_ready_for_plan(service.store.load("maria")))

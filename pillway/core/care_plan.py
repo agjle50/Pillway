@@ -67,8 +67,12 @@ def relevant(record):
                 or _answer(record, "blood_pressure")[0] not in ("", "no reading"))
     targets, recs, daily = {}, [], []
 
+    gestational = "gestational" in conditions
     if diabetes or _answer(record, "blood_sugar")[0]:
-        targets["a1c_target"] = ("7.0", "Diabetes Canada's usual A1C target for most adults with type 2 diabetes.")
+        if gestational:   # pregnancy targets are different: the pharmacist sets this one
+            targets["a1c_target"] = ("", "Gestational diabetes: targets in pregnancy differ, so the pharmacist sets this.")
+        else:
+            targets["a1c_target"] = ("7.0", "Diabetes Canada's usual A1C target for most adults with type 2 diabetes.")
         monitoring = str(profile.get("monitoring", "")).lower()
         if "libre" in monitoring or "cgm" in monitoring or "sensor" in monitoring:
             targets["sugar_checks"] = ("keep your sensor on and look at your readings every day",
@@ -80,10 +84,15 @@ def relevant(record):
                                        "Newly diagnosed and using finger pricks" + (f"; last reading {sugar}."
                                        if sugar and sugar != "no reading" else "; no recent reading given."),
                                        "avant le déjeuner et 2 heures après votre plus gros repas, 3 jours par semaine")
+    pressure_condition = "blood pressure" in conditions or "hypertension" in conditions
     if bp_known:
         average = f"{intake['bp_systolic']}/{intake['bp_diastolic']}" if intake.get("bp_systolic") else profile.get("last_bp")
-        targets["bp_target"] = ("130/80", "Usual target with diabetes" + (f"; their average is {average}." if average else "."))
+        targets["bp_target"] = ("130/80", "Pillway's resting blood pressure target" +
+                                (" with diabetes" if diabetes else "") + (f"; their average is {average}." if average else "."))
         daily.append("bp_daily")
+    salt = _answer(record, "salt")[0].lower()
+    if pressure_condition or (salt and "rarely" not in salt):
+        daily.append("salt_daily")
     activity_value, activity_text = _answer(record, "activity")
     if activity_value or activity_text:
         minutes = _minutes(activity_text or activity_value)
@@ -114,6 +123,7 @@ def relevant(record):
         if not any(word in monitoring for word in ("libre", "cgm", "sensor")):
             recs.append("cgm")
         daily.insert(0, "feet_daily")
+        recs.append("eye_exam")             # retinopathy: one of the topics in Pillway's care plans
     elif bp_known:
         recs.append("labs")
     if diet in ("unsure", "better") or bmi_high or any(w in concerns for w in ("weight", "diet", "food", "eat")) \
@@ -153,6 +163,10 @@ GUIDELINE_RANGES = {
 def ai_value_ok(line_id, value):
     check = GUIDELINE_RANGES.get(line_id)
     return bool(check and check(str(value)))
+
+
+def _has(record, word):
+    return word in " ".join(record["profile"].get("conditions", [])).lower()
 
 
 def rule_goals(record):
@@ -230,6 +244,8 @@ def build_draft(record, ai_plan, source):
                 value, reason, *french = targets[base["id"]]
                 value_fr = french[0] if french else ""
                 ai = by_ai.get(base["id"])
+                if not value and base["id"] == "a1c_target":
+                    ai = None   # left for the pharmacist on purpose (e.g. gestational diabetes): the AI never fills it
                 if ai and str(ai.get("value", "")).strip() and not ai_value_ok(base["id"], ai["value"]):
                     from .. import debug_log
                     debug_log.log("careplan", "AI value outside Pillway's guideline ignored", line=base["id"],
@@ -238,7 +254,7 @@ def build_draft(record, ai_plan, source):
                 if ai and str(ai.get("value", "")).strip() and base["kind"] == "suggested":
                     value, reason = str(ai["value"]).strip()[:60], str(ai.get("reason") or reason)[:200]
                     value_fr = ""
-                suggested = base["kind"] == "suggested"
+                suggested = base["kind"] == "suggested" and bool(value)   # empty = the pharmacist sets it
                 lines.append(_line(base, value=value, value_fr=value_fr, suggested=suggested,
                                    confirmed=not suggested, reason=reason, ai=bool(ai) and suggested))
         elif sid == "recommended":
@@ -258,6 +274,13 @@ def build_draft(record, ai_plan, source):
                                    "regardez vos pieds chaque jour et gardez la zone propre et couverte.",
                                 reason="A foot sore was flagged during the check-in.")
                 lines.append(line)
+        elif sid == "resources":
+            diabetes_on, pressure_on = _has(record, "diabet"), (_has(record, "blood pressure") or _has(record, "hypertension"))
+            for base in section["lines"]:
+                wanted = base.get("for")
+                if (wanted == "diabetes" and diabetes_on) or (wanted == "blood pressure" and pressure_on) \
+                        or not (diabetes_on or pressure_on):
+                    lines.append(_line(base, reason="Public patient resource (plain language)."))
         elif sid == "medications":
             meds = record.get("medications", [])
             if meds:

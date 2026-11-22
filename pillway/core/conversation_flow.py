@@ -18,6 +18,16 @@ from .content import advice, load
 from .patient_summary import detect_changes, intake_summary, side_effect_matches
 
 
+def question_fits(record, question):
+    """Does this question fit the patient's conditions? (Unknown conditions: every question fits.)"""
+    from .intake import condition_flags
+    diabetes, pressure, known = condition_flags(record)
+    wanted = question.get("for")
+    if not wanted or not known:
+        return True
+    return ("diabetes" in wanted and diabetes) or ("blood pressure" in wanted and pressure)
+
+
 def question_list(record):
     """The questions for this patient, after skip rules, pharmacist choices and the max setting."""
     settings = get_settings()
@@ -27,11 +37,16 @@ def question_list(record):
         by_id = {q["id"]: q for q in questions}
         questions = [by_id[qid] for qid in chosen if qid in by_id]
     profile = record["profile"]
-    kept = [q for q in questions
-            if not any(profile.get(key) == value for key, value in q.get("skip_if", {}).items())]
+    # Pillway's program: diabetes and/or high blood pressure. Only ask what fits this patient's
+    # conditions (when nothing is known, everything is asked so nothing important is skipped).
+    from .intake import condition_flags
+    diabetes, _pressure, known = condition_flags(record)
+    kept = [q for q in questions if question_fits(record, q)
+            and not any(profile.get(key) == value for key, value in q.get("skip_if", {}).items())]
     limit = settings.patient.max_questions_per_check_in
     # goals and main concerns shape the care plan, so the question limit never drops them
-    must_keep = ({"feet"} if record["bot_settings"].get("ask_feet_every_check_in") else set()) | {"concerns", "goal"}
+    must_keep = ({"feet"} if record["bot_settings"].get("ask_feet_every_check_in") and (diabetes or not known)
+                 else set()) | {"concerns", "goal"}
     trimmed = kept[:limit]
     ids = [q["id"] for q in trimmed]
     by_id = {q["id"]: q for q in kept}
