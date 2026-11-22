@@ -8,6 +8,7 @@ import time
 from ..theme import (
     BORDER,
     INK,
+    SURFACE_HIGH,
     RED,
     SHADOW,
     TEXT_MUTED,
@@ -27,16 +28,14 @@ class CheckUpMixin:
             off = (1 - self.anim) * self.S(70) * (i + 1)
             by = y + i * (bh + self.S(22)) + off
             tag = "bar::" + "_".join(title.split())
-            self.rrect(x1, by + self.S(4), x2, by + bh + self.S(4), self.S(20),
-                       fill=SHADOW, outline="", tags=tag)
-            self.rrect(x1, by, x2, by + bh, self.S(20), fill=WHITE,
-                       outline=BORDER, width=self.S(1.2), tags=tag)
+            self.rrect(x1, by, x2, by + bh, self.S(28), fill=SURFACE_HIGH,
+                       outline=SURFACE_HIGH, width=self.S(1.2), tags=tag)
             cx, cy, r = x1 + self.S(56), by + bh / 2, self.S(30)
             self.c.create_oval(cx - r, cy - r, cx + r, cy + r, fill=RED, outline="", tags=tag)
             self.draw_icon(icon, cx, cy, self.S(28), WHITE, tag, bg=RED)
             self.text(x1 + self.S(106), cy - self.S(14), label, 26, INK, "bold", tag=tag)
             self.text(x1 + self.S(106), cy + self.S(20), sub, 14, TEXT_MUTED, tag=tag)
-            self.draw_icon("chev_right", x2 - self.S(34), cy, self.S(24), TEXT_MUTED, tag)
+            self.draw_icon("chev_right", x2 - self.S(34), cy, self.S(24), TEXT_MUTED, tag, bg=SURFACE_HIGH)
             self.clickable(tag, lambda t=title: self.checkup_choice(t))
         if self.status and self.anim >= 1:
             self.text((x1 + x2) / 2, y + 2 * bh + self.S(60),

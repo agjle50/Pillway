@@ -57,7 +57,7 @@ from .ui.pharmacist.workspace_router import WorkspaceRouterMixin
 from .ui.profile_actions import ProfileActionsMixin
 from .ui.shell.header import HeaderMixin
 from .ui.shell.sidebar import SidebarMixin
-from .ui.theme import BASE_H, BASE_W, WHITE, pick_font
+from .ui.theme import BASE_H, BASE_W, SURFACE, WHITE, pick_font
 
 
 def enable_high_dpi():
@@ -96,11 +96,11 @@ class PillwayApp(
         self.title(settings.branding.app_name)
         self.geometry("1500x900")
         self.minsize(900, 560)
-        self.configure(bg=WHITE)
+        self.configure(bg=SURFACE)
         self.protocol("WM_DELETE_WINDOW", self.close_application)
         pick_font(self)
 
-        self.c = tk.Canvas(self, bg=WHITE, highlightthickness=0, bd=0)
+        self.c = tk.Canvas(self, bg=SURFACE, highlightthickness=0, bd=0)
         self.c.pack(fill="both", expand=True)
         self._click_targets = []
         self.c.bind("<Button-1>", self._dispatch_expanded_click, add="+")
@@ -278,6 +278,11 @@ class PillwayApp(
                     self.draw_pharmacist_dashboard()
             else:
                 self.draw_dashboard()
+        else:
+            # every other page sits on the same white sheet as the dashboard
+            self.rrect(*self.panel_box(), self.S(28), fill=WHITE, outline=WHITE)
+        if self.section == "Dashboard":
+            pass
         elif self.section == "Settings":
             self.draw_settings()
         elif self.section == "Manage profiles":

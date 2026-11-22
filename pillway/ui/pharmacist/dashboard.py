@@ -16,7 +16,7 @@ from ...core.care_plan import blanks_to_fill
 from ...storage import app_state
 from ...storage.patient_store import display_name, initials
 from ..theme import (AMBER, AMBER_SOFT, BORDER, GREEN, GREEN_SOFT, INK, LIVE_GREEN, NAVY, PAGE_BG, RED,
-                     RED_SOFT, RED_TEXT, SHADOW, TEXT_DARK, TEXT_MUTED, WHITE)
+                     RED_SOFT, RED_TEXT, SHADOW, SURFACE_HIGH, BORDER_SOFT, TONAL, TEXT_DARK, TEXT_MUTED, WHITE)
 
 
 def needs_attention_key(record):
@@ -46,7 +46,7 @@ def sort_by_attention(records):
 class PharmacistDashboardMixin:
     def draw_pharmacist_dashboard(self):
         x1, y1, x2, y2 = self.sw + self.S(14), self.S(92), self.w - self.S(14), self.h - self.S(14)
-        self.c.create_rectangle(x1, y1, x2, y2, fill=PAGE_BG, outline="")
+        self.rrect(x1, y1, x2, y2, self.S(28), fill=WHITE, outline=WHITE)  # white sheet
         records = self.store.all()
         y = self._draw_summary_tiles(records, x1 + self.S(20), y1 + self.S(16), x2 - self.S(20))
         y = self._draw_filter_bar(x1 + self.S(20), y + self.S(14), x2 - self.S(20))
@@ -56,7 +56,7 @@ class PharmacistDashboardMixin:
             self.rrect(x1 + self.S(20), y, x2 - self.S(20), y + self.S(50), self.S(12), fill="#e8f6ee", outline=GREEN)
             self.text(x1 + self.S(40), y + self.S(25), "All clear: no open flags and no care plans waiting.", 14, GREEN, "bold")
             y += self.S(64)
-        area = self.make_scroll(x1 + self.S(10), y, x2 - self.S(10), y2 - self.S(6), PAGE_BG)
+        area = self.make_scroll(x1 + self.S(10), y, x2 - self.S(10), y2 - self.S(16), WHITE)
         height = self._draw_tiles(area, shown, x2 - x1 - self.S(40))
         self.finish_scroll(area, height)
 
@@ -75,7 +75,7 @@ class PharmacistDashboardMixin:
         width = (x2 - x1 - gap * (len(tiles) - 1)) / len(tiles)
         for index, (label, value, colour) in enumerate(tiles):
             tx = x1 + index * (width + gap)
-            self.rrect(tx, y, tx + width, y + self.S(92), self.S(14), fill=WHITE, outline=BORDER)
+            self.rrect(tx, y, tx + width, y + self.S(92), self.S(20), fill=SURFACE_HIGH, outline=SURFACE_HIGH)
             if colour != TEXT_DARK:  # a coloured edge marks the tiles that need action
                 self.c.create_rectangle(tx + 1, y + self.S(14), tx + self.S(6), y + self.S(78), fill=colour, outline="")
             self.text(tx + self.S(22), y + self.S(36), value, 30, colour, "bold")
@@ -94,10 +94,11 @@ class PharmacistDashboardMixin:
             item = self.c.create_text(0, -500, text=label, font=self.font(13, "bold"))
             width = self.c.bbox(item)[2] - self.c.bbox(item)[0] + self.S(36) + (self.S(14) if name == "ACTIVE" else 0)
             self.c.delete(item)
-            self.rrect(x, y, x + width, y + self.S(44), self.S(22), fill=INK if selected else WHITE,
-                       outline=INK if selected else BORDER, tags=tag)
+            # Google-style filter chips: tinted when selected, outlined when not
+            self.rrect(x, y, x + width, y + self.S(44), self.S(22), fill=TONAL if selected else WHITE,
+                       outline=TONAL if selected else BORDER, width=self.S(1.4), tags=tag)
             self.text(x + width / 2 + (self.S(7) if name == "ACTIVE" else 0), y + self.S(22), label, 13,
-                      WHITE if selected else INK, "bold", anchor="center", tag=tag)
+                      NAVY if selected else TEXT_DARK, "bold", anchor="center", tag=tag)
             if name == "ACTIVE":
                 self.c.create_oval(x + self.S(10), y + self.S(18), x + self.S(18), y + self.S(26), fill=LIVE_GREEN,
                                    outline="", tags=tag)
@@ -111,12 +112,12 @@ class PharmacistDashboardMixin:
                                    "Name" if self.dash_sort == "Needs attention" else "Needs attention")):
             tag = "dashbtn::" + "_".join(label.split())
             item = self.c.create_text(0, -500, text=label, font=self.font(12, "bold"))
-            width = self.c.bbox(item)[2] - self.c.bbox(item)[0] + self.S(30)
+            width = self.c.bbox(item)[2] - self.c.bbox(item)[0] + self.S(40)
             self.c.delete(item)
             primary = key is None
-            self.rrect(right - width, y, right, y + self.S(44), self.S(10), fill=RED if primary else WHITE,
-                       outline=RED if primary else BORDER, tags=tag)
-            self.text(right - width / 2, y + self.S(22), label, 12, WHITE if primary else INK, "bold", anchor="center", tag=tag)
+            self.rrect(right - width, y, right, y + self.S(44), self.S(22), fill=RED if primary else SURFACE_HIGH,
+                       outline=RED if primary else SURFACE_HIGH, tags=tag)
+            self.text(right - width / 2, y + self.S(22), label, 13, WHITE if primary else NAVY, "bold", anchor="center", tag=tag)
             action = self.add_patient_profile if primary else (lambda k=key, v=value: self.set_dashboard_pref(**{k: v}))
             self.clickable(tag, action)
             right -= width + self.S(10)
@@ -159,8 +160,8 @@ class PharmacistDashboardMixin:
         tag = f"tile::{record['id']}"
         open_flags = [f for f in record["flags"] if f["status"] == "open"]
         moved = self.recently_moved.get(record["id"], 0) > time.monotonic()
-        self.rr(canvas, x, y, x + size, y + size, self.S(22), fill=RED_SOFT if moved else WHITE,
-                outline=RED if moved else BORDER, width=self.S(3 if moved else 1.2), tags=tag)
+        self.rr(canvas, x, y, x + size, y + size, self.S(28), fill=RED_SOFT if moved else WHITE,
+                outline=RED if moved else BORDER_SOFT, width=self.S(3 if moved else 1.5), tags=tag)
         compact = self.dash_view == "compact"
         cx, avatar_y, radius = x + size / 2, y + size * 0.30, size * 0.15
         canvas.create_oval(cx - radius, avatar_y - radius, cx + radius, avatar_y + radius, fill=NAVY, outline="", tags=tag)

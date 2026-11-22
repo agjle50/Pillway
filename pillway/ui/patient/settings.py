@@ -29,7 +29,7 @@ class SettingsMixin:
         self.draw_icon("back", self.sw + self.S(36), y, self.S(26), INK, "back")
         self.clickable("back", lambda: self.go(back_to))
         self.text(self.sw + self.S(70), y, title, 22, INK, tag="page_title")
-        self.c.create_line(self.sw, y + self.S(36), self.w, y + self.S(36), fill=BORDER)
+        self.c.create_line(self.sw + self.S(14), y + self.S(36), self.w - self.S(14), y + self.S(36), fill=BORDER)
         return y + self.S(36)
 
     def draw_settings(self):

@@ -11,7 +11,7 @@ from config import get_settings
 
 from ...storage.chat_history import format_chat_time, local_date_label
 from ..theme import (AMBER, AMBER_SOFT, BORDER, CHAT_BG, INK, NAV_ICON, NAVY, RED, RED_SOFT, RED_TEXT, TEXT_DARK,
-                     TEXT_MUTED, TEXT_SUBTLE, WHITE)
+                     SURFACE_HIGH, TEXT_MUTED, TEXT_SUBTLE, WHITE)
 
 # Flag labels under a patient's message: (label background, label colour, icon, words). Never colour alone.
 FLAG_LABELS = {1: (RED_SOFT, RED_TEXT, "flag", "chat.shared_urgent"), 2: (AMBER_SOFT, AMBER, "alert", "chat.shared_watch")}
@@ -78,8 +78,8 @@ class ChatMixin:
             previous = message
         if self.patient_id in self.service.busy:
             self._draw_avatar(canvas, self.S(30), y + self.S(24))
-            self.rr(canvas, self.S(58), y, self.S(58) + self.S(190), y + self.S(48), self.S(24), fill=WHITE,
-                    outline=BORDER)
+            self.rr(canvas, self.S(58), y, self.S(58) + self.S(190), y + self.S(48), self.S(24),
+                    fill=SURFACE_HIGH, outline=SURFACE_HIGH)
             self.tx(canvas, self.S(80), y + self.S(24), self.t("chat.typing"), 15, TEXT_MUTED, anchor="w")
             y += self.S(64)
         return y + self.S(10)
@@ -108,7 +108,7 @@ class ChatMixin:
             fill, ink, meta, outline = NAVY, WHITE, NAV_ICON, NAVY
         else:
             x1 = self.S(58)
-            fill, ink, meta, outline = WHITE, TEXT_DARK, TEXT_SUBTLE, BORDER
+            fill, ink, meta, outline = SURFACE_HIGH, TEXT_DARK, TEXT_SUBTLE, SURFACE_HIGH
             if show_avatar:
                 self._draw_avatar(canvas, self.S(30), y + self.S(22))
         inner_w = bubble_w - 2 * pad
@@ -134,14 +134,14 @@ class ChatMixin:
             bottom += self.S(46)
         if not mine:
             right = self.btn(canvas, x1 + pad, bottom, self.t("chat.read_aloud"),
-                             lambda text=text: self.read_aloud(text), "ghost", size=14, height=self.S(40))
+                             lambda text=text: self.read_aloud(text), "white", size=14, height=self.S(40))
             self.btn(canvas, right + self.S(10), bottom, self.t("chat.copy"),
-                     lambda text=text: self.copy_chat_message(text), "ghost", size=14, height=self.S(40))
+                     lambda text=text: self.copy_chat_message(text), "white", size=14, height=self.S(40))
             bottom += self.S(52)
             if message.get("source") == "offline":
                 item = self.tx(canvas, x1 + pad, bottom, self.t("chat.offline"), 13, TEXT_MUTED, width=inner_w)
                 bottom = self.bottom_of(canvas, item) + self.S(10)
-        rect = self.rr(canvas, x1, y, x1 + bubble_w, bottom + self.S(4), self.S(20), fill=fill, outline=outline,
+        rect = self.rr(canvas, x1, y, x1 + bubble_w, bottom + self.S(4), self.S(24), fill=fill, outline=outline,
                        width=max(1, self.S(1)))
         canvas.tag_lower(rect)
         return bottom + self.S(4)
@@ -185,16 +185,17 @@ class ChatMixin:
 
     def _draw_input(self, x1, x2, input_y, input_h):
         left, right = x1 + self.S(28), x2 - self.S(28)
-        self.rrect(left, input_y, right, input_y + input_h, input_h / 2, fill=WHITE, outline=BORDER,
-                   width=self.S(1.6), tags="chat_input_box")
+        # Google-style search-bar message box: tinted pill, navy outline while typing
+        self.rrect(left, input_y, right, input_y + input_h, input_h / 2, fill=SURFACE_HIGH, outline=SURFACE_HIGH,
+                   width=self.S(2), tags="chat_input_box")
         entry = tk.Entry(self, relief="flat", bd=0, font=self.font(17), fg=TEXT_DARK, insertbackground=INK,
-                         highlightthickness=0, bg=WHITE)
+                         highlightthickness=0, bg=SURFACE_HIGH)
         entry.insert(0, self.chat_draft or self.chat_placeholder)
         if not self.chat_draft:
             entry.configure(fg=TEXT_MUTED)
         entry.bind("<FocusIn>", lambda e: (self.c.itemconfigure("chat_input_box", outline=NAVY),
                                            self.chat_focus_in(e)))
-        entry.bind("<FocusOut>", lambda e: (self.c.itemconfigure("chat_input_box", outline=BORDER),
+        entry.bind("<FocusOut>", lambda e: (self.c.itemconfigure("chat_input_box", outline=SURFACE_HIGH),
                                             self.chat_focus_out(e)))
         entry.bind("<Return>", self.send_chat_message)
         self.chat_entry = entry
@@ -205,7 +206,7 @@ class ChatMixin:
         mic_x, send_x = right - self.S(88), right - self.S(34)
         if get_settings().patient.voice_input:
             voice_active = getattr(self, "voice_typing_active", False)
-            mic_bg = RED if voice_active else SOFT_BUTTON
+            mic_bg = RED if voice_active else WHITE
             self.c.create_oval(mic_x - r, mid - r, mic_x + r, mid + r, fill=mic_bg, outline="", tags="chat_mic")
             self.draw_icon("mic", mic_x, mid, self.S(20), WHITE if voice_active else NAVY, "chat_mic", bg=mic_bg)
             self.clickable("chat_mic", self.voice_typing)

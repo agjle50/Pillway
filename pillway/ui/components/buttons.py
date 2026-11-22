@@ -6,6 +6,7 @@ Called by: header, Tasks screen, settings screens.
 
 from ..theme import (
     INK,
+    SURFACE_HIGH,
     RED,
     SHADOW,
     TOGGLE_OFF,
@@ -15,13 +16,9 @@ from ..theme import (
 
 class ButtonsMixin:
     def beveled_button(self, x1, y1, x2, y2, icon, tag, func):
-        rad = self.S(14)
-        # bevel: soft shadow underneath, light top highlight inside
-        self.rrect(x1, y1 + self.S(3), x2, y2 + self.S(3), rad, fill=SHADOW, outline="", tags=tag)
-        self.rrect(x1, y1, x2, y2, rad, fill=WHITE, outline="#d7dbe5", width=self.S(1.5), tags=tag)
-        self.c.create_line(x1 + rad, y1 + self.S(2.5), x2 - rad, y1 + self.S(2.5),
-                           fill="#f7f8fb", width=self.S(2), tags=tag)
-        self.draw_icon(icon, (x1 + x2) / 2, (y1 + y2) / 2, self.S(26), INK, tag)
+        """A round icon button (Google style: flat circle, no bevel or shadow)."""
+        self.c.create_oval(x1, y1, x2, y2, fill=SURFACE_HIGH, outline="", tags=tag)
+        self.draw_icon(icon, (x1 + x2) / 2, (y1 + y2) / 2, self.S(24), INK, tag, bg=SURFACE_HIGH)
         self.clickable(tag, func)
 
     def toggle(self, x, cy, on, tag, func):
