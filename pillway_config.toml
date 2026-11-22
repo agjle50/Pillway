@@ -129,12 +129,15 @@ french_strings_file = "data/french_strings.json"
 # -----------------------------------------------------------------------------
 [call]
 call_enabled = true
-# "auto"    = try the offline Vosk model first (downloads ~40 MB once); if that can't work,
-#             use Windows' built-in speech recognition instead (Windows only). Recommended.
-# "vosk"    = only the offline Vosk model.
+# "auto"    = the most accurate engine that works on this computer: Whisper (on-device,
+#             much better at understanding people), then Vosk, then Windows' own. Recommended.
+# "whisper" = only Whisper (needs: pip install faster-whisper; downloads its model once).
+# "vosk"    = only the offline Vosk model (small and fast, but makes more mistakes).
 # "windows" = only Windows' built-in speech recognition (no download needed).
 # "none"    = no microphone; the call uses the scripted demo lines.
 speech_to_text_engine = "auto"
+# Whisper model size: "base" (fast, good) or "small" (more accurate, slower on old laptops).
+whisper_model = "base"
 # Leave blank to use the system default, or select a device under Settings > Microphone.
 microphone_device = ""
 # "continuous" listens while the microphone is unmuted; mute to pause listening.
@@ -144,6 +147,15 @@ voice_meter_sensitivity = 1.0
 # Sarah's voice (blank prefers an installed female voice; set a name to override) and speed (words per minute).
 sarah_voice = ""
 sarah_speech_rate = 165
+# Natural voice: a lifelike Microsoft neural voice (needs internet and `pip install edge-tts`).
+# Without internet Sarah automatically uses the computer's own voice instead.
+# Note: Sarah's reply text is sent to Microsoft's speech service to be voiced.
+natural_voice = true
+natural_voice_en = "en-US-AvaMultilingualNeural"
+natural_voice_fr = "fr-CA-SylvieNeural"
+# Slightly quicker and brighter than default: warm and upbeat, like a friendly nurse.
+natural_voice_rate = "+6%"
+natural_voice_pitch = "+8Hz"
 
 
 # -----------------------------------------------------------------------------

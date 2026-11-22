@@ -2,7 +2,8 @@
 
 Called by: the "Read aloud" button on the assistant's messages and the Call screen.
 
-Order (most reliable first):
+Order:
+  0. A natural neural voice (voice/natural_voice.py) when edge-tts is installed and online.
   1. The computer's own voice, run as a separate program:
        Windows -> PowerShell + System.Speech, preferring an installed female voice
        Mac     -> the `say` command with a female voice
@@ -155,7 +156,21 @@ def _speak_pyttsx3(text, lang, _generation):
     engine.runAndWait()
 
 
-ENGINES = (_speak_system, _speak_pyttsx3)
+def _speak_natural(text, lang, generation):
+    """Lifelike neural voice (needs internet + edge-tts); see voice/natural_voice.py."""
+    from . import natural_voice
+    if not natural_voice.available():
+        raise RuntimeError("natural voice not installed or turned off")
+    natural_voice.speak(text, lang, should_stop=lambda: generation != _current["generation"])
+
+
+def _speak_system_clean(text, lang, generation):
+    """The computer's own voice, reading the same spoken-style text as the natural voice."""
+    from .natural_voice import speech_text
+    _speak_system(speech_text(text, lang), lang, generation)
+
+
+ENGINES = (_speak_natural, _speak_system_clean, _speak_pyttsx3)
 
 
 def stop():

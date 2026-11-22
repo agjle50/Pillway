@@ -15,3 +15,7 @@ pyttsx3==2.99
 # Call feature: offline speech-to-text and microphone (optional: the call has a scripted demo without them)
 sounddevice==0.5.6
 vosk==0.3.45
+# Much more accurate speech-to-text, still on-device (first choice when installed; ~140 MB model downloads once)
+faster-whisper>=1.0
+# Sarah's natural voice (Microsoft neural voices; needs internet, falls back to the computer's voice)
+edge-tts>=6.1

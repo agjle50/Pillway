@@ -78,8 +78,11 @@ class DropdownMixin:
             self.bind_all("<Button-1>", self._close_branded_menu_on_outside, add="+")
             self.bind_all("<Escape>", lambda _e: self._close_branded_menu(), add="+")
             self._popover_bindings = True
+        # The click that opened the menu must not also count as a click "outside" it.
+        # BUG FIX: this used after_idle(), but placing the menu runs update_idletasks(),
+        # which fired that reset immediately, so the same click closed the menu again.
         self._popover_opened_now = True
-        self.after_idle(lambda: setattr(self, "_popover_opened_now", False))
+        self.after(250, lambda: setattr(self, "_popover_opened_now", False))
         return frame
 
     def _place_popover(self, frame):

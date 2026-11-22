@@ -116,11 +116,14 @@ class ConversationService:
                 patient_messages[-1],
             )
             contact_time = session.get("end") or patient_messages[-1].get("time") or session.get("start")
+            flagged = [flag.get("topic", "") for flag in record.get("flags", [])
+                       if flag.get("session_id") == session["id"] and flag.get("topic")]
             return {
                 "session_id": session["id"],
                 "kind": session.get("kind", "CHAT"),
                 "at": contact_time,
                 "topic": " ".join(topic_message.get("text", "").split())[:180],
+                "flag_topic": flagged[-1] if flagged else "",   # a clean topic name, safe to say aloud
             }
         return None
 
@@ -156,20 +159,18 @@ class ConversationService:
                 )
         except (TypeError, ValueError):
             when = "récemment" if is_french else "recently"
-        topic = previous.get("topic", "").strip()
+        # Sound like a person who remembers the gist, not a machine replaying a transcript:
+        # never quote the patient's last words (speech-to-text mistakes would be read back).
+        topic = previous.get("flag_topic", "").strip()
         if is_french:
-            topic_text = f' Nous avons parlé de « {topic} ».' if topic else ""
-            greeting = f"Bonjour {first_name}, bon retour. Notre dernier échange était {kind} {when}.{topic_text}"
-            return greeting + (
-                " Voulez-vous un bref résumé, reprendre cette conversation ou parler d'un nouveau sujet? "
-                "Vous n'avez pas besoin de vous souvenir de notre dernier échange; nous pouvons repartir à zéro."
-            )
-        topic_text = f' We talked about "{topic}".' if topic else ""
-        greeting = f"Hi {first_name}, welcome back. We last spoke by {kind} {when}.{topic_text}"
-        return greeting + (
-            " Would you like a quick recap, continue that conversation, or talk about something new? "
-            "You don't need to remember what we discussed—we can start fresh."
-        )
+            about = f", au sujet de : {topic}" if topic else ""
+            return (f"Bonjour {first_name}, contente de vous retrouver! On s'est parlé {when}{about}. "
+                    "Voulez-vous un petit résumé, reprendre là où on s'était laissées, ou parler d'un nouveau sujet? "
+                    "Pas besoin de vous souvenir de tout, on peut repartir à zéro.")
+        about = f", about {topic}" if topic else ""
+        return (f"Hi {first_name}, welcome back! We last talked {when}{about}. "
+                "Would you like a quick recap, pick up where we left off, or talk about something new? "
+                "You don't need to remember what we talked about, we can start fresh.")
 
     # ---- the main entry point --------------------------------------------------
 
