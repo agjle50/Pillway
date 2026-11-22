@@ -4,12 +4,24 @@ import math
 
 from .. import theme
 from ..theme import WHITE
+from . import smooth
 
 
 class IconMixin:
-    def draw_icon(self, kind, cx, cy, size, color, tag, bg=WHITE):
-        """Draw an icon on a 24x24 grid centred on (cx, cy)."""
-        c = self.c
+    def draw_icon(self, kind, cx, cy, size, color, tag, bg=WHITE, canvas=None):
+        """Draw an icon on a 24x24 grid centred on (cx, cy): crisp image when possible."""
+        canvas = canvas or self.c
+        tags = (tag, f"{tag}_icon") if tag else None
+        if smooth.available():
+            try:
+                return smooth.icon(canvas, lambda target, k, x, y, sz, col, b: self._paint_icon(
+                    target, k, x, y, sz, col, None, b), kind, cx, cy, size, color, bg, tags=tags)
+            except Exception as error:  # never lose an icon: fall back to plain drawing
+                print(f"[icons] {kind}: {type(error).__name__}: {error}")
+        return self._paint_icon(canvas, kind, cx, cy, size, color, tag, bg)
+
+    def _paint_icon(self, c, kind, cx, cy, size, color, tag, bg=WHITE):
+        """The icon shapes, drawn with canvas calls onto `c` (a Tk canvas or an IconPainter)."""
         u = size / 24
         lw = max(1.0, 1.9 * u)
         tags = (tag, f"{tag}_icon") if tag else None
@@ -28,7 +40,10 @@ class IconMixin:
         def rect(x1, y1, x2, y2, r=0, fill=""):
             a = P(x1, y1, x2, y2)
             if r:
-                self.rrect(*a, r * u, outline=color, fill=fill, width=lw, tags=tags)
+                if getattr(c, "is_painter", False):
+                    c.create_round_rect(*a, r * u, outline=color, fill=fill, width=lw)
+                else:
+                    self.round_box(c, *a, r * u, outline=color, fill=fill, width=lw, tags=tags)
             else:
                 c.create_rectangle(*a, outline=color, fill=fill, width=lw, tags=tags)
 

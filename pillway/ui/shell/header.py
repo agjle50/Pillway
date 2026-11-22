@@ -8,7 +8,7 @@ The language toggle and "Talk to a pharmacist" are always visible on the patient
 from config import get_settings
 
 from ...storage.patient_store import display_name, initials
-from ..theme import BORDER, INK, RED, TEXT_DARK, TEXT_MUTED, WHITE
+from ..theme import BORDER, HOVER, INK, NAVY, RADIUS, RED, TEXT_DARK, TEXT_MUTED, WHITE
 
 
 class HeaderMixin:
@@ -17,35 +17,39 @@ class HeaderMixin:
             self.draw_detail_header()
             return
         c, w = self.c, self.w
-        top, size = self.S(18), self.S(54)
-        cy = top + size / 2
+        size = self.S(44)
+        cy = self.S(46)
+        top = cy - size / 2
         title = {"Dashboard": "Dashboard" if self.role == "patient" else "Patients"}.get(self.section)
         if title:
-            self.text(self.sw + self.S(28), cy, title, 28, TEXT_DARK, "bold")
+            self.text(self.sw + self.S(26), cy, self.t(title), 25, TEXT_DARK, "bold")
 
         if self.role == "patient" and self.record:
             name, short = display_name(self.record), initials(self.record)
         else:
-            name, short = "Pharmacist", "PH"
-        self.draw_icon("chev_down", w - self.S(34), cy, self.S(22), INK, "profile")
-        name_item = self.text(w - self.S(54), cy, name, 17, INK, "bold", anchor="e", tag="profile")
-        r = self.S(27)
-        ax = c.bbox(name_item)[0] - self.S(14) - r
-        c.create_oval(ax - r, cy - r, ax + r, cy + r, fill="#080b32", outline="#080b32", tags="profile")
-        self.text(ax, cy, short, 16, WHITE, "bold", anchor="center", tag="profile")
+            profile = self.profiles.get(self.active_profile_id, {}) if hasattr(self, "profiles") else {}
+            name = profile.get("name") or "Pharmacist"
+            short = "".join(part[:1] for part in name.split()[:2]).upper() or "PH"
+        # account button: navy initials circle, name, chevron (opens the account menu)
+        self.draw_icon("chev_down", w - self.S(30), cy, self.S(18), INK, "profile")
+        name_item = self.text(w - self.S(46), cy, name, 15, INK, anchor="e", tag="profile")
+        r = self.S(20)
+        ax = c.bbox(name_item)[0] - self.S(10) - r
+        self.circle(c, ax - r, cy - r, ax + r, cy + r, fill=NAVY, tags="profile")
+        self.text(ax, cy, short, 14, WHITE, "bold", anchor="center", tag="profile")
         self.clickable("profile", lambda: self.toggle_dropdown("profile"))
-        self.profile_box = (ax - r, top + size)
+        self.profile_box = (ax - r, cy + size / 2)
 
-        right = ax - r - self.S(24)
+        right = ax - r - self.S(30)
         if self.role == "patient":
             self.beveled_button(right - size, top, right, top + size, "card", "payments", lambda: self.go("Payments"))
             right -= size + self.S(14)
         self.beveled_button(right - size, top, right, top + size, "bell", "bell",
                             lambda: self.toggle_dropdown("notifications"))
         if self.unread_notifications():
-            d = self.S(7)
-            c.create_oval(right - d * 1.6, top - d * 0.4, right + d * 0.4, top + d * 1.6,
-                          fill=RED, outline=WHITE, width=self.S(2), tags="bell")
+            d = self.S(6)
+            self.circle(c, right - d * 1.8, top - d * 0.2, right + d * 0.2, top + d * 1.8,
+                        fill=RED, outline=WHITE, width=self.S(2), tags="bell")
         self.bell_box = (right - size, top + size)
         right -= size + self.S(18)
         if self.role == "patient":
@@ -58,27 +62,34 @@ class HeaderMixin:
         probe = self.c.create_text(0, -500, text=label, font=self.font(14, "bold"))
         text_w = self.c.bbox(probe)[2] - self.c.bbox(probe)[0]
         self.c.delete(probe)
-        x1 = right - text_w - self.S(64)
-        self.rrect(x1, cy - self.S(25), right, cy + self.S(25), self.S(25), fill=RED, outline="", tags=tag)
-        self.draw_icon("phone", x1 + self.S(24), cy, self.S(20), WHITE, tag, bg=RED)
-        self.text(x1 + self.S(42), cy, label, 14, WHITE, "bold", tag=tag)
+        x1 = right - text_w - self.S(60)
+        h = self.S(22)
+        self.rrect(x1, cy - h, right, cy + h, self.S(RADIUS), fill=RED, tags=(tag, f"{tag}::bg"))
+        self.draw_icon("phone", x1 + self.S(22), cy, self.S(18), WHITE, tag, bg=RED)
+        self.text(x1 + self.S(40), cy, label, 14, WHITE, "bold", tag=tag)
         self.clickable(tag, self.talk_to_pharmacist)
+        self._hover_shade(tag, f"{tag}::bg", RED, "#c7361f")
         return x1
 
     def _draw_language_toggle(self, right, cy):
-        width, height = self.S(108), self.S(44)
+        """EN | FR segmented control: outlined like the icon buttons, selected half in navy."""
+        width, height = self.S(100), self.S(44)
         x1 = right - width
-        self.rrect(x1, cy - height / 2, right, cy + height / 2, height / 2, fill="#eef1f6", outline=BORDER)
+        self.rrect(x1, cy - height / 2, right, cy + height / 2, self.S(RADIUS), fill=WHITE, outline=BORDER,
+                   width=self.S(1.2))
         for index, code in enumerate(("en", "fr")):
             sx1 = x1 + self.S(4) + index * (width - self.S(8)) / 2
             sx2 = sx1 + (width - self.S(8)) / 2
             tag = f"lang::{code}"
             selected = self.lang == code
-            self.rrect(sx1, cy - height / 2 + self.S(4), sx2, cy + height / 2 - self.S(4), height / 2,
-                       fill=INK if selected else "#eef1f6", outline="", tags=tag)
-            self.text((sx1 + sx2) / 2, cy, code.upper(), 14, WHITE if selected else TEXT_MUTED, "bold",
+            fill = NAVY if selected else WHITE
+            self.rrect(sx1, cy - height / 2 + self.S(4), sx2, cy + height / 2 - self.S(4), self.S(RADIUS - 2),
+                       fill=fill, outline=fill, tags=(tag, f"{tag}::bg"))
+            self.text((sx1 + sx2) / 2, cy, code.upper(), 14, WHITE if selected else TEXT_DARK, "bold",
                       anchor="center", tag=tag)
             self.clickable(tag, lambda lang=code: self.set_language(lang))
+            if not selected:
+                self._hover_shade(tag, f"{tag}::bg", WHITE, HOVER)
         if self.lang == "fr" and get_settings().french.show_translation_review_status:
             from ...core.content import load
             key = "translation.ok" if load("french_strings").get("reviewed") else "translation.review"

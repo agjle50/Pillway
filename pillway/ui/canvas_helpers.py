@@ -11,6 +11,10 @@ from .theme import (
 from . import theme
 
 
+from .components import smooth
+
+SMOOTH_OPTIONS = {"fill", "outline", "width", "tags", "state"}
+
 class CanvasHelpersMixin:
     def S(self, v):
         return v * self.s
@@ -20,6 +24,48 @@ class CanvasHelpersMixin:
         return (theme.FONT, -max(1, round(size * self.s)), weight, slant)
 
     def rrect(self, x1, y1, x2, y2, r, **kw):
+        return self.round_box(self.c, x1, y1, x2, y2, r, **kw)
+
+    def round_box(self, canvas, x1, y1, x2, y2, r, **kw):
+        """Rounded box on any canvas: crisp anti-aliased image when possible (see smooth.py).
+
+        House style: corners are at most RADIUS (8 px). Only shapes asked to be fully round
+        (radius = half the height, e.g. toggle switches) keep their pill shape.
+        """
+        short = min(abs(x2 - x1), abs(y2 - y1))
+        if r < short / 2 - 0.5:
+            r = min(r, self.S(theme.RADIUS))
+        if smooth.available() and set(kw) <= SMOOTH_OPTIONS:
+            try:
+                return smooth.shape(canvas, "rect", x1, y1, x2, y2, r, **kw)
+            except Exception as error:  # never break a screen over a rounded corner
+                print(f"[smooth] {type(error).__name__}: {error}")
+        r = max(0, min(r, (x2 - x1) / 2, (y2 - y1) / 2))
+        pts = [x1 + r, y1, x2 - r, y1, x2, y1, x2, y1 + r, x2, y2 - r, x2, y2,
+               x2 - r, y2, x1 + r, y2, x1, y2, x1, y2 - r, x1, y1 + r, x1, y1]
+        return canvas.create_polygon(pts, smooth=True, **kw)
+
+    def circle(self, canvas, x1, y1, x2, y2, **kw):
+        """Crisp anti-aliased circle/ellipse on any canvas (falls back to a plain oval)."""
+        if smooth.available() and set(kw) <= SMOOTH_OPTIONS:
+            try:
+                return smooth.shape(canvas, "oval", x1, y1, x2, y2, **kw)
+            except Exception as error:
+                print(f"[smooth] {type(error).__name__}: {error}")
+        return canvas.create_oval(x1, y1, x2, y2, **kw)
+
+    def _hover_shade(self, tag, bg_tag, normal, hover, canvas=None, outline=False):
+        """Change the background shape bg_tag to `hover` while the pointer is over `tag`."""
+        canvas = canvas or self.c
+        kw = (lambda colour: {"fill": colour, "outline": colour}) if outline else (lambda colour: {"fill": colour})
+        canvas.tag_bind(tag, "<Enter>", lambda _e: self.recolor(bg_tag, canvas=canvas, **kw(hover)), add="+")
+        canvas.tag_bind(tag, "<Leave>", lambda _e: self.recolor(bg_tag, canvas=canvas, **kw(normal)), add="+")
+
+    def recolor(self, tag, fill=None, outline=None, canvas=None):
+        """Recolour shapes after drawing (works for crisp image shapes and plain items)."""
+        smooth.recolor(canvas or self.c, tag, fill=fill, outline=outline)
+
+    def _unused_old_rrect(self, x1, y1, x2, y2, r, **kw):
         r = max(0, min(r, (x2 - x1) / 2, (y2 - y1) / 2))
         pts = [x1 + r, y1, x2 - r, y1, x2, y1, x2, y1 + r, x2, y2 - r, x2, y2,
                x2 - r, y2, x1 + r, y2, x1, y2, x1, y2 - r, x1, y1 + r, x1, y1]
@@ -64,6 +110,7 @@ class CanvasHelpersMixin:
             return self._invoke_clickable(func)
 
     def text(self, x, y, txt, size, color, weight="normal", anchor="w", tag=None, slant="roman"):
+        txt = self.tr(txt)
         return self.c.create_text(x, y, text=txt, fill=color, anchor=anchor,
                                   font=self.font(size, weight, slant), tags=tag)
 

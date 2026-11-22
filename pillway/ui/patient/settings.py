@@ -301,8 +301,8 @@ class SettingsMixin:
         x1 = self.sw + self.S(36)
         x2 = self.w - self.S(36)
         questions = (
-            ("What can Juliez help me with?",
-             "Juliez can help you review your check-in and care-plan information. It is not a doctor."),
+            ("What can Sarah help me with?",
+             "Sarah can help you review your check-in and care-plan information. It is not a doctor."),
             ("Who can see my check-in?",
              "Your care team may review your check-in and any request you send to them."),
             ("What if I need medical help now?",

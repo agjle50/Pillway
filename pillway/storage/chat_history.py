@@ -77,7 +77,7 @@ class ChatHistoryStore:
                         raise ValueError(
                             f"Invalid timestamp in profile {profile_id!r} chat log"
                         ) from error
-                sender = "Juliez" if message["sender"] == "Sarah" else message["sender"]
+                sender = message["sender"]
                 logs[profile_id].append((sender, message["message"], timestamp or None))
         return logs
 

@@ -17,47 +17,50 @@ TEXT_DARK = _brand.text_dark
 TEXT_MUTED = _brand.text_muted
 BORDER = _brand.border
 
-# Supporting colours
-RED_DARK = "#d93636"
-RED_TEXT = "#c42b2b"       # brand red, deepened for small text on white (5.9:1 contrast)
-TEXT_SUBTLE = "#5d6880"    # timestamps and hints (still 5.6:1 on white)
-BORDER_SOFT = "#e3e7ee"    # dividers inside cards
-NAV_SELECTED = "#1d2570"   # selected row in the pharmacist's dark sidebar
-# Pillway surfaces: a cool blue-grey canvas behind white cards.
-SURFACE = "#e9edf6"
-SURFACE_HIGH = "#f3f5fa"
-TONAL = "#dfe3f6"          # selected item in the side menu (navy text on it: 13:1)
-ORANGE = "#f28c28"
-HOVER = "#f1f3f7"
-SIDEBAR_BG = "#080c38"
-SIDEBAR_HOVER = "#151b55"
+# Supporting colours (matched to Pillway's site: navy sidebar, white cards, red-orange accent)
+RED_DARK = "#c7361f"
+RED_TEXT = "#c7361f"       # the accent red, deepened for small text on white (4.9:1 contrast)
+TEXT_SUBTLE = "#65667b"    # timestamps and hints (5.3:1 on white)
+BORDER_SOFT = "#ececef"    # dividers inside cards
+NAV_SELECTED = "#1b1d4a"   # selected row in the pharmacist's dark patient sidebar
+SURFACE = "#ffffff"        # window background (Pillway's pages are white)
+SURFACE_HIGH = "#f5f5f7"   # quiet fills: assistant bubbles, message box
+TONAL = "#f0f0f3"
+ORANGE = "#e3432a"
+HOVER = "#eeeef1"          # grey shown under the pointer (buttons, menu rows)
+SIDEBAR_BG = "#060725"
+SIDEBAR_HOVER = "#14163f"
 SIDEBAR_SELECTED = "#ffffff"
-SIDEBAR_TEXT = "#f4f5ff"
-SIDEBAR_SELECTED_TEXT = "#ef3f3f"
-AMBER = "#b26a00"
+SIDEBAR_TEXT = "#ffffff"
+SIDEBAR_SELECTED_TEXT = "#e3432a"
+SIDEBAR_DIVIDER = "#3a3b5c"
+AMBER = "#9a5b00"
 AMBER_SOFT = "#fff4e5"
 GREEN = "#1e7a46"
 GREEN_SOFT = "#e8f6ee"
 LIVE_GREEN = "#22c55e"
-RED_SOFT = "#fde8e8"
-TEXT_OFF = "#8a93a6"
+RED_SOFT = "#fdecea"
+TEXT_OFF = "#8a8b9c"
 WHITE = "#ffffff"
-SOFT_BLUE = "#eef2ff"
-INK = "#101a3c"
-NAV_TEXT = "#edf0ff"
-NAV_ICON = "#c3cbef"
-DIVIDER = "#2a3170"
-SHADOW = "#e1e5ed"
-TOGGLE_OFF = "#d5dae4"
+SOFT_BLUE = "#eef0f8"
+INK = "#09173a"            # names and strong text
+NAV_TEXT = "#ffffff"
+NAV_ICON = "#e6e6ee"
+DIVIDER = "#3a3b5c"
+SHADOW = "#e6e6ea"
+TOGGLE_OFF = "#d5d6de"
 CHAT_BG = "#ffffff"
-PAGE_BG = "#f5f6fa"
-BLACK_SIDEBAR = "#0b0b0f"
-BLACK_SIDEBAR_SELECTED = "#26262e"
-BLACK_SIDEBAR_TEXT = "#e9e9ef"
+PAGE_BG = "#ffffff"
+BLACK_SIDEBAR = "#060725"
+BLACK_SIDEBAR_SELECTED = "#1b1d4a"
+BLACK_SIDEBAR_TEXT = "#ffffff"
 FOCUS = "#2563eb"
+RADIUS = 8                 # corner radius for buttons, inputs and cards (base pixels)
 
 # Fonts: the first one installed on this computer wins (Windows, Mac, then Linux).
-FONT_CHOICES = ("Century Gothic", "Arial Rounded MT Bold", "Segoe UI", "SF Pro Text",
+# "Pillway Sans" is the bundled font (Montserrat, renamed; see pillway/assets/fonts). It is
+# loaded into this app only (not installed on the computer) by load_bundled_fonts().
+FONT_CHOICES = ("Pillway Sans", "Montserrat", "Century Gothic", "Segoe UI", "SF Pro Text",
                 "SF Pro", "Helvetica Neue", "Arial", "DejaVu Sans")
 FONT = FONT_CHOICES[0]
 
@@ -67,6 +70,24 @@ BASE_W, BASE_H = 1500, 900
 MIN_TEXT = 12
 # Smallest tap target in base pixels (accessibility: at least 44 px).
 MIN_TAP = 44
+
+
+def load_bundled_fonts():
+    """Make the bundled font usable by this app (Windows: private to this process).
+
+    Call before the Tk window is created. On Mac/Linux the font falls back to the system's.
+    """
+    import sys
+    from pathlib import Path
+    folder = Path(__file__).resolve().parent.parent / "assets" / "fonts"
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        for path in folder.glob("*.ttf"):
+            ctypes.windll.gdi32.AddFontResourceExW(str(path), 0x10, 0)  # 0x10 = FR_PRIVATE
+    except Exception:
+        pass
 
 
 def pick_font(root):

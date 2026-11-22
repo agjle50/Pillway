@@ -4,48 +4,18 @@ Called by: header, Tasks screen, settings screens.
 """
 
 
-from ..theme import (
-    INK,
-    ORANGE,
-    HOVER,
-    SURFACE_HIGH,
-    RED,
-    SHADOW,
-    BORDER_SOFT,
-    TOGGLE_OFF,
-    WHITE,
-)
+from ..theme import BORDER, HOVER, INK, RADIUS, RED, TOGGLE_OFF, WHITE
 
 
 class ButtonsMixin:
     def beveled_button(self, x1, y1, x2, y2, icon, tag, func):
-        """A softly raised circular icon button with a warm hover accent."""
-        self.c.create_oval(
-            x1 + self.S(1), y1 + self.S(3), x2 + self.S(1), y2 + self.S(3),
-            fill=SHADOW, outline="", tags=f"{tag}::shadow",
-        )
-        self.c.create_oval(
-            x1, y1, x2, y2, fill=SURFACE_HIGH, outline=BORDER_SOFT,
-            width=max(1, self.S(1)), tags=(tag, f"{tag}::background"),
-        )
-        self.draw_icon(icon, (x1 + x2) / 2, (y1 + y2) / 2, self.S(24), INK, tag, bg=SURFACE_HIGH)
+        """Pillway's outlined square icon button (bell, card): no highlight, grey fill on hover."""
+        bg_tag = f"{tag}::background"
+        self.rrect(x1, y1, x2, y2, self.S(RADIUS), fill=WHITE, outline=BORDER, width=self.S(1.2),
+                   tags=(tag, bg_tag))
+        self.draw_icon(icon, (x1 + x2) / 2, (y1 + y2) / 2, self.S(22), INK, tag)
         self.clickable(tag, func)
-        self.c.tag_bind(
-            tag, "<Enter>",
-            lambda *_: (
-                self.c.itemconfigure(f"{tag}::background", fill=HOVER),
-                self.c.itemconfigure(f"{tag}_icon", fill=ORANGE),
-            ),
-            add="+",
-        )
-        self.c.tag_bind(
-            tag, "<Leave>",
-            lambda *_: (
-                self.c.itemconfigure(f"{tag}::background", fill=SURFACE_HIGH),
-                self.c.itemconfigure(f"{tag}_icon", fill=INK),
-            ),
-            add="+",
-        )
+        self._hover_shade(tag, bg_tag, WHITE, HOVER)
 
     def toggle(self, x, cy, on, tag, func):
         w, h = self.S(84), self.S(48)

@@ -41,7 +41,7 @@ class MedicalRobot:
         self.assessment_stage = "awaiting_change_status"
         conditions = " and ".join(self.known_conditions)
         return (
-            f"{salutation}! I'm Juliez, Pillway's automated virtual assistant. "
+            f"{salutation}! I'm Sarah, Pillway's automated virtual assistant. "
             f"I understand you've completed the short assessment and have {conditions}. "
             "Has anything changed since then, or is there anything new you'd like to tell me?"
         )
