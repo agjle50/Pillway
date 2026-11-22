@@ -31,6 +31,16 @@ UNAVAILABLE = "Read-aloud isn't available on this computer."
 
 _lock = threading.Lock()
 _current = {"process": None, "generation": 0}
+_on_playing = {}   # generation -> callback(bool): True when sound actually starts, False when it stops
+
+
+def _playing(generation, value):
+    callback = _on_playing.get(generation)
+    if callback and (not value or generation == _current["generation"]):
+        try:
+            callback(value)
+        except Exception:
+            pass
 
 # Text is passed in an environment variable, not on the command line or stdin, so
 # accents (French) survive and nothing in the text can be run as a command.
@@ -51,6 +61,7 @@ _WINDOWS_SCRIPT = (
     "$culture = if ($v) { $v.VoiceInfo.Culture.Name } elseif ($prefix -eq 'fr') { 'fr-CA' } else { 'en-US' }; "
     "$escaped = [System.Security.SecurityElement]::Escape($env:PILLWAY_TTS_TEXT); "
     "$ssml = \"<speak version='1.0' xml:lang='$culture' xmlns='http://www.w3.org/2001/10/synthesis'><prosody rate='105%' pitch='+4%'>$escaped</prosody></speak>\"; "
+    "[Console]::Out.WriteLine('START'); [Console]::Out.Flush(); "
     "$s.SpeakSsml($ssml)"
 )
 
@@ -96,15 +107,27 @@ def _speak_system(text, lang, generation):
         raise RuntimeError(UNAVAILABLE)
     args, env = command
     flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)  # no black console window on Windows
-    process = subprocess.Popen(args, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+    process = subprocess.Popen(args, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                stderr=subprocess.PIPE, creationflags=flags)
     with _lock:
         if generation != _current["generation"]:  # a newer message started meanwhile
             process.kill()
             return
         _current["process"] = process
+
+    def watch_start():
+        # Windows prints START right before the voice begins (PowerShell itself takes a moment
+        # to load); other systems start speaking straight away.
+        if sys.platform != "win32":
+            _playing(generation, True)
+        for line in process.stdout:
+            if line.strip() == b"START":
+                _playing(generation, True)
+    watcher = threading.Thread(target=watch_start, daemon=True)
+    watcher.start()
     try:
-        _out, err = process.communicate(timeout=180)
+        process.wait(timeout=180)
+        err = process.stderr.read() if process.stderr else b""
     except subprocess.TimeoutExpired:
         process.kill()
         raise RuntimeError("Read-aloud took too long and was stopped.")
@@ -153,6 +176,7 @@ def _speak_pyttsx3(text, lang, _generation):
     if selected:
         engine.setProperty("voice", selected.id)
     engine.say(text)
+    _playing(_generation, True)
     engine.runAndWait()
 
 
@@ -161,7 +185,8 @@ def _speak_natural(text, lang, generation):
     from . import natural_voice
     if not natural_voice.available():
         raise RuntimeError("natural voice not installed or turned off")
-    natural_voice.speak(text, lang, should_stop=lambda: generation != _current["generation"])
+    natural_voice.speak(text, lang, should_stop=lambda: generation != _current["generation"],
+                        on_playing=lambda value: _playing(generation, value))
 
 
 def _speak_system_clean(text, lang, generation):
@@ -182,15 +207,18 @@ def stop():
         process.kill()
 
 
-def speak(text, lang="en", on_error=None, on_done=None):
+def speak(text, lang="en", on_error=None, on_done=None, on_playing=None):
     """Speak in the background (stops anything already speaking).
 
     on_done() is called when speech ends; on_error(message) if nothing could speak.
+    on_playing(True/False) is called when sound ACTUALLY starts and stops (for lip-sync).
     Both are called from the background thread: the UI must hand them to its own loop.
     """
     stop()
     with _lock:
         generation = _current["generation"]
+        if on_playing:
+            _on_playing[generation] = on_playing
 
     def run():
         last_error = UNAVAILABLE
@@ -202,9 +230,12 @@ def speak(text, lang="en", on_error=None, on_done=None):
                 except Exception as error:  # try the next engine
                     last_error = str(error) or UNAVAILABLE
                     print(f"[read-aloud] {engine.__name__} failed: {type(error).__name__}: {error}")
+                finally:
+                    _playing(generation, False)
             if on_error:
                 on_error(UNAVAILABLE if last_error == UNAVAILABLE else f"{UNAVAILABLE} ({last_error})")
         finally:
+            _on_playing.pop(generation, None)
             if on_done:
                 on_done()
     threading.Thread(target=run, daemon=True).start()

@@ -22,7 +22,7 @@ SCHEMA = {
         "flag_model": ("claude-haiku-5-5", str, None),
         "care_plan_model": ("claude-opus-5-5", str, None),
         "summary_model": ("claude-sonnet-5-5", str, None),
-        "call_model": ("claude-sonnet-5-5", str, None),
+        "call_model": ("claude-opus-5-5", str, None),
         "memory_model": ("claude-haiku-5-5", str, None),
         "conversation_style": ("natural", str, ["natural", "scripted"]),
         "conversation_temperature": (0.7, float, (0.0, 1.0)),

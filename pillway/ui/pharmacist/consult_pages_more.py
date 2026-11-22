@@ -5,6 +5,8 @@ Called by: ui/pharmacist/workspace_router.py.
 
 import tkinter as tk
 
+from ..components.slim_scrollbar import SlimScrollbar
+
 from ..theme import (RED_TEXT, 
     BORDER,
     INK,
@@ -105,10 +107,10 @@ class ConsultPagesMoreMixin:
             bd=0, highlightthickness=0, font=self.font(12),
             padx=max(4, int(self.S(8))), pady=max(4, int(self.S(8))),
         )
-        log_scrollbar = tk.Scrollbar(self.doctor_log_frame, command=log.yview)
+        log_scrollbar = SlimScrollbar(self.doctor_log_frame, command=log.yview, width=max(8, int(self.S(12))))
         log.configure(yscrollcommand=log_scrollbar.set)
-        log.pack(side="left", fill="both", expand=True)
         log_scrollbar.pack(side="right", fill="y")
+        log.pack(side="left", fill="both", expand=True)
         messages = self.chat_logs.get(self.selected_patient_id, [])
         if messages:
             for sender, message, timestamp in messages:

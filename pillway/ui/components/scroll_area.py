@@ -8,6 +8,8 @@ Buttons are at least 44 px tall at normal size (easy to tap) and show a hand cur
 
 import tkinter as tk
 
+from .slim_scrollbar import SlimScrollbar
+
 from ..theme import (BORDER, FOCUS, INK, NAVY, RED, RED_DARK, RED_TEXT, SHADOW, SURFACE_HIGH, TEXT_DARK,
                      TEXT_MUTED, WHITE)
 
@@ -37,8 +39,10 @@ class ScrollAreaMixin:
         """Create a scrollable canvas in the box. Draw on the returned canvas, then call finish_scroll()."""
         frame = tk.Frame(self, bg=bg, bd=0, highlightthickness=0)
         canvas = tk.Canvas(frame, bg=bg, bd=0, highlightthickness=0, yscrollincrement=max(1, int(self.S(20))))
-        bar = tk.Scrollbar(frame, orient="vertical", command=canvas.yview)
-        canvas.configure(yscrollcommand=bar.set, width=max(1, int(x2 - x1)), height=max(1, int(y2 - y1)))
+        bar_w = max(8, int(self.S(12)))
+        bar = SlimScrollbar(frame, command=canvas.yview, width=bar_w, bg=bg)
+        canvas.configure(yscrollcommand=bar.set, width=max(1, int(x2 - x1) - bar_w), height=max(1, int(y2 - y1)))
+        bar.pack(side="right", fill="y")            # packed first, so it always gets its width
         canvas.pack(side="left", fill="both", expand=True)
         canvas._bar = bar
         canvas._box = (x1, y1, x2, y2)
@@ -48,6 +52,7 @@ class ScrollAreaMixin:
             canvas.yview_scroll(step, "units")
             return "break"
         canvas.bind("<MouseWheel>", wheel)
+        bar.bind("<MouseWheel>", wheel)
         canvas.bind("<Button-4>", lambda _e: canvas.yview_scroll(-1, "units"))
         canvas.bind("<Button-5>", lambda _e: canvas.yview_scroll(1, "units"))
         self.c.create_window(x1, y1, window=frame, anchor="nw", width=max(1, int(x2 - x1)), height=max(1, int(y2 - y1)))
@@ -58,8 +63,6 @@ class ScrollAreaMixin:
         x1, y1, x2, y2 = canvas._box
         height = max(content_height, y2 - y1)
         canvas.configure(scrollregion=(0, 0, int(x2 - x1), int(height)))
-        if content_height > y2 - y1 + 2:
-            canvas._bar.pack(side="right", fill="y")
         if keep_bottom:
             self.after_idle(lambda: canvas.winfo_exists() and canvas.yview_moveto(1.0))
 

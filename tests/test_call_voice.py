@@ -18,8 +18,19 @@ class SpokenTextTests(unittest.TestCase):
 
     def test_bullets_become_separate_short_sentences(self):
         said = natural_voice.speech_text("Here's what I noted:\n• Dizziness\n• A new pill")
-        self.assertEqual(natural_voice.sentences(said)[0], "Here's what I noted.")
+        self.assertEqual(said, "Here's what I noted. Dizziness. A new pill")
         self.assertNotIn("•", said)
+
+    def test_normal_replies_are_voiced_in_one_piece_so_there_are_no_gaps(self):
+        reply = "That sounds uncomfortable. When did you first notice it? Was it after a long walk?"
+        self.assertEqual(natural_voice.sentences(reply), [reply])
+
+    def test_long_replies_split_once_so_she_starts_talking_quickly(self):
+        reply = "Okay, thanks for telling me all of that. " + "Here is a longer explanation sentence. " * 15
+        chunks = natural_voice.sentences(reply)
+        self.assertEqual(len(chunks), 2)
+        self.assertTrue(chunks[0].startswith("Okay, thanks"))
+        self.assertEqual(" ".join(chunks), reply.strip())
 
     def test_ranges_and_symbols(self):
         said = natural_voice.speech_text("Aim for 0.8–1.0 g/kg, e.g. eggs & beans.")

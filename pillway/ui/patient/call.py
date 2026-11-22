@@ -149,14 +149,16 @@ class CallMixin:
         # Sarah's mouth moves while she is speaking
         images = state.get("avatar_images")
         if images:
-            talking = state.get("sarah_speaking") and int(self.call_elapsed() * 6) % 2 == 0
+            # lip-sync: only while sound is actually playing, with a slightly irregular rhythm
+            t = self.call_elapsed()
+            talking = state.get("sarah_audio") and (math.sin(t * 13.0) + 0.6 * math.sin(t * 7.3)) > 0.15
             self.c.itemconfigure("call_avatar", image=images[1 if talking else 0])
         self.c.itemconfigure("call_status_line", text=self._call_status_line())
 
     def _call_status_line(self):
         state = self.call_state or {}
         fr = self.lang == "fr"
-        if state.get("sarah_speaking"):
+        if state.get("sarah_audio"):
             return "Sarah parle…" if fr else "Speaking…"
         if state.get("muted"):
             return "Votre micro est coupé" if fr else "Your mic is muted"

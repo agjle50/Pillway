@@ -49,4 +49,5 @@ SETTINGS_ITEMS = [
     ("Account tour", "bulb"),
     ("Info and legal", "doc"),
     ("Microphone", "mic"),
+    ("AI connection", "bulb"),
 ]
