@@ -1,9 +1,8 @@
-"""Check up -> Call: talk to Sarah by voice, designed like the iPhone call screen.
+"""Check up -> Call: hands-free voice conversation with Sarah, styled like a phone call.
 
 Called by: ui/patient/dashboard.py when self.call_open is True.
-Big name and timer, a GREEN ring that moves with the patient's voice (grey when muted or
-silent), big round mute / hold-to-talk / end buttons, and large captions. Concerning
-sentences show in red with a flag. Microphone and session logic: ui/patient/call_audio.py.
+The live level bar grows and shifts red-to-green with the microphone input. Microphone
+and session logic: ui/patient/call_audio.py. The mic stays live until muted or the call ends.
 """
 
 from config import get_settings
@@ -11,17 +10,18 @@ from config import get_settings
 from ..theme import RED, WHITE
 
 CALL_BG, CALL_PANEL, CALL_GREY, CALL_GREEN = "#1c1c1e", "#2c2c2e", "#8e8e93", "#34c759"
+CALL_RED = "#ff3b30"
 
 
 class CallMixin:
     def draw_call_preview(self, x1, y1, x2, y2):
-        if not self.call_state:
-            self._begin_call()
-        state = self.call_state
         self.rrect(x1, y1, x2, y2, self.S(16), fill=CALL_BG, outline=CALL_BG)
         if not self.record["consent"]["accepted"]:
             self.draw_consent(x1, y1, x2, y2)
             return
+        if not self.call_state:
+            self._begin_call()
+        state = self.call_state
         cx = (x1 + x2) / 2
         self.text(cx, y1 + self.S(58), self.t("call.title"), 34, WHITE, anchor="center")
         self.text(cx, y1 + self.S(96), self.t("call.subtitle"), 14, CALL_GREY, anchor="center")
@@ -35,11 +35,33 @@ class CallMixin:
         self.c.create_oval(cx - radius, avatar_y - radius, cx + radius, avatar_y + radius, fill="#636366", outline="")
         self.text(cx, avatar_y, "S", 48, WHITE, "bold", anchor="center")
 
+        meter_width = min(self.S(210), max(self.S(90), x2 - cx - self.S(130)))
+        meter_x1 = x2 - self.S(22) - meter_width
+        meter_y = y1 + self.S(158)
+        meter_label = "NIVEAU DU MICRO" if self.lang == "fr" else "MICROPHONE LEVEL"
+        self.text(meter_x1 + meter_width / 2, meter_y - self.S(17), meter_label,
+                  9, CALL_GREY, "bold", anchor="center")
+        self.c.create_rectangle(
+            meter_x1, meter_y, meter_x1 + meter_width, meter_y + self.S(10),
+            fill="#3a3a3c", outline="#555558", width=max(1, self.S(1)), tags="call_meter_track",
+        )
+        self.c.create_rectangle(
+            meter_x1, meter_y, meter_x1, meter_y + self.S(10),
+            fill=CALL_RED, outline="", tags="call_meter_fill",
+        )
+        self.c.itemconfigure("call_meter_fill", state="hidden")
+        self.text(meter_x1 + meter_width / 2, meter_y + self.S(24),
+                  self._call_meter_status(), 9, CALL_GREY, anchor="center", tag="call_meter_status")
+
         self._draw_captions(cx, avatar_y + self.S(100), min(self.S(760), x2 - x1 - self.S(60)), y2 - self.S(240))
-        self.text(cx, y2 - self.S(200), state.get("status", ""), 13, RED if state.get("error") else CALL_GREY,
-                  anchor="center", tag="call_status")
+        self.c.create_text(
+            cx, y2 - self.S(200), text=state.get("status", ""),
+            fill=RED if state.get("error") else CALL_GREY, font=self.font(13),
+            anchor="center", width=max(1, x2 - x1 - self.S(100)), justify="center",
+            tags="call_status",
+        )
         self._draw_call_controls(cx, y2 - self.S(110))
-        if state.get("mic_missing"):
+        if state.get("mic_missing") or state.get("speech_disabled"):
             self._draw_no_mic_help(x1, x2, y2)
 
     def _draw_captions(self, cx, top, width, bottom):
@@ -64,7 +86,7 @@ class CallMixin:
 
     def _draw_call_controls(self, cx, cy):
         state = self.call_state
-        spacing, small, big = self.S(150), self.S(38), self.S(54)
+        spacing, small = self.S(150), self.S(38)
         # mute
         muted = state.get("muted")
         self.c.create_oval(cx - spacing - small, cy - small, cx - spacing + small, cy + small,
@@ -74,23 +96,24 @@ class CallMixin:
         if muted:
             self.c.create_line(cx - spacing - self.S(16), cy + self.S(16), cx - spacing + self.S(16), cy - self.S(16),
                                fill=CALL_BG, width=self.S(3), tags="call_mute")
-        self.text(cx - spacing, cy + small + self.S(18), self.t("call.mute"), 13, WHITE, anchor="center")
+        mic_label = self.t("call.unmute") if muted else self.t("call.mute")
+        self.text(cx - spacing, cy + small + self.S(18), mic_label, 13, WHITE, anchor="center")
         self.clickable("call_mute", self.toggle_call_mute)
-        # hold to talk (or "say demo line" when there is no microphone)
-        talk_tag = "call_talk"
-        holding = state.get("holding")
-        self.c.create_oval(cx - big, cy - big, cx + big, cy + big, fill=CALL_GREEN if holding else "#30d158",
-                           outline=WHITE if holding else "", width=self.S(3), tags=talk_tag)
-        self.draw_icon("mic", cx, cy, self.S(34), WHITE, talk_tag, bg=CALL_GREEN)
-        label = self.t("call.demo_line") if state.get("use_demo") else self.t("call.hold")
-        self.text(cx, cy + big + self.S(18), label, 13, WHITE, "bold", anchor="center")
-        if state.get("use_demo"):
-            self.clickable(talk_tag, self.say_demo_line)
-        else:
-            self.c.tag_bind(talk_tag, "<ButtonPress-1>", lambda _e: self.start_talking())
-            self.c.tag_bind(talk_tag, "<ButtonRelease-1>", lambda _e: self.stop_talking())
-            self.c.tag_bind(talk_tag, "<Enter>", lambda _e: self.c.configure(cursor="hand2"))
-            self.c.tag_bind(talk_tag, "<Leave>", lambda _e: self.c.configure(cursor=""))
+        speaker_on = state.get("speaker_enabled", False)
+        speaker_tag = "call_speaker"
+        self.c.create_oval(
+            cx - small, cy - small, cx + small, cy + small,
+            fill=CALL_GREEN if speaker_on else CALL_PANEL, outline="", tags=speaker_tag,
+        )
+        self.draw_icon("speaker", cx, cy, self.S(26), WHITE, speaker_tag, bg=CALL_GREEN if speaker_on else CALL_PANEL)
+        if not speaker_on:
+            self.c.create_line(
+                cx - self.S(17), cy + self.S(17), cx + self.S(17), cy - self.S(17),
+                fill=WHITE, width=self.S(3), tags=speaker_tag,
+            )
+        speaker_label = self.t("call.speaker") if speaker_on else self.t("call.speaker_off")
+        self.text(cx, cy + small + self.S(18), speaker_label, 13, WHITE, "bold", anchor="center")
+        self.clickable(speaker_tag, self.toggle_call_speaker)
         # end call
         self.c.create_oval(cx + spacing - small, cy - small, cx + spacing + small, cy + small, fill="#ff3b30",
                            outline="", tags="end_call_preview")
@@ -102,7 +125,8 @@ class CallMixin:
         width = min(self.S(700), x2 - x1 - self.S(40))
         cx = (x1 + x2) / 2
         top = y2 - self.S(300)
-        item = self.c.create_text(cx, top, text=self.t("call.no_mic"), fill="#ffcc00", font=self.font(12),
+        message = self.t("call.speech_disabled") if self.call_state.get("speech_disabled") else self.t("call.no_mic")
+        item = self.c.create_text(cx, top, text=message, fill="#ffcc00", font=self.font(12),
                                   width=width, justify="center", anchor="s")
         box = self.c.bbox(item)
         tag = "call_switch_chat"
@@ -119,6 +143,18 @@ class CallMixin:
         session = self.call_state.get("session_id")
         return [m for m in self.record["messages"] if m.get("session_id") == session and m.get("channel") == "call"]
 
-    def uses_demo_call(self):
+    def speech_recognition_disabled(self):
         settings = get_settings()
-        return settings.ai.demo_mode or settings.call.speech_to_text_engine == "none"
+        return settings.call.speech_to_text_engine == "none"
+
+    def _call_meter_status(self):
+        state = self.call_state
+        if state.get("muted"):
+            return "Microphone muted" if self.lang == "en" else "Microphone en sourdine"
+        if not state.get("meter_available"):
+            return "Microphone unavailable" if self.lang == "en" else "Microphone indisponible"
+        level = state.get("level", 0.0)
+        if level <= 0.025:
+            return "No voice detected" if self.lang == "en" else "Aucune voix détectée"
+        return (f"Input detected · {round(level * 100)}%" if self.lang == "en"
+                else f"Entrée détectée · {round(level * 100)}%")

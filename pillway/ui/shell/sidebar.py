@@ -36,7 +36,7 @@ class SidebarMixin:
                 y += self.S(8)
                 continue
             label, icon = item
-            tag = f"nav::{label}"
+            tag = f"nav::{label.replace(' ', '_')}"
             selected = label == self.section or (label in ("Medications", "Orders", "Tasks")
                                                 and self.section == "Dashboard" and self.tab == label
                                                 and self.role == "patient")

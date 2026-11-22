@@ -151,14 +151,20 @@ class ChatMixin:
         mid = input_y + input_h / 2
         mic_x, send_x = x2 - self.S(110), x2 - self.S(58)
         if get_settings().patient.voice_input:
+            voice_active = getattr(self, "voice_typing_active", False)
             self.c.create_oval(mic_x - self.S(21), mid - self.S(21), mic_x + self.S(21), mid + self.S(21),
-                               fill="#eef1f6", outline="", tags="chat_mic")
-            self.draw_icon("mic", mic_x, mid, self.S(20), INK, "chat_mic", bg="#eef1f6")
+                               fill=RED if voice_active else "#eef1f6", outline="", tags="chat_mic")
+            self.draw_icon("mic", mic_x, mid, self.S(20), WHITE if voice_active else INK, "chat_mic",
+                           bg=RED if voice_active else "#eef1f6")
             self.clickable("chat_mic", self.voice_typing)
         busy = self.patient_id in self.service.busy
         self.c.create_oval(send_x - self.S(21), mid - self.S(21), send_x + self.S(21), mid + self.S(21),
                            fill=TEXT_MUTED if busy else RED, outline="", tags="chat_send")
         self.draw_icon("send", send_x, mid, self.S(20), WHITE, "chat_send", bg=TEXT_MUTED if busy else RED)
         self.clickable("chat_send", self.send_chat_message)
-        status = self.t("chat.typing") if busy else self.t("chat.saved") if self.record["messages"] else ""
-        self.text(x1 + self.S(40), input_y + input_h + self.S(11), status, 10, TEXT_MUTED)
+        status = (
+            getattr(self, "voice_typing_status", "")
+            or (self.t("chat.typing") if busy else self.t("chat.saved") if self.record["messages"] else "")
+        )
+        self.text(x1 + self.S(40), input_y + input_h + self.S(11), status, 10, TEXT_MUTED,
+                  tag="chat_voice_status")

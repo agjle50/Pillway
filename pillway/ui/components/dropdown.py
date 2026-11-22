@@ -18,12 +18,24 @@ class DropdownMixin:
     def dropdown_items(self):
         if self.dropdown == "notifications":
             if self.role == "pharmacist":
-                items = [(f"Urgent: {display_name(r)}", f"{f['topic']} · {f['time'][11:16]}",
-                          lambda pid=r["id"]: self.select_doctor_patient(pid))
-                         for r in self.store.all() for f in r["flags"] if f["status"] == "open" and f["tier"] == 1]
-                return "Notifications", items or [("All clear", "No urgent flags right now.", None)]
+                items = [
+                    (f"New patient ticket: {display_name(record)}",
+                     f"{request['reason']} · {request['time'][11:16]}",
+                     lambda pid=record["id"]: self.select_doctor_patient(pid))
+                    for record in self.store.all()
+                    for request in record["pharmacist_requests"]
+                    if request["status"] == "open"
+                ]
+                items.extend(
+                    (f"Urgent: {display_name(record)}", f"{flag['topic']} · {flag['time'][11:16]}",
+                     lambda pid=record["id"]: self.select_doctor_patient(pid))
+                    for record in self.store.all()
+                    for flag in record["flags"]
+                    if flag["status"] == "open" and flag["tier"] == 1
+                )
+                return "Notifications", items or [("No notifications", "You're all caught up.", None)]
             return "Notifications", [(head, sub, None) for head, sub in self.notifications] or [
-                ("No notifications", "You're all caught up.", None)]
+                ("No notifications yet", "New updates will appear here.", None)]
         items = [("Manage profiles", "Switch between demo accounts", lambda: self.go("Manage profiles")),
                  ("Settings", "Account, payments, notifications", lambda: self.go("Settings"))]
         if self.role == "pharmacist":
@@ -40,7 +52,7 @@ class DropdownMixin:
         menu = tk.Canvas(self, width=int(width), height=int(height), bg=WHITE, highlightthickness=1,
                          highlightbackground=BORDER, bd=0)
         menu.place(x=int(x1), y=int(top))
-        menu.lift()
+        menu.tk.call("raise", menu._w)
         self.dropdown_frame = menu
         self.tx(menu, self.S(20), self.S(18), title, 16, INK, "bold")
         y = self.S(56)

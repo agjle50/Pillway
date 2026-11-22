@@ -87,12 +87,24 @@ class ManageProfilesMixin:
                     text=f"{count} chat messages saved on this device",
                     fill=TEXT_MUTED, anchor="w", font=self.font(12), tags=tag,
                 )
-            button_text = "Active account" if active else "Switch account"
-            profile_canvas.create_text(
-                list_w - self.S(171), row_y + row_h / 2, text=button_text,
-                fill=RED if not active else TEXT_MUTED, anchor="center",
-                font=self.font(13, "bold"), tags=tag,
+            switch_tag = f"profile_switch::{index}"
+            switch_x1, switch_x2 = list_w - self.S(244), list_w - self.S(104)
+            profile_canvas.create_rectangle(
+                switch_x1, row_y + self.S(38), switch_x2, row_y + self.S(82),
+                fill="#fff0ed" if not active else "#f5f6f8",
+                outline=BORDER, width=max(1, int(self.S(1))), tags=switch_tag,
             )
+            profile_canvas.create_text(
+                (switch_x1 + switch_x2) / 2, row_y + row_h / 2,
+                text="Active account" if active else "Switch account",
+                fill=RED if not active else TEXT_MUTED, anchor="center",
+                font=self.font(12, "bold"), tags=switch_tag,
+            )
+            if not active:
+                self.bind_click(
+                    profile_canvas, switch_tag,
+                    lambda selected=profile_id: self.switch_profile(selected),
+                )
             delete_tag = f"profile_delete::{index}"
             can_delete = role_counts[profile["role"]] > 1
             delete_label = "Delete" if can_delete else "Required"
@@ -110,19 +122,14 @@ class ManageProfilesMixin:
                 font=self.font(10, "bold"), tags=delete_tag,
             )
             if can_delete:
-                profile_canvas.tag_bind(
-                    delete_tag, "<Button-1>",
-                    lambda _event, selected=profile_id: self.delete_profile(selected),
+                self.bind_click(
+                    profile_canvas, delete_tag,
+                    lambda selected=profile_id: self.delete_profile(selected),
                 )
-                profile_canvas.tag_bind(delete_tag, "<Enter>",
-                                        lambda _event: profile_canvas.configure(cursor="hand2"))
-                profile_canvas.tag_bind(delete_tag, "<Leave>",
-                                        lambda _event: profile_canvas.configure(cursor=""))
-            profile_canvas.tag_bind(
-                tag, "<Button-1>", lambda _event, selected=profile_id: self.switch_profile(selected),
+            self.bind_click(
+                profile_canvas, tag,
+                lambda selected=profile_id: self.switch_profile(selected),
             )
-            profile_canvas.tag_bind(tag, "<Enter>", lambda _event: profile_canvas.configure(cursor="hand2"))
-            profile_canvas.tag_bind(tag, "<Leave>", lambda _event: profile_canvas.configure(cursor=""))
         content_h = max(1, int(len(self.profiles) * (self.S(120) + self.S(14))))
         profile_canvas.configure(
             scrollregion=(0, 0, int(list_w), content_h),

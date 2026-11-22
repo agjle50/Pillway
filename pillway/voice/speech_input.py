@@ -1,12 +1,13 @@
 """On-device speech transcription for the call preview."""
 
 import json
-from array import array
+import queue
 import shutil
 import tempfile
 import threading
 import urllib.request
 import zipfile
+from array import array
 from pathlib import Path
 
 
@@ -93,12 +94,79 @@ def audio_level(raw_bytes):
     return min(1.0, rms / 6000)
 
 
+def input_devices():
+    try:
+        import sounddevice
+    except ImportError as error:
+        raise RuntimeError(f"Audio input is unavailable: {error}") from error
+
+    try:
+        devices = sounddevice.query_devices()
+    except sounddevice.PortAudioError as error:
+        raise RuntimeError(f"Could not list microphone devices: {error}") from error
+
+    supported = []
+    for index, device in enumerate(devices):
+        if device.get("max_input_channels", 0) <= 0:
+            continue
+        try:
+            sounddevice.check_input_settings(
+                device=index, channels=1, samplerate=16000, dtype="int16",
+            )
+        except sounddevice.PortAudioError:
+            continue
+        supported.append((index, device["name"]))
+    return supported
+
+
+def resolve_input_device(selection=None):
+    try:
+        import sounddevice
+    except ImportError as error:
+        raise RuntimeError(f"Audio input is unavailable: {error}") from error
+
+    try:
+        devices = sounddevice.query_devices()
+    except sounddevice.PortAudioError as error:
+        raise RuntimeError(f"Could not list microphone devices: {error}") from error
+    if selection is None or not str(selection).strip():
+        index = sounddevice.default.device[0]
+        if index is None or index < 0:
+            raise ValueError("No system-default microphone is selected.")
+    elif str(selection).strip().isdigit():
+        index = int(str(selection).strip())
+    else:
+        name = str(selection).strip().casefold()
+        matches = [
+            item for item, device in enumerate(devices)
+            if device.get("max_input_channels", 0) > 0 and name in device["name"].casefold()
+        ]
+        if not matches:
+            raise ValueError(f"No microphone matches '{selection}'. Choose a device in Settings > Microphone.")
+        default = sounddevice.default.device[0]
+        index = default if default in matches else matches[0]
+
+    if index < 0 or index >= len(devices) or devices[index].get("max_input_channels", 0) <= 0:
+        raise ValueError(f"Audio device {index} is not an input microphone.")
+    try:
+        sounddevice.check_input_settings(
+            device=index, channels=1, samplerate=16000, dtype="int16",
+        )
+    except sounddevice.PortAudioError as error:
+        raise ValueError(
+            f"Microphone '{devices[index]['name']}' does not support the speech input format: {error}"
+        ) from error
+    return index
+
+
 class LocalSpeechInput:
-    def __init__(self, model_root, events, device=None):
-        self.device = device or None
+    def __init__(self, model_root, events, device=None, transcribe=True):
+        self.device = device
         self.model_root = Path(model_root)
         self.events = events
+        self.transcribe = transcribe
         self.stop_event = threading.Event()
+        self.muted_event = threading.Event()
         self.thread = threading.Thread(target=self._run, daemon=True)
 
     def start(self):
@@ -107,13 +175,20 @@ class LocalSpeechInput:
     def stop(self):
         self.stop_event.set()
 
+    def set_muted(self, muted):
+        if muted:
+            self.muted_event.set()
+        else:
+            self.muted_event.clear()
+
     def is_alive(self):
         return self.thread.is_alive()
 
     def _run(self):
         try:
             import sounddevice
-            from vosk import KaldiRecognizer, Model
+            if self.transcribe:
+                from vosk import KaldiRecognizer, Model
         except ImportError as error:
             self.events.put((
                 "error",
@@ -124,26 +199,38 @@ class LocalSpeechInput:
 
         try:
             self.events.put(("state", "preparing"))
-            model_path = ensure_model(self.model_root, self.stop_event, self.events)
-            if self.stop_event.is_set():
-                self.events.put(("state", "stopped"))
-                return
-
-            model = Model(str(model_path))
-            recognizer = KaldiRecognizer(model, 16000)
+            recognizer = None
+            audio_chunks = queue.Queue(maxsize=20)
+            recognition_failed = threading.Event()
+            if self.transcribe:
+                model_path = ensure_model(self.model_root, self.stop_event, self.events)
+                if self.stop_event.is_set():
+                    self.events.put(("state", "stopped"))
+                    return
+                model = Model(str(model_path))
+                recognizer = KaldiRecognizer(model, 16000)
 
             def on_audio(indata, _frames, _time_info, status):
-                self.events.put(("level", audio_level(indata)))
-                if status:
-                    self.events.put(("status", f"Microphone status: {status}"))
-                if recognizer.AcceptWaveform(bytes(indata)):
-                    phrase = json.loads(recognizer.Result()).get("text", "").strip()
-                    if phrase:
-                        self.events.put(("final", phrase))
-                else:
-                    partial = json.loads(recognizer.PartialResult()).get("partial", "").strip()
-                    if partial:
-                        self.events.put(("partial", partial))
+                if self.stop_event.is_set() or self.muted_event.is_set():
+                    return
+                try:
+                    raw_audio = bytes(indata)
+                    self.events.put(("level", audio_level(raw_audio)))
+                    if status:
+                        self.events.put(("status", f"Microphone status: {status}"))
+                    if recognizer is not None:
+                        audio_chunks.put_nowait(raw_audio)
+                except queue.Full:
+                    self.events.put(("error", "Speech recognition could not keep up with microphone input."))
+                    recognition_failed.set()
+                    self.stop_event.set()
+                except Exception as error:
+                    self.events.put((
+                        "error",
+                        f"Microphone callback failed: {type(error).__name__}: {error}",
+                    ))
+                    recognition_failed.set()
+                    self.stop_event.set()
 
             with sounddevice.RawInputStream(
                 samplerate=16000,
@@ -154,11 +241,39 @@ class LocalSpeechInput:
                 callback=on_audio,
             ):
                 self.events.put(("state", "listening"))
-                while not self.stop_event.wait(0.1):
-                    pass
-                phrase = json.loads(recognizer.FinalResult()).get("text", "").strip()
-                if phrase:
-                    self.events.put(("final", phrase))
+                while not recognition_failed.is_set():
+                    if self.stop_event.is_set() and audio_chunks.empty():
+                        break
+                    try:
+                        raw_audio = audio_chunks.get(timeout=0.1)
+                    except queue.Empty:
+                        continue
+                    try:
+                        if recognizer and recognizer.AcceptWaveform(raw_audio):
+                            phrase = json.loads(recognizer.Result()).get("text", "").strip()
+                            if phrase:
+                                self.events.put(("final", phrase))
+                        elif recognizer:
+                            partial = json.loads(recognizer.PartialResult()).get("partial", "").strip()
+                            if partial:
+                                self.events.put(("partial", partial))
+                    except Exception as error:
+                        self.events.put((
+                            "error",
+                            f"Speech recognition failed: {type(error).__name__}: {error}",
+                        ))
+                        recognition_failed.set()
+                        self.stop_event.set()
+                if recognizer is not None and not recognition_failed.is_set():
+                    try:
+                        phrase = json.loads(recognizer.FinalResult()).get("text", "").strip()
+                        if phrase:
+                            self.events.put(("final", phrase))
+                    except Exception as error:
+                        self.events.put((
+                            "error",
+                            f"Speech recognition failed while finishing: {type(error).__name__}: {error}",
+                        ))
             self.events.put(("state", "stopped"))
         except InterruptedError:
             self.events.put(("state", "stopped"))

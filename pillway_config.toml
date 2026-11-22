@@ -132,10 +132,10 @@ call_enabled = true
 # "vosk" = offline speech-to-text on this computer (downloads a ~40 MB model once).
 # "none" = no microphone; the call uses the scripted demo lines.
 speech_to_text_engine = "vosk"
-# Leave blank to use the computer's default microphone. Or type part of its name, like "USB".
+# Leave blank to use the system default, or select a device under Settings > Microphone.
 microphone_device = ""
-# "hold_to_talk" (press and hold the big button; most reliable) or "continuous".
-listening_mode = "hold_to_talk"
+# "continuous" listens while the microphone is unmuted; mute to pause listening.
+listening_mode = "continuous"
 # How jumpy the green voice meter is. 1.0 = normal, 2.0 = more sensitive.
 voice_meter_sensitivity = 1.0
 # Sarah's speaking voice (leave blank for the computer's default) and speed (words per minute).

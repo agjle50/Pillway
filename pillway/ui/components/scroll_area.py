@@ -87,7 +87,7 @@ class ScrollAreaMixin:
         return x1 + width
 
     def bind_click(self, canvas, tag, func):
-        canvas.tag_bind(tag, "<Button-1>", lambda _e: func())
+        canvas.tag_bind(tag, "<Button-1>", lambda _e: self._invoke_clickable(func))
         canvas.tag_bind(tag, "<Enter>", lambda _e: canvas.configure(cursor="hand2"))
         canvas.tag_bind(tag, "<Leave>", lambda _e: canvas.configure(cursor=""))
 

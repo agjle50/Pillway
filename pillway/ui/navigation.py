@@ -48,4 +48,5 @@ SETTINGS_ITEMS = [
     ("Notifications", "bell"),
     ("Account tour", "bulb"),
     ("Info and legal", "doc"),
+    ("Microphone", "mic"),
 ]

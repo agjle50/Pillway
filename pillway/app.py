@@ -54,7 +54,6 @@ from .ui.pharmacist.medication_review import MedicationReviewMixin
 from .ui.pharmacist.patient_detail import PatientDetailMixin
 from .ui.pharmacist.workspace_router import WorkspaceRouterMixin
 from .ui.profile_actions import ProfileActionsMixin
-from .ui.sample_content import NOTIFICATIONS
 from .ui.shell.header import HeaderMixin
 from .ui.shell.sidebar import SidebarMixin
 from .ui.theme import BASE_H, BASE_W, WHITE, pick_font
@@ -105,6 +104,7 @@ class PillwayApp(
         self._click_targets = []
         self.c.bind("<Button-1>", self._dispatch_expanded_click, add="+")
         self.c.bind("<Button-1>", self.close_dropdown_on_outside_click, add="+")
+        self.bind_all("<Button-1>", self._sound_on_native_button_click, add="+")
 
         # shared data (one source of truth for both roles)
         self.store = PatientStore()
@@ -126,13 +126,15 @@ class PillwayApp(
         self.status = ""                  # small message under Check up bars
         self.toast = ""                   # short confirmation message ("Saved", "Resolved")
         self.prescriptions = []
-        self.notifications = list(NOTIFICATIONS)
+        self.notifications = []
         self.profile_status = ""
         self.doctor_status = ""
         self.doctor_section = "User account information"
         self.detail_section = "Flagged messages"
         self.doctor_workspace_open = False
         prefs = app_state.load()
+        if "microphone_device" in prefs:
+            settings.call.microphone_device = str(prefs["microphone_device"])
         self.dash_filter, self.dash_sort, self.dash_view = prefs["filter"], prefs["sort"], prefs["view"]
         if "review_required" in prefs:  # the pharmacist's switch on the care plan screen
             settings.pharmacist.pharmacist_review_required = prefs["review_required"]
@@ -170,9 +172,23 @@ class PillwayApp(
         self.call_listener = None
         self.call_events = None
         self._call_poll_job = None
+        self.microphone_test_listener = None
+        self.microphone_test_events = None
+        self.microphone_test_active = False
+        self.microphone_test_level = 0.0
+        self.microphone_test_status = ""
+        self.microphone_test_error = False
+        self._mic_test_job = None
         self.chat_draft = ""
         self.chat_focus_requested = False
         self.chat_entry = None
+        self.voice_listener = None
+        self.voice_events = None
+        self.voice_typing_active = False
+        self.voice_typing_status = ""
+        self.voice_typing_had_text = False
+        self.voice_typing_error = False
+        self._voice_typing_job = None
         self.chat_view_frame = None
         self.chat_message_canvas = None
         self.chat_scrollbar = None
@@ -226,6 +242,10 @@ class PillwayApp(
 
     def render(self):
         self._job = None
+        if not self.chat_open and self.voice_listener:
+            self._stop_voice_typing()
+        if self.section != "Microphone" and self.microphone_test_listener:
+            self._stop_microphone_test()
         self._click_targets = []
         for job in self._task_toggle_jobs.values():
             self.after_cancel(job)
@@ -257,6 +277,10 @@ class PillwayApp(
             self.draw_settings()
         elif self.section == "Manage profiles":
             self.draw_manage_profiles()
+        elif self.section == "Microphone":
+            self.draw_microphone_settings()
+        elif self.section in ("See a doctor", "Contact us", "Account tour", "FAQ"):
+            self.draw_placeholder_page(self.section)
         else:
             self.draw_placeholder_page(self.section)
         if self.toast:
@@ -313,9 +337,17 @@ class PillwayApp(
 
     def close_application(self):
         listener = self.call_listener
+        voice_listener = self.voice_listener
+        microphone_test_listener = self.microphone_test_listener
         self._stop_call_input()
+        self._stop_voice_typing()
+        self._stop_microphone_test()
         if listener and listener.is_alive():
             listener.thread.join(timeout=1)
+        if voice_listener and voice_listener.is_alive():
+            voice_listener.thread.join(timeout=1)
+        if microphone_test_listener and microphone_test_listener.is_alive():
+            microphone_test_listener.thread.join(timeout=1)
         self._cancel_checkup_animation()
         for job in self._task_toggle_jobs.values():
             self.after_cancel(job)

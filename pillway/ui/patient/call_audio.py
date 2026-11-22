@@ -1,57 +1,63 @@
-"""The Call screen's behaviour: microphone check, hold-to-talk, green meter, transcript, ending the call.
+"""The Call screen's behavior: continuous microphone input, green meter, transcript, and ending the call.
 
 Called by: ui/patient/call.py buttons.
 - Speech-to-text is OFFLINE (Vosk, see voice/speech_input.py), chosen in [call] of the config.
-  Hold-to-talk is the default because continuous listening is unreliable in a noisy room.
+- The microphone listens hands-free while unmuted; the patient can mute it at any time.
 - Every sentence goes through the SAME flow and two-layer flagging as the chat (channel "call").
-- Sarah's replies are spoken (voice/tts.py) and shown as captions.
+- Sarah's replies can be spoken (voice/tts.py) and are shown as captions.
 - On "end", the call is saved as a CALL session with its duration for the pharmacist's log.
-- No microphone or demo mode: a scripted call with a simulated green meter.
+- If speech input is disabled or no microphone is available, the screen offers a switch to chat.
 """
 
 import queue
-import random
 import time
 
 from config import get_settings
 
 from ...storage.paths import data_folder
-from ...voice.speech_input import LocalSpeechInput
+from ...voice.speech_input import LocalSpeechInput, resolve_input_device
 from ...voice.tts import speak
-from ..sample_content import DEMO_CALL_LINES
 
 
-def microphone_available():
+def microphone_status():
     try:
-        import sounddevice
-        return bool([d for d in sounddevice.query_devices() if d.get("max_input_channels", 0) > 0])
-    except Exception:
-        return False
+        resolve_input_device(get_settings().call.microphone_device)
+    except (RuntimeError, ValueError) as error:
+        return False, str(error)
+    return True, ""
 
 
 class CallAudioMixin:
     def _begin_call(self):
-        use_demo = self.uses_demo_call() or not microphone_available()
-        self.call_state = {"started": time.monotonic(), "level": 0.0, "muted": False, "holding": False,
-                           "heard": [], "use_demo": use_demo, "demo_index": 0, "spoken": set(),
-                           "mic_missing": not use_demo and False,
-                           "status": "Tap the green button to say the next line." if use_demo else "Getting the microphone ready…"}
-        if not self.uses_demo_call() and not microphone_available():
-            self.call_state["mic_missing"] = True
-            self.call_state["status"] = ""
+        meter_available, microphone_message = microphone_status()
+        transcribe = not self.speech_recognition_disabled()
+        self.call_state = {"started": time.monotonic(), "level": 0.0, "muted": False,
+                           "heard": [], "spoken": set(),
+                           "speaker_enabled": get_settings().patient.read_aloud,
+                           "speech_disabled": not transcribe,
+                           "meter_available": meter_available, "mic_missing": not meter_available,
+                           "status": (
+                               ("Getting the microphone ready…" if self.lang == "en"
+                                else "Préparation du microphone…")
+                               if meter_available else
+                               (f"{microphone_message} Switch to chat to continue."
+                                if self.lang == "en" else
+                                f"{microphone_message} Passez au clavardage pour continuer.")
+                           )}
         self.call_state["session_id"] = self.service.start_session(self.patient_id, "CALL")
         self.record = self.store.load(self.patient_id)
-        if not use_demo:
-            self._start_listener()
+        if meter_available:
+            self._start_listener(transcribe=transcribe)
         self._tick_call()
 
     def call_elapsed(self):
         return time.monotonic() - self.call_state.get("started", time.monotonic())
 
-    def _start_listener(self):
+    def _start_listener(self, transcribe=True):
         self.call_events = queue.Queue()
         self.call_listener = LocalSpeechInput(data_folder() / "models", self.call_events,
-                                              device=get_settings().call.microphone_device or None)
+                                              device=resolve_input_device(get_settings().call.microphone_device),
+                                              transcribe=transcribe)
         self.call_listener.start()
 
     def _tick_call(self):
@@ -60,6 +66,7 @@ class CallAudioMixin:
         if not self.call_open or not self.call_state:
             return
         state = self.call_state
+        redraw = False
         while self.call_events is not None:
             try:
                 event, value = self.call_events.get_nowait()
@@ -69,42 +76,76 @@ class CallAudioMixin:
                 sensitivity = get_settings().call.voice_meter_sensitivity
                 state["level"] = 0.0 if state["muted"] else min(1.0, value * sensitivity)
             elif event == "state" and value == "listening":
-                state["status"] = "Hold the green button and speak." if self.lang == "en" else "Maintenez le bouton vert et parlez."
+                state["status"] = (
+                    ("Listening. Speak naturally; mute the microphone whenever you like."
+                     if self.lang == "en" else
+                     "Écoute active. Parlez normalement; vous pouvez couper le micro à tout moment.")
+                    if not self.speech_recognition_disabled() else
+                    ("Speech recognition is disabled. Switch to chat to continue."
+                     if self.lang == "en" else
+                     "La reconnaissance vocale est désactivée. Passez au clavardage pour continuer.")
+                )
             elif event == "status":
                 state["status"] = value
-            elif event == "final" and value and (state["holding"] or state.get("release_grace", 0) > time.monotonic()
-                                                 or get_settings().call.listening_mode == "continuous"):
+            elif event == "final" and value and not state["muted"]:
                 state["heard"].append(value)
             elif event == "error":
-                state.update(mic_missing=True, use_demo=True, error=True, status="")
-        if state.get("fake_until", 0) > time.monotonic():
-            state["level"] = random.uniform(0.25, 0.9)
-        elif state.get("use_demo"):
-            state["level"] = 0.0
-        if state["heard"] and not state["holding"] and state.get("release_grace", 0) < time.monotonic():
+                error = str(value)
+                if len(error) > 110:
+                    error = error[:107].rstrip() + "..."
+                state.update(
+                    mic_missing=True, meter_available=False, level=0.0,
+                    error=True,
+                    status=(f"Microphone unavailable: {error}" if self.lang == "en"
+                            else f"Microphone indisponible : {error}"),
+                )
+                redraw = True
+        if state["heard"]:
             self._send_call_text(" ".join(state["heard"]))
             state["heard"] = []
         self._speak_new_replies()
-        self._update_call_widgets()
+        if redraw:
+            self.render()
+        else:
+            self._update_call_widgets()
         self._call_poll_job = self.after(75, self._tick_call)
 
     def _update_call_widgets(self):
-        """Move the ring and timer without redrawing the whole screen."""
+        """Update the voice ring, meter, timer and mic status without a full redraw."""
         bbox = self.c.bbox("call_ring")
         if bbox:
             cx, cy = (bbox[0] + bbox[2]) / 2, (bbox[1] + bbox[3]) / 2
             ring = self.S(74) + self.call_state["level"] * self.S(40)
             live = self.call_state["level"] > 0.05 and not self.call_state["muted"]
             self.c.coords("call_ring", cx - ring, cy - ring, cx + ring, cy + ring)
-            self.c.itemconfigure("call_ring", outline="#34c759" if live else "#3a3a3c")
+            self.c.itemconfigure(
+                "call_ring", outline=self._call_meter_colour(self.call_state["level"])
+                if live else "#3a3a3c",
+            )
+        track = self.c.coords("call_meter_track")
+        if track:
+            level = self.call_state["level"] if not self.call_state["muted"] else 0.0
+            fill_width = max(0.0, (track[2] - track[0]) * level)
+            self.c.coords(
+                "call_meter_fill", track[0], track[1], track[0] + fill_width, track[3],
+            )
+            visible = self.call_state.get("meter_available") and level > 0.025
+            self.c.itemconfigure(
+                "call_meter_fill", state="normal" if visible else "hidden",
+                fill=self._call_meter_colour(level),
+            )
+            self.c.itemconfigure("call_meter_status", text=self._call_meter_status())
         self.c.itemconfigure("call_timer", text=self._call_clock())
         self.c.itemconfigure("call_status", text=self.call_state.get("status", ""))
+
+    def _call_meter_colour(self, level):
+        return self._blend_color("#ff3b30", "#34c759", max(0.0, min(1.0, level)))
 
     def _speak_new_replies(self):
         for message in self.call_caption_lines():
             if message["role"] == "sarah" and message["id"] not in self.call_state["spoken"]:
                 self.call_state["spoken"].add(message["id"])
-                if get_settings().patient.read_aloud:
+                if self.call_state.get("speaker_enabled"):
                     speak(message["text"], self.lang)
 
     def _send_call_text(self, text):
@@ -112,30 +153,27 @@ class CallAudioMixin:
         self.service.busy.add(patient_id)
         self.run_in_background(lambda: self.service.handle_message(patient_id, text, "call"))
 
-    def start_talking(self):
-        if self.call_state.get("muted"):
-            return
-        self.call_state["holding"] = True
-        self.render()
-
-    def stop_talking(self):
-        self.call_state["holding"] = False
-        self.call_state["release_grace"] = time.monotonic() + 0.8  # let the last words arrive
-        self.render()
-
-    def say_demo_line(self):
-        """Scripted call for the stage: simulated green meter, then the line is 'heard'."""
-        lines = DEMO_CALL_LINES.get(self.lang) or DEMO_CALL_LINES.get("en", [])
-        if not lines or self.patient_id in self.service.busy:
-            return
-        line = lines[self.call_state["demo_index"] % len(lines)]
-        self.call_state["demo_index"] += 1
-        self.call_state["fake_until"] = time.monotonic() + 1.4
-        self.after(1400, lambda: self.call_open and self._send_call_text(line))
-
     def toggle_call_mute(self):
         self.call_state["muted"] = not self.call_state.get("muted")
         self.call_state["level"] = 0.0
+        listener = getattr(self, "call_listener", None)
+        if listener:
+            listener.set_muted(self.call_state["muted"])
+        if self.call_state["muted"] and getattr(self, "call_events", None):
+            queued = []
+            while True:
+                try:
+                    event = self.call_events.get_nowait()
+                except queue.Empty:
+                    break
+                if event[0] not in ("final", "partial", "level"):
+                    queued.append(event)
+            for event in queued:
+                self.call_events.put(event)
+        self.render()
+
+    def toggle_call_speaker(self):
+        self.call_state["speaker_enabled"] = not self.call_state.get("speaker_enabled", False)
         self.render()
 
     def switch_call_to_chat(self):

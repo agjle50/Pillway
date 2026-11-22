@@ -86,7 +86,16 @@ class HeaderMixin:
 
     def unread_notifications(self):
         if self.role == "pharmacist":
-            return any(f["status"] == "open" and f["tier"] == 1 for r in self.store.all() for f in r["flags"])
+            records = self.store.all()
+            return any(
+                request["status"] == "open"
+                for record in records
+                for request in record["pharmacist_requests"]
+            ) or any(
+                flag["status"] == "open" and flag["tier"] == 1
+                for record in records
+                for flag in record["flags"]
+            )
         return bool(self.notifications)
 
     def set_language(self, lang):

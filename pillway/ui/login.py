@@ -61,7 +61,9 @@ class LoginMixin:
             self.refresh_record()
             self.select_tab("Check up")
             return
-        self.active_profile_id = next(pid for pid, p in self.profiles.items() if p["role"] == "Pharmacist")
+        profile = self.profiles.get(self.active_profile_id, {})
+        if profile.get("role") != "Pharmacist":
+            self.active_profile_id = next(pid for pid, p in self.profiles.items() if p["role"] == "Pharmacist")
         self.doctor_workspace_open = False
         self.render()
 

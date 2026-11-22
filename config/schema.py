@@ -74,7 +74,7 @@ SCHEMA = {
         "call_enabled": (True, bool, None),
         "speech_to_text_engine": ("vosk", str, ["vosk", "none"]),
         "microphone_device": ("", str, None),
-        "listening_mode": ("hold_to_talk", str, ["hold_to_talk", "continuous"]),
+        "listening_mode": ("continuous", str, ["hold_to_talk", "continuous"]),
         "voice_meter_sensitivity": (1.0, float, (0.1, 5.0)),
         "sarah_voice": ("", str, None),
         "sarah_speech_rate": (165, int, (80, 300)),
