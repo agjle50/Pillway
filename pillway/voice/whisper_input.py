@@ -87,7 +87,7 @@ def transcribe(model, raw, lang):
     import numpy as np
     audio = np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
     segments, _info = model.transcribe(
-        audio, language="fr" if lang == "fr" else "en", beam_size=5, vad_filter=False,
+        audio, language="fr" if lang == "fr" else "en", beam_size=2, vad_filter=False,
         condition_on_previous_text=False, initial_prompt=PROMPT.get(lang, PROMPT["en"]),
         no_speech_threshold=0.6, temperature=0.0)
     parts = [seg.text.strip() for seg in segments if getattr(seg, "no_speech_prob", 0) < 0.6]

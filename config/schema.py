@@ -22,7 +22,7 @@ SCHEMA = {
         "flag_model": ("gemini-3.5-flash-lite", str, None),
         "care_plan_model": ("gemini-3.8-flash", str, None),
         "summary_model": ("gemini-3.8-flash", str, None),
-        "call_model": ("gemini-3.8-flash", str, None),
+        "call_model": ("gemini-3.5-flash-lite", str, None),
         "memory_model": ("gemini-3.5-flash-lite", str, None),
         "conversation_style": ("natural", str, ["natural", "scripted"]),
         "thinking_level": ("low", str, ["low", "medium", "high"]),
