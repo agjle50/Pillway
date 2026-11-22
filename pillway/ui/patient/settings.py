@@ -11,7 +11,7 @@ from config import get_settings
 from ...storage import app_state
 from ...storage.paths import data_folder
 from ...voice.speech_input import LocalSpeechInput, input_devices, resolve_input_device
-from ..theme import (
+from ..theme import (RED_TEXT, 
     RED,
     BORDER,
     INK,
@@ -76,7 +76,7 @@ class SettingsMixin:
         try:
             devices = input_devices()
         except RuntimeError as error:
-            self.text(x1, y, str(error), 14, RED)
+            self.text(x1, y, str(error), 14, RED_TEXT)
             return
 
         settings = get_settings().call
@@ -109,7 +109,7 @@ class SettingsMixin:
                 lambda device=index: self.set_microphone_device(device),
             )
         if not devices:
-            self.text(x1, y + self.S(12), "No compatible microphone inputs were found.", 14, RED)
+            self.text(x1, y + self.S(12), "No compatible microphone inputs were found.", 14, RED_TEXT)
             y += self.S(38)
         self.c.create_text(
             x1, y + self.S(18),

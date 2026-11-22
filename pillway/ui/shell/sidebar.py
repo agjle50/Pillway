@@ -10,6 +10,7 @@ from ..theme import (
     NAV_TEXT,
     NAVY,
     NAVY_DARK,
+    NAV_SELECTED,
     RED,
     WHITE,
 )
@@ -40,12 +41,12 @@ class SidebarMixin:
             selected = label == self.section or (label in ("Medications", "Orders", "Tasks")
                                                 and self.section == "Dashboard" and self.tab == label
                                                 and self.role == "patient")
-            bg = WHITE if selected else NAVY
-            fg = RED if selected else NAV_TEXT
-            ic = RED if selected else NAV_ICON
+            bg = NAV_SELECTED if selected else NAVY
             c.create_rectangle(0, y, sw, y + row_h, fill=bg, outline=bg, tags=tag)
-            self.draw_icon(icon, self.S(32), y + row_h / 2, self.S(26), ic, tag, bg=bg)
-            self.text(self.S(62), y + row_h / 2, label, 16, fg,
+            if selected:  # a red marker on the left edge shows where you are
+                c.create_rectangle(0, y + self.S(10), self.S(5), y + row_h - self.S(10), fill=RED, outline="", tags=tag)
+            self.draw_icon(icon, self.S(36), y + row_h / 2, self.S(24), WHITE if selected else NAV_ICON, tag, bg=bg)
+            self.text(self.S(66), y + row_h / 2, label, 16, WHITE if selected else NAV_TEXT,
                       "bold" if selected else "normal", tag=tag)
             self.clickable(tag, lambda l=label: self.go(l))
             y += row_h

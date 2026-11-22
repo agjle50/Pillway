@@ -6,7 +6,7 @@ while the patient is chatting (live sync redraws within about a second).
 """
 
 from ...storage.chat_history import format_chat_time
-from ..theme import AMBER, BORDER, INK, RED, TEXT_DARK, TEXT_MUTED, WHITE
+from ..theme import AMBER, BORDER, INK, RED, RED_TEXT, TEXT_DARK, TEXT_MUTED, WHITE
 
 
 def group_by_session(record):
@@ -48,7 +48,7 @@ class LogMixin:
             for message in messages:
                 mine = message["role"] == "patient"
                 tier = message.get("tier") if mine else None
-                colour = RED if tier == 1 else AMBER if tier == 2 else (INK if mine else TEXT_DARK)
+                colour = RED_TEXT if tier == 1 else AMBER if tier == 2 else (INK if mine else TEXT_DARK)
                 who = "Patient" if mine else "Sarah"
                 tag = {1: "  [URGENT FLAG]", 2: "  [WATCH FLAG]"}.get(tier, "")
                 head = self.tx(canvas, self.S(18), y, f"{who} · {format_chat_time(message['time'])}{tag}", 11, colour, "bold")

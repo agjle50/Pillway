@@ -9,7 +9,7 @@ from tkinter import filedialog
 
 from ...core import care_plan as plan_logic
 from ...core.content import load
-from ..theme import AMBER, AMBER_SOFT, BORDER, GREEN, GREEN_SOFT, INK, RED, TEXT_DARK, TEXT_MUTED
+from ..theme import RED_TEXT, AMBER, AMBER_SOFT, BORDER, GREEN, GREEN_SOFT, INK, RED, TEXT_DARK, TEXT_MUTED
 
 STATUS_STYLE = {"draft": ("careplan.draft", AMBER_SOFT, AMBER), "changes_requested": ("careplan.changes", AMBER_SOFT, AMBER),
                 "approved": ("careplan.approved", GREEN_SOFT, GREEN),
@@ -36,7 +36,7 @@ class PatientCarePlanMixin:
 
     def _draw_plan_language(self, canvas, plan, lang, y, width):
         template = load("care_plan_template")
-        self.tx(canvas, 0, y, template["care_plan_title"][lang], 24, RED, "bold")
+        self.tx(canvas, 0, y, template["care_plan_title"][lang], 24, RED_TEXT, "bold")
         y += self.S(44)
         if plan["goals"]:
             item = self.tx(canvas, 0, y, template["goals_title"][lang], 14, INK, "bold", width=width)

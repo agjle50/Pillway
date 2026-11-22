@@ -10,9 +10,12 @@ import tkinter as tk
 from config import get_settings
 
 from ...storage.chat_history import format_chat_time, local_date_label
-from ..theme import AMBER, AMBER_SOFT, BORDER, CHAT_BG, INK, RED, RED_SOFT, TEXT_DARK, TEXT_MUTED, WHITE
+from ..theme import (AMBER, AMBER_SOFT, BORDER, CHAT_BG, INK, NAV_ICON, NAVY, RED, RED_SOFT, RED_TEXT, TEXT_DARK,
+                     TEXT_MUTED, TEXT_SUBTLE, WHITE)
 
-BUBBLE_STYLES = {1: (RED_SOFT, RED, "flag", "chat.shared_urgent"), 2: (AMBER_SOFT, AMBER, "alert", "chat.shared_watch")}
+# Flag labels under a patient's message: (label background, label colour, icon, words). Never colour alone.
+FLAG_LABELS = {1: (RED_SOFT, RED_TEXT, "flag", "chat.shared_urgent"), 2: (AMBER_SOFT, AMBER, "alert", "chat.shared_watch")}
+SOFT_BUTTON = "#e9ecf5"     # mic button and similar quiet controls
 
 
 class ChatMixin:
@@ -33,16 +36,17 @@ class ChatMixin:
         self._chat_toast_x, self._chat_toast_y = (x1 + x2) / 2, header_y + self.S(23)  # where toasts show
         self.text((x1 + x2) / 2, date_y, local_date_label(), 10, TEXT_MUTED, "bold", anchor="center")
 
-        input_h = self.S(58)
+        input_h = self.S(64)
         input_y = y2 - self.S(22) - input_h
         quick = self._quick_replies(record)
-        quick_h = self.S(56) if quick else 0
+        quick_layout = self._layout_quick_replies(quick, x1 + self.S(28), x2 - self.S(28))
+        quick_h = (quick_layout[-1][2] + self.S(60)) if quick_layout else 0
         area = self.make_scroll(x1 + self.S(8), date_y + self.S(16), x2 - self.S(8), input_y - quick_h - self.S(8), CHAT_BG)
         self.chat_message_canvas = area
         height = self._draw_messages(area, record, x2 - x1 - self.S(16))
         self.finish_scroll(area, height, keep_bottom=True)
-        if quick:
-            self._draw_quick_replies(quick, x1 + self.S(28), x2 - self.S(28), input_y - quick_h)
+        if quick_layout:
+            self._draw_quick_replies(quick_layout, input_y - quick_h)
         self._draw_input(x1, x2, input_y, input_h)
 
     # ---- pieces -----------------------------------------------------------------------
@@ -56,53 +60,91 @@ class ChatMixin:
             right = self.c.bbox(item)[0] - self.S(18)
         convo = record["conversation"]
         if convo["stage"] in ("questions", "wrap_up") and (convo["question_index"] > 0 or convo["stage"] == "wrap_up"):
-            item = self.text(right, y, "‹ " + self.t("chat.back"), 13, RED, "bold", anchor="e", tag="chat_go_back")
+            item = self.text(right, y, "‹ " + self.t("chat.back"), 14, RED_TEXT, "bold", anchor="e", tag="chat_go_back")
             self.clickable("chat_go_back", self.go_back_one_question)
 
     def _draw_messages(self, canvas, record, width):
-        size = 15 * get_settings().patient.text_size
-        bubble_w = width * 0.72
-        y = self.S(12)
+        size = 17 * get_settings().patient.text_size
+        bubble_w = min(width * 0.74, self.S(680))  # keeps lines short enough to read comfortably
+        y = self.S(16)
         messages = record["messages"]
         if not messages:
-            self.tx(canvas, width / 2, self.S(40), self.t("chat.empty"), 16, TEXT_MUTED, anchor="n")
+            self.tx(canvas, width / 2, self.S(48), self.t("chat.empty"), 17, TEXT_MUTED, anchor="n")
+        previous = None
         for message in messages:
-            y = self._draw_bubble(canvas, message, y, width, bubble_w, size) + self.S(14)
+            same_sender = previous is not None and previous["role"] == message["role"]
+            y = self._draw_bubble(canvas, message, y, width, bubble_w, size, show_avatar=not same_sender)
+            y += self.S(10 if same_sender else 20)
+            previous = message
         if self.patient_id in self.service.busy:
-            self.rr(canvas, self.S(12), y, self.S(200), y + self.S(46), self.S(18), fill=WHITE, outline=BORDER)
-            self.tx(canvas, self.S(30), y + self.S(23), self.t("chat.typing"), 13, TEXT_MUTED, "bold", anchor="w")
-            y += self.S(60)
+            self._draw_avatar(canvas, self.S(30), y + self.S(24))
+            self.rr(canvas, self.S(58), y, self.S(58) + self.S(190), y + self.S(48), self.S(24), fill=WHITE,
+                    outline=BORDER)
+            self.tx(canvas, self.S(80), y + self.S(24), self.t("chat.typing"), 15, TEXT_MUTED, anchor="w")
+            y += self.S(64)
         return y + self.S(10)
 
-    def _draw_bubble(self, canvas, message, y, width, bubble_w, size):
+    def _draw_avatar(self, canvas, cx, cy):
+        r = self.S(18)
+        canvas.create_oval(cx - r, cy - r, cx + r, cy + r, fill=RED, outline="")
+        name = get_settings().branding.assistant_name
+        self.tx(canvas, cx, cy, name[:1].upper(), 15, WHITE, "bold", anchor="center")
+
+    def _draw_bubble(self, canvas, message, y, width, bubble_w, size, show_avatar=True):
+        """Patient messages: solid navy on the right. Sarah's: white cards on the left with her initial."""
         mine = message["role"] == "patient"
+        pad = self.S(18)
+        text = message["text"].strip()
+        # Fit the bubble to its words (short replies get short bubbles), within the max width.
+        probe = canvas.create_text(0, -2000, text=text, font=self.font(size), width=bubble_w - 2 * pad, anchor="nw")
+        box = canvas.bbox(probe)
+        canvas.delete(probe)
+        natural = (box[2] - box[0]) + 2 * pad if box else bubble_w
+        flagged = mine and message.get("tier") in FLAG_LABELS
+        smallest = self.S(380) if flagged else self.S(150) if mine else self.S(300)  # room for the flag label/buttons
+        bubble_w = min(bubble_w, max(natural, smallest))
+        if mine:
+            x1 = width - bubble_w - self.S(12)
+            fill, ink, meta, outline = NAVY, WHITE, NAV_ICON, NAVY
+        else:
+            x1 = self.S(58)
+            fill, ink, meta, outline = WHITE, TEXT_DARK, TEXT_SUBTLE, BORDER
+            if show_avatar:
+                self._draw_avatar(canvas, self.S(30), y + self.S(22))
+        inner_w = bubble_w - 2 * pad
+        top = y + pad
+        if not mine and show_avatar:
+            self.tx(canvas, x1 + pad, top, get_settings().branding.assistant_name, 14, INK, "bold")
+        self.tx(canvas, x1 + bubble_w - pad, top, format_chat_time(message["time"]), 12, meta, anchor="ne")
+        if not mine and show_avatar:
+            top += self.S(26)
+        else:
+            top += self.S(22)
+        body = self.tx(canvas, x1 + pad, top, text, size, ink, width=inner_w)
+        bottom = self.bottom_of(canvas, body) + self.S(14)
         tier = message.get("tier") if mine else None
-        fill, edge, icon, label_key = BUBBLE_STYLES.get(tier, ("#e7e8ee" if mine else WHITE, BORDER, None, None))
-        pad = self.S(16)
-        x1 = width - bubble_w - self.S(12) if mine else self.S(12)
-        sender = ("You" if self.lang == "en" else "Vous") if mine else get_settings().branding.assistant_name
-        head = self.tx(canvas, x1 + pad, y + pad, sender, 13, RED if tier == 1 else INK, "bold")
-        self.tx(canvas, x1 + bubble_w - pad, y + pad, format_chat_time(message["time"]), 11, TEXT_MUTED, anchor="ne")
-        body = self.tx(canvas, x1 + pad, self.bottom_of(canvas, head) + self.S(6), message["text"], size,
-                       TEXT_DARK, width=bubble_w - 2 * pad)
-        bottom = self.bottom_of(canvas, body) + self.S(10)
-        if label_key:
-            self.draw_icon_on(canvas, icon, x1 + pad + self.S(9), bottom + self.S(10), self.S(18), edge)
-            self.tx(canvas, x1 + pad + self.S(24), bottom + self.S(10), self.t(label_key), 12, edge, "bold", anchor="w")
-            bottom += self.S(28)
+        if tier in FLAG_LABELS:
+            soft, strong, icon, key = FLAG_LABELS[tier]
+            label = self.tx(canvas, x1 + pad + self.S(34), bottom + self.S(17), self.t(key), 14, strong, "bold",
+                            anchor="w")
+            lx2 = canvas.bbox(label)[2] + self.S(14)
+            pill = self.rr(canvas, x1 + pad, bottom, lx2, bottom + self.S(34), self.S(17), fill=soft, outline="")
+            canvas.tag_lower(pill)
+            self.draw_icon_on(canvas, icon, x1 + pad + self.S(18), bottom + self.S(17), self.S(18), strong)
+            bottom += self.S(46)
         if not mine:
             right = self.btn(canvas, x1 + pad, bottom, self.t("chat.read_aloud"),
-                             lambda text=message["text"]: self.read_aloud(text), "ghost", size=11, height=self.S(32))
-            self.btn(canvas, right + self.S(8), bottom, self.t("chat.copy"),
-                     lambda text=message["text"]: self.copy_chat_message(text), "ghost", size=11, height=self.S(32))
-            bottom += self.S(40)
+                             lambda text=text: self.read_aloud(text), "ghost", size=14, height=self.S(40))
+            self.btn(canvas, right + self.S(10), bottom, self.t("chat.copy"),
+                     lambda text=text: self.copy_chat_message(text), "ghost", size=14, height=self.S(40))
+            bottom += self.S(52)
             if message.get("source") == "offline":
-                self.tx(canvas, x1 + pad, bottom, self.t("chat.offline"), 10, TEXT_MUTED)
-                bottom += self.S(18)
-        rect = self.rr(canvas, x1, y, x1 + bubble_w, bottom + self.S(6), self.S(18), fill=fill, outline=edge,
-                       width=max(1, self.S(2 if tier else 1)))
+                item = self.tx(canvas, x1 + pad, bottom, self.t("chat.offline"), 13, TEXT_MUTED, width=inner_w)
+                bottom = self.bottom_of(canvas, item) + self.S(10)
+        rect = self.rr(canvas, x1, y, x1 + bubble_w, bottom + self.S(4), self.S(20), fill=fill, outline=outline,
+                       width=max(1, self.S(1)))
         canvas.tag_lower(rect)
-        return bottom + self.S(6)
+        return bottom + self.S(4)
 
     def draw_icon_on(self, canvas, kind, cx, cy, size, color):
         """Draw one of our vector icons on another canvas (temporarily swap the target)."""
@@ -119,53 +161,62 @@ class ChatMixin:
         last = record["messages"][-1] if record["messages"] else None
         return (last or {}).get("quick", []) if last and last["role"] == "sarah" else []
 
-    def _draw_quick_replies(self, options, x1, x2, y):
-        x = x1
+    def _layout_quick_replies(self, options, x1, x2):
+        """Place the reply chips in rows (wrapping instead of dropping the ones that don't fit)."""
+        placed, x, row, gap = [], x1, 0, self.S(10)
         for index, option in enumerate(options):
-            tag = f"quick::{index}"
-            probe = self.c.create_text(0, -500, text=option, font=self.font(14, "bold"))
-            text_w = self.c.bbox(probe)[2] - self.c.bbox(probe)[0]
+            probe = self.c.create_text(0, -500, text=option, font=self.font(15, "bold"))
+            width = self.c.bbox(probe)[2] - self.c.bbox(probe)[0] + self.S(40)
             self.c.delete(probe)
-            width = text_w + self.S(36)
-            if x + width > x2:
-                break
-            self.rrect(x, y + self.S(4), x + width, y + self.S(48), self.S(22), fill=WHITE, outline=RED,
-                       width=self.S(1.5), tags=tag)
-            self.text(x + width / 2, y + self.S(26), option, 14, RED, "bold", anchor="center", tag=tag)
+            if x + width > x2 and x > x1:
+                x, row = x1, row + 1
+            placed.append((index, option, row * self.S(58), x, min(width, x2 - x1)))
+            x += width + gap
+        return placed
+
+    def _draw_quick_replies(self, layout, y):
+        for index, option, dy, x, width in layout:
+            tag = f"quick::{index}"
+            top = y + dy + self.S(4)
+            self.rrect(x, top, x + width, top + self.S(48), self.S(24), fill=WHITE, outline=NAVY,
+                       width=self.S(1.6), tags=tag)
+            self.text(x + width / 2, top + self.S(24), option, 15, NAVY, "bold", anchor="center", tag=tag)
             self.clickable(tag, lambda text=option: self.send_quick_reply(text))
-            x += width + self.S(10)
 
     def _draw_input(self, x1, x2, input_y, input_h):
-        self.rrect(x1 + self.S(28), input_y, x2 - self.S(28), input_y + input_h, self.S(16), fill=WHITE,
-                   outline=BORDER, width=self.S(1.2))
-        entry = tk.Entry(self, relief="flat", bd=0, font=self.font(15), fg=TEXT_DARK, insertbackground=INK,
-                         highlightthickness=0)
+        left, right = x1 + self.S(28), x2 - self.S(28)
+        self.rrect(left, input_y, right, input_y + input_h, input_h / 2, fill=WHITE, outline=BORDER,
+                   width=self.S(1.6), tags="chat_input_box")
+        entry = tk.Entry(self, relief="flat", bd=0, font=self.font(17), fg=TEXT_DARK, insertbackground=INK,
+                         highlightthickness=0, bg=WHITE)
         entry.insert(0, self.chat_draft or self.chat_placeholder)
         if not self.chat_draft:
             entry.configure(fg=TEXT_MUTED)
-        entry.bind("<FocusIn>", self.chat_focus_in)
-        entry.bind("<FocusOut>", self.chat_focus_out)
+        entry.bind("<FocusIn>", lambda e: (self.c.itemconfigure("chat_input_box", outline=NAVY),
+                                           self.chat_focus_in(e)))
+        entry.bind("<FocusOut>", lambda e: (self.c.itemconfigure("chat_input_box", outline=BORDER),
+                                            self.chat_focus_out(e)))
         entry.bind("<Return>", self.send_chat_message)
         self.chat_entry = entry
-        self.c.create_window(x1 + self.S(52), input_y + input_h / 2, width=max(20, x2 - x1 - self.S(220)),
-                             height=self.S(34), window=entry, anchor="w")
+        self.c.create_window(left + self.S(28), input_y + input_h / 2, width=max(20, right - left - self.S(160)),
+                             height=self.S(36), window=entry, anchor="w")
         mid = input_y + input_h / 2
-        mic_x, send_x = x2 - self.S(110), x2 - self.S(58)
+        r = self.S(23)
+        mic_x, send_x = right - self.S(88), right - self.S(34)
         if get_settings().patient.voice_input:
             voice_active = getattr(self, "voice_typing_active", False)
-            self.c.create_oval(mic_x - self.S(21), mid - self.S(21), mic_x + self.S(21), mid + self.S(21),
-                               fill=RED if voice_active else "#eef1f6", outline="", tags="chat_mic")
-            self.draw_icon("mic", mic_x, mid, self.S(20), WHITE if voice_active else INK, "chat_mic",
-                           bg=RED if voice_active else "#eef1f6")
+            mic_bg = RED if voice_active else SOFT_BUTTON
+            self.c.create_oval(mic_x - r, mid - r, mic_x + r, mid + r, fill=mic_bg, outline="", tags="chat_mic")
+            self.draw_icon("mic", mic_x, mid, self.S(20), WHITE if voice_active else NAVY, "chat_mic", bg=mic_bg)
             self.clickable("chat_mic", self.voice_typing)
         busy = self.patient_id in self.service.busy
-        self.c.create_oval(send_x - self.S(21), mid - self.S(21), send_x + self.S(21), mid + self.S(21),
-                           fill=TEXT_MUTED if busy else RED, outline="", tags="chat_send")
-        self.draw_icon("send", send_x, mid, self.S(20), WHITE, "chat_send", bg=TEXT_MUTED if busy else RED)
+        send_bg = TEXT_SUBTLE if busy else RED
+        self.c.create_oval(send_x - r, mid - r, send_x + r, mid + r, fill=send_bg, outline="", tags="chat_send")
+        self.draw_icon("send", send_x, mid, self.S(20), WHITE, "chat_send", bg=send_bg)
         self.clickable("chat_send", self.send_chat_message)
         status = (
             getattr(self, "voice_typing_status", "")
             or (self.t("chat.typing") if busy else self.t("chat.saved") if self.record["messages"] else "")
         )
-        self.text(x1 + self.S(40), input_y + input_h + self.S(11), status, 10, TEXT_MUTED,
+        self.text(left + self.S(24), input_y + input_h + self.S(13), status, 13, TEXT_MUTED,
                   tag="chat_voice_status")

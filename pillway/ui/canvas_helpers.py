@@ -16,6 +16,7 @@ class CanvasHelpersMixin:
         return v * self.s
 
     def font(self, size, weight="normal", slant="roman"):
+        size = max(size, theme.MIN_TEXT)  # accessibility: no text smaller than MIN_TEXT
         return (theme.FONT, -max(1, round(size * self.s)), weight, slant)
 
     def rrect(self, x1, y1, x2, y2, r, **kw):
