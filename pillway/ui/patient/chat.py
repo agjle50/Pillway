@@ -30,6 +30,7 @@ class ChatMixin:
             return
         self._draw_progress(record, x2, header_y)
         date_y = header_y + self.S(46)
+        self._chat_toast_x, self._chat_toast_y = (x1 + x2) / 2, header_y + self.S(23)  # where toasts show
         self.text((x1 + x2) / 2, date_y, local_date_label(), 10, TEXT_MUTED, "bold", anchor="center")
 
         input_h = self.S(58)

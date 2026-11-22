@@ -112,14 +112,37 @@ class ScrollAreaMixin:
         return x + width
 
     def draw_toast(self):
-        """Short confirmation at the bottom centre ("Saved", "Flag resolved")."""
+        """Short confirmation at the bottom centre ("Saved", "Flag resolved").
+
+        BUG FIX: in the chat the bottom centre is covered by the text box (Tk always draws
+        real widgets on top of canvas drawings), so the message looked cut off underneath it.
+        In the chat it is drawn in the strip under the chat title instead.
+        """
         cx, y = (self.sw + self.w) / 2, self.h - self.S(46)
-        item = self.c.create_text(cx, y, text=self.toast, fill=WHITE, font=self.font(13, "bold"))
+        chat_y = self._chat_toast_y
+        if self.chat_open and chat_y is not None:
+            cx, y = self._chat_toast_x, chat_y
+        item = self.c.create_text(cx, y, text=self.toast, fill=WHITE, font=self.font(13, "bold"), tags="toast")
         box = self.c.bbox(item)
         pad = self.S(16)
         self.rrect(box[0] - pad, box[1] - self.S(8), box[2] + pad, box[3] + self.S(8), self.S(14),
-                   fill=INK, outline=SHADOW)
-        self.c.tag_raise(item)
+                   fill=INK, outline=SHADOW, tags="toast")
+        self.c.tag_raise("toast")
+        self.c.tag_raise(item)  # the words go above their dark box
+
+    def flash_light(self, message):
+        """Show a toast WITHOUT redrawing the page (so the chat doesn't jump back to the bottom)."""
+        self.c.delete("toast")
+        self.toast = message
+        self.draw_toast()
+        self._toast_token += 1
+        token = self._toast_token
+
+        def clear():
+            if token == self._toast_token:
+                self.toast = ""
+                self.c.delete("toast")
+        self.after(1800, clear)
 
     def focus_ring(self, canvas, x1, y1, x2, y2):
         return self.rr(canvas, x1 - 3, y1 - 3, x2 + 3, y2 + 3, self.S(10), fill="", outline=FOCUS, width=2)

@@ -122,6 +122,8 @@ class PillwayApp(
         self.dropdown = None              # None | "notifications" | "profile"
         self.dropdown_frame = None
         self.dropdown_menu = None
+        self._chat_toast_x = self._chat_toast_y = None
+        self._toast_token = 0
         self.notification_prefs = {}      # Settings > Notifications switches (this session only)
         self.anim = 1.0                   # 0 -> 1 slide-in for the Check up bars
         self._checkup_animation_job = None
