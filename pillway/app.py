@@ -114,6 +114,11 @@ class PillwayApp(
 
         # shared data (one source of truth for both roles)
         self.store = PatientStore()
+        if settings.call.speech_to_text_engine in ("auto", "whisper"):
+            from .storage.paths import data_folder
+            from .voice import whisper_input
+            if whisper_input.available():  # load the speech model now, so the mic is instant later
+                whisper_input.preload(data_folder() / "models")
         self.service = ConversationService(store=self.store)
         self.role = None                  # None = sign-in screen, "patient" or "pharmacist"
         self.lang = settings.patient.default_language
